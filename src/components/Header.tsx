@@ -78,7 +78,7 @@ export default function Header() {
 
       {/* Band 2 — main row */}
       <div className="bg-brand text-white">
-        <div className="container-site flex items-center gap-2 py-3 sm:gap-3">
+        <div className="container-site relative flex items-center gap-2 py-3 sm:gap-3">
           {/* Hamburger (mobile) */}
           <button
             onClick={() => setMobileOpen(true)}
@@ -108,7 +108,7 @@ export default function Header() {
 
           {/* Cart */}
           <div
-            className="relative"
+            className="ml-auto"
             onMouseEnter={() => setCartOpen(true)}
             onMouseLeave={() => setCartOpen(false)}
           >
@@ -125,7 +125,7 @@ export default function Header() {
               )}
             </Link>
             {cartOpen && (
-              <div className="absolute right-0 top-full z-20 mt-1 w-80 rounded-xl bg-white text-ink shadow-xl ring-1 ring-black/5">
+              <div className="absolute left-4 right-4 top-full z-20 mt-1 rounded-xl bg-white text-ink shadow-xl ring-1 ring-black/5 sm:left-auto sm:w-80">
                 {count === 0 ? (
                   <div className="p-6 text-center">
                     <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-gray-50 text-brand">
