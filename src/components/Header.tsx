@@ -39,7 +39,6 @@ export default function Header() {
       if (e.key === "Escape") {
         setMegaOpen(false);
         setCartOpen(false);
-        setSearchOpen(false);
         setMobileOpen(false);
       }
     };
