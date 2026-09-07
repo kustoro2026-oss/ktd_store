@@ -39,3 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local-only assets / debug dumps (not part of the site build)
+/ktd shop/
+/productlist.json
+/*.png

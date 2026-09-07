@@ -1,26 +1,189 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@theme {
+  --color-brand: #f2300c;
+  --color-brand-2: #ff4735;
+  --color-ink: #2c2b2e;
+  --color-muted: #5c5b5f;
+  --color-muted-2: #828184;
+  --color-stock: #a7a7a8;
+  --color-wa: #469640;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-sans: var(--font-inter), Helvetica, Arial, sans-serif;
+  --font-accent: var(--font-inter), "Open Sauce One", Helvetica, sans-serif;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: #ffffff;
+  color: #2c2b2e;
+  font-family: var(--font-inter), Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Shared site container */
+.container-site {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 1200px;
+  padding-inline: 16px;
+}
+
+/* Simple line clamp helper */
+.clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Scraped product description styles */
+.deskripsi-produk p {
+  margin: 0.5rem 0;
+}
+.deskripsi-produk ol {
+  list-style: decimal outside;
+  padding-left: 1.5rem;
+  margin: 0.5rem 0;
+}
+.deskripsi-produk ul {
+  list-style: disc outside;
+  padding-left: 1.5rem;
+  margin: 0.5rem 0;
+}
+.deskripsi-produk li {
+  margin: 0.15rem 0;
+}
+.deskripsi-produk img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+  margin: 0.5rem 0;
+}
+.deskripsi-produk h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0.75rem 0 0.5rem;
+}
+.deskripsi-produk h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0.75rem 0 0.5rem;
+}
+.deskripsi-produk h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0.5rem 0;
+}
+.deskripsi-produk strong,
+.deskripsi-produk b {
+  font-weight: 700;
+}
+.deskripsi-produk a {
+  color: #f2300c;
+  text-decoration: underline;
+}
+.deskripsi-produk table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.5rem 0;
+  font-size: 0.875rem;
+}
+.deskripsi-produk th,
+.deskripsi-produk td {
+  border: 1px solid #e5e7eb;
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+  vertical-align: top;
+}
+.deskripsi-produk th {
+  background: #f9fafb;
+  font-weight: 600;
+}
+
+/* ---------- Global polish ---------- */
+
+:root {
+  color-scheme: light;
+}
+
+::selection {
+  background: rgba(242, 48, 12, 0.15);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Line clamp helpers */
+.clamp-1 {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Hide scrollbar (horizontal chips) */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Thin scrollbar for lists */
+.thin-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #d6d5d8 transparent;
+}
+.thin-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.thin-scroll::-webkit-scrollbar-thumb {
+  background: #d6d5d8;
+  border-radius: 3px;
+}
+
+/* Fade / rise animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-in-up {
+  animation: fadeInUp 0.45s ease-out both;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.animate-fade-in {
+  animation: fadeIn 0.25s ease-out both;
 }
