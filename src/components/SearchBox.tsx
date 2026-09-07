@@ -290,7 +290,7 @@ export default function SearchBox({ variant, onNavigate }: Props) {
   return (
     <form
       onSubmit={submitSearch}
-      className="relative flex items-center overflow-hidden rounded-lg bg-white text-ink"
+      className="relative flex items-center rounded-lg bg-white text-ink"
     >
       <input
         value={query}
@@ -309,12 +309,12 @@ export default function SearchBox({ variant, onNavigate }: Props) {
         aria-autocomplete="list"
         aria-controls="ktd-search-list-mobile"
         aria-expanded={open}
-        className="min-w-0 w-full px-4 py-2.5 text-base text-ink outline-none placeholder:text-muted-2"
+        className="min-w-0 w-full rounded-l-lg px-4 py-2.5 text-base text-ink outline-none placeholder:text-muted-2"
       />
       <button
         type="submit"
         aria-label="Cari"
-        className="flex shrink-0 items-center gap-1.5 border-l border-gray-100 px-3.5 py-2.5 text-sm font-semibold text-brand transition-colors hover:bg-gray-50"
+        className="flex shrink-0 items-center gap-1.5 rounded-r-lg border-l border-gray-100 px-3.5 py-2.5 text-sm font-semibold text-brand transition-colors hover:bg-gray-50"
       >
         <Search className="h-4 w-4" />
         <span>Cari</span>
@@ -322,7 +322,7 @@ export default function SearchBox({ variant, onNavigate }: Props) {
       {open && (
         <div
           id="ktd-search-list-mobile"
-          className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-lg bg-white text-ink shadow-xl ring-1 ring-black/5"
+          className="absolute left-0 right-0 top-full z-20 mt-1 max-h-[60vh] overflow-y-auto overflow-x-hidden rounded-lg bg-white text-ink shadow-xl ring-1 ring-black/5"
         >
           {dropdownContent}
         </div>
