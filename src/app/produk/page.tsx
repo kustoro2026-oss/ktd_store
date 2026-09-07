@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import PlpContent from "./PlpContent";
 import { anekaClient, type AnekaCategory, type AnekaProduct } from "@/lib/anekadropship";
+import { filterByRelevance } from "@/lib/search";
 
 // Regenerate listing pages at most every 5 minutes.
 export const revalidate = 300;
@@ -30,8 +31,13 @@ async function getProducts(search: string, category: string, page: number) {
   if (hit && Date.now() - hit.ts < LIST_TTL) return hit.data;
   try {
     const data = await anekaClient.getProducts({ search, category, page });
-    listCache.set(key, { data, ts: Date.now() });
-    return data;
+    // The supplier's search is loose; keep only products whose name actually
+    // matches the query so unrelated items never appear in search results.
+    const result = search
+      ? { products: filterByRelevance(data.products, search), totalPages: data.totalPages }
+      : data;
+    listCache.set(key, { data: result, ts: Date.now() });
+    return result;
   } catch {
     return null;
   }

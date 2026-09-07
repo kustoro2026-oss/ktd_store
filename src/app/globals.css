@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+/* Force a light color scheme so browser "auto dark mode" never inverts the
+   white search inputs into light-text-on-light-background (which made typed
+   text invisible on some phones). */
+@layer base {
+  html {
+    color-scheme: light only;
+  }
+}
+
 @theme {
   --color-brand: #f2300c;
   --color-brand-2: #ff4735;

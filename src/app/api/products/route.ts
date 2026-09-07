@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { anekaClient } from "@/lib/anekadropship";
+import { filterByRelevance } from "@/lib/search";
 
 // Simple in-memory cache (per server instance). Clear on restart.
 const cache = new Map<string, { data: unknown; ts: number }>();
@@ -46,7 +47,10 @@ export async function GET(req: NextRequest) {
       sort === "newest"
         ? await anekaClient.getNewestProducts(query)
         : await anekaClient.getProducts(query);
-    const data = { products, page: query.page, totalPages };
+    // The supplier's search is loose; keep only products whose name actually
+    // matches the query so unrelated items never appear in search results.
+    const relevant = query.search ? filterByRelevance(products, query.search) : products;
+    const data = { products: relevant, page: query.page, totalPages };
     cacheSet(key, data);
     return NextResponse.json(data, { headers: CACHE_HEADERS });
   } catch (err) {

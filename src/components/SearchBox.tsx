@@ -265,7 +265,7 @@ export default function SearchBox({ variant, onNavigate }: Props) {
             aria-autocomplete="list"
             aria-controls="ktd-search-list-desktop"
             aria-expanded={open}
-            className="w-full px-4 py-2.5 text-sm outline-none placeholder:text-muted-2"
+            className="min-w-0 w-full px-4 py-2.5 text-sm text-ink outline-none placeholder:text-muted-2"
           />
           <button
             type="submit"
@@ -303,12 +303,13 @@ export default function SearchBox({ variant, onNavigate }: Props) {
         onKeyDown={onKeyDown}
         placeholder="Cari produk di KTD Store..."
         autoComplete="off"
+        enterKeyHint="search"
         role="combobox"
         aria-label="Cari produk"
         aria-autocomplete="list"
         aria-controls="ktd-search-list-mobile"
         aria-expanded={open}
-        className="w-full px-4 py-2.5 text-sm outline-none placeholder:text-muted-2"
+        className="min-w-0 w-full px-4 py-2.5 text-base text-ink outline-none placeholder:text-muted-2"
       />
       <button type="submit" aria-label="Cari" className="px-4 py-2.5 text-brand">
         <Search className="h-5 w-5" />
