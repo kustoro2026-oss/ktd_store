@@ -83,6 +83,8 @@ export default function Header() {
           <button
             onClick={() => setMobileOpen(true)}
             aria-label="Buka menu"
+            aria-expanded={mobileOpen}
+            aria-controls="ktd-mobile-drawer"
             className="flex h-10 w-10 items-center justify-center rounded-lg transition-colors hover:bg-white/10 md:hidden"
           >
             <Menu className="h-6 w-6" />
@@ -191,6 +193,31 @@ export default function Header() {
 
         </div>
 
+        {/* Quick links (mobile) */}
+        <nav
+          aria-label="Navigasi utama"
+          className="container-site flex gap-1.5 overflow-x-auto pb-2 md:hidden scrollbar-hide"
+        >
+          <Link
+            href="/produk"
+            className="shrink-0 rounded-full bg-white/15 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/25"
+          >
+            Semua Produk
+          </Link>
+          <Link
+            href="/cara-belanja"
+            className="shrink-0 rounded-full bg-white/15 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/25"
+          >
+            Cara Belanja
+          </Link>
+          <Link
+            href="/konfirmasi-pembayaran"
+            className="shrink-0 rounded-full bg-white/15 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/25"
+          >
+            Konfirmasi Pembayaran
+          </Link>
+        </nav>
+
         {/* Search (mobile) */}
         <div className="container-site pb-3 md:hidden">
           <SearchBox variant="mobile" onNavigate={closeAll} />
@@ -262,7 +289,7 @@ export default function Header() {
 
       {/* Mobile drawer */}
       {mobileOpen && (
-        <div className="fixed inset-0 z-[60] md:hidden">
+        <div id="ktd-mobile-drawer" className="fixed inset-0 z-[60] md:hidden">
           <div
             className="absolute inset-0 bg-black/50 animate-fade-in"
             onClick={() => setMobileOpen(false)}
