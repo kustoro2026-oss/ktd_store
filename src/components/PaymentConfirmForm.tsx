@@ -17,7 +17,7 @@ const PAYMENT_METHODS = [
 export default function PaymentConfirmForm() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [orderId, setOrderId] = useState("");
+  const [product, setProduct] = useState("");
   const [method, setMethod] = useState(PAYMENT_METHODS[0]);
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
@@ -27,8 +27,8 @@ export default function PaymentConfirmForm() {
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (!name.trim() || !orderId.trim() || !amount.trim()) {
-      setError("Mohon lengkapi Nama, No. Pesanan, dan Jumlah Dibayar.");
+    if (!name.trim() || !product.trim() || !amount.trim()) {
+      setError("Mohon lengkapi Nama, Produk yang Dipesan, dan Jumlah Dibayar.");
       return;
     }
     const lines = [
@@ -36,7 +36,7 @@ export default function PaymentConfirmForm() {
       "",
       `Nama: ${name.trim()}`,
       `No. HP: ${phone.trim() || "-"}`,
-      `No. Pesanan: ${orderId.trim()}`,
+      `Produk yang Dipesan: ${product.trim()}`,
       `Metode Pembayaran: ${method}`,
       `Jumlah Dibayar: ${amount.trim()}`,
     ];
@@ -98,15 +98,15 @@ export default function PaymentConfirmForm() {
       </div>
 
       <div>
-        <label htmlFor="pc-order" className="mb-1.5 block text-sm font-semibold text-ink">
-          No. Pesanan <span className="text-red-500">*</span>
+        <label htmlFor="pc-product" className="mb-1.5 block text-sm font-semibold text-ink">
+          Produk yang Dipesan <span className="text-red-500">*</span>
         </label>
         <input
-          id="pc-order"
+          id="pc-product"
           type="text"
-          value={orderId}
-          onChange={(e) => setOrderId(e.target.value)}
-          placeholder="Contoh: MK-20260901-001"
+          value={product}
+          onChange={(e) => setProduct(e.target.value)}
+          placeholder="Contoh: Sepatu Sneakers Putih Ukuran 42"
           className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20"
         />
       </div>

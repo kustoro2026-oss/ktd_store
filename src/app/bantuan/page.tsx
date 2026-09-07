@@ -70,7 +70,7 @@ const TOPICS = [
 const FAQS = [
   {
     q: "Bagaimana cara melacak pesanan saya?",
-    a: "Hubungi CS kami melalui WhatsApp dengan nomor pesanan Anda, dan kami akan mengirimkan informasi status serta nomor resi pengiriman Anda.",
+    a: "Hubungi CS kami melalui WhatsApp dengan menyertakan nama dan detail pesanan Anda (produk yang dibeli, tanggal pemesanan, dan jumlah pembayaran), lalu kami akan mengirimkan informasi status serta nomor resi pengiriman Anda.",
   },
   {
     q: "Apakah produk bisa diretur atau ditukar?",

@@ -36,7 +36,7 @@ const INFO = [
   {
     icon: ReceiptText,
     title: "Isi Data Pesanan",
-    desc: "Lengkapi nama, nomor pesanan, metode pembayaran, dan jumlah yang dibayar.",
+    desc: "Lengkapi nama, produk yang dipesan, metode pembayaran, dan jumlah yang dibayar.",
   },
   {
     icon: ShieldCheck,
