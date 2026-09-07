@@ -56,7 +56,7 @@ export default function ProductCard({ p }: { p: AnekaProduct }) {
         <div className="mt-1 text-xs text-muted-2">{p.terjual || "0"} terjual</div>
 
         {/* CTA */}
-        <div className="mt-auto flex gap-2 pt-3">
+        <div className="mt-auto flex flex-wrap gap-2 pt-3">
           <button
             type="button"
             onClick={() => toggleItem({ id: p.id, name: p.name, image: p.image, price })}
@@ -71,7 +71,7 @@ export default function ProductCard({ p }: { p: AnekaProduct }) {
           </button>
           <Link
             href={`/produk/${p.id}`}
-            className="flex min-w-0 flex-1 items-center justify-center rounded-lg bg-brand py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-2"
+            className="flex min-w-[96px] flex-1 items-center justify-center whitespace-nowrap rounded-lg bg-brand px-2 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-2"
           >
             Lihat Detail
           </Link>
