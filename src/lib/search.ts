@@ -18,25 +18,49 @@ export function normalizeForSearch(s: string): string {
 }
 
 /**
+ * Find `term` in a list of normalized words as a WHOLE WORD.
+ * For terms of 5+ characters a word-prefix match is also allowed
+ * ("sneaker" → "sneakers"), but short terms must match exactly so
+ * "tas" never matches inside "mengatasi".
+ */
+function wordIndex(words: string[], term: string): number {
+  const exact = words.findIndex((w) => w === term);
+  if (exact !== -1) return exact;
+  if (term.length >= 5) return words.findIndex((w) => w.startsWith(term));
+  return -1;
+}
+
+/**
  * Rank a product name against a query:
  *  0 = name starts with the full query
- *  1 = name contains the full query
- *  2+ = name contains at least one query token (earlier position = better)
+ *  1 = name contains the full query (or the whole word)
+ *  2+ = name contains at least one query token (earlier word = better)
  *  -1 = no match at all
  */
 export function rankMatch(name: string, query: string): number {
   const n = normalizeForSearch(name);
   const full = normalizeForSearch(query);
   if (!n || !full) return -1;
-  if (n.startsWith(full)) return 0;
-  if (n.includes(full)) return 1;
-  const tokens = full.split(" ").filter((t) => t.length >= 3);
-  let best = Infinity;
-  for (const t of tokens) {
-    const idx = n.indexOf(t);
-    if (idx !== -1 && idx < best) best = idx;
+  const tokens = full.split(" ");
+  const words = n.split(" ");
+
+  if (tokens.length > 1) {
+    // Multi-word query: prefer the phrase, otherwise any token.
+    if (n.includes(full)) return n.startsWith(full) ? 0 : 1;
+    let best = Infinity;
+    for (const t of tokens) {
+      if (t.length < 3) continue;
+      const idx = wordIndex(words, t);
+      if (idx !== -1 && idx < best) best = idx;
+    }
+    return best === Infinity ? -1 : best + 2;
   }
-  return best === Infinity ? -1 : best + 2;
+
+  // Single-word query: whole-word match only.
+  const t = full;
+  const idx = wordIndex(words, t);
+  if (idx === -1) return -1;
+  return idx === 0 ? 0 : 1;
 }
 
 /**
