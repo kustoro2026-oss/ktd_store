@@ -311,8 +311,13 @@ export default function SearchBox({ variant, onNavigate }: Props) {
         aria-expanded={open}
         className="min-w-0 w-full px-4 py-2.5 text-base text-ink outline-none placeholder:text-muted-2"
       />
-      <button type="submit" aria-label="Cari" className="px-4 py-2.5 text-brand">
-        <Search className="h-5 w-5" />
+      <button
+        type="submit"
+        aria-label="Cari"
+        className="flex shrink-0 items-center gap-1.5 border-l border-gray-100 px-3.5 py-2.5 text-sm font-semibold text-brand transition-colors hover:bg-gray-50"
+      >
+        <Search className="h-4 w-4" />
+        <span>Cari</span>
       </button>
       {open && (
         <div
