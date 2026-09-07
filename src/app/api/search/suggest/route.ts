@@ -12,6 +12,11 @@ const TTL = 3 * 60_000; // 3 minutes
 const MAX_ENTRIES = 300;
 const LIMIT = 8;
 
+// Edge/CDN caching for the hottest queries (prefixes repeat while typing).
+const CACHE_HEADERS = {
+  "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
+};
+
 export async function GET(req: NextRequest) {
   const q = (req.nextUrl.searchParams.get("q") ?? "").trim();
   if (!q) return NextResponse.json({ suggestions: [] });
@@ -19,7 +24,7 @@ export async function GET(req: NextRequest) {
   const key = q.toLowerCase();
   const hit = cache.get(key);
   if (hit && Date.now() - hit.ts < TTL) {
-    return NextResponse.json({ suggestions: hit.data });
+    return NextResponse.json({ suggestions: hit.data }, { headers: CACHE_HEADERS });
   }
 
   try {
@@ -44,7 +49,7 @@ export async function GET(req: NextRequest) {
       if (oldest !== undefined) cache.delete(oldest);
     }
     cache.set(key, { data: suggestions, ts: Date.now() });
-    return NextResponse.json({ suggestions });
+    return NextResponse.json({ suggestions }, { headers: CACHE_HEADERS });
   } catch {
     // Upstream unreachable / timed out — degrade gracefully instead of 502.
     return NextResponse.json({ suggestions: [] });
