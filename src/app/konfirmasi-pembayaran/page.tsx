@@ -7,6 +7,24 @@ export const metadata: Metadata = {
   title: "Konfirmasi Pembayaran",
   description:
     "Konfirmasi pembayaran pesanan Anda di KTD Store melalui WhatsApp dengan cepat dan mudah.",
+  alternates: { canonical: "/konfirmasi-pembayaran" },
+  openGraph: {
+    type: "website",
+    url: "/konfirmasi-pembayaran",
+    title: "Konfirmasi Pembayaran — KTD Store",
+    description:
+      "Konfirmasi pembayaran pesanan Anda di KTD Store melalui WhatsApp dengan cepat dan mudah.",
+    images: [{ url: "/images/logo.png", width: 512, height: 512, alt: "KTD Store" }],
+    siteName: "KTD Store",
+    locale: "id_ID",
+  },
+  twitter: {
+    card: "summary",
+    title: "Konfirmasi Pembayaran — KTD Store",
+    description:
+      "Konfirmasi pembayaran pesanan Anda di KTD Store melalui WhatsApp dengan cepat dan mudah.",
+    images: ["/images/logo.png"],
+  },
 };
 
 const INFO = [

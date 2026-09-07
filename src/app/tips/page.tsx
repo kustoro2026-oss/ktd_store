@@ -7,6 +7,24 @@ export const metadata: Metadata = {
   title: "Blog",
   description:
     "Artikel, tips, dan informasi bermanfaat seputar belanja cerdas di KTD Store.",
+  alternates: { canonical: "/tips" },
+  openGraph: {
+    type: "website",
+    url: "/tips",
+    title: "Blog KTD Store — Tips & Info Belanja Cerdas",
+    description:
+      "Artikel, tips, dan informasi bermanfaat seputar belanja cerdas di KTD Store.",
+    images: [{ url: "/images/blog/pembersih.jpg", alt: "Blog KTD Store" }],
+    siteName: "KTD Store",
+    locale: "id_ID",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Blog KTD Store — Tips & Info Belanja Cerdas",
+    description:
+      "Artikel, tips, dan informasi bermanfaat seputar belanja cerdas di KTD Store.",
+    images: ["/images/blog/pembersih.jpg"],
+  },
 };
 
 export default function BlogPage() {

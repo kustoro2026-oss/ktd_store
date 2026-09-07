@@ -6,6 +6,24 @@ export const metadata: Metadata = {
   title: "Karir",
   description:
     "Kenali budaya kerja di KTD Store. Saat ini belum ada lowongan, pantau halaman ini untuk kesempatan berikutnya.",
+  alternates: { canonical: "/karir" },
+  openGraph: {
+    type: "website",
+    url: "/karir",
+    title: "Karir — KTD Store",
+    description:
+      "Kenali budaya kerja di KTD Store. Saat ini belum ada lowongan, pantau halaman ini untuk kesempatan berikutnya.",
+    images: [{ url: "/images/logo.png", width: 512, height: 512, alt: "KTD Store" }],
+    siteName: "KTD Store",
+    locale: "id_ID",
+  },
+  twitter: {
+    card: "summary",
+    title: "Karir — KTD Store",
+    description:
+      "Kenali budaya kerja di KTD Store. Saat ini belum ada lowongan, pantau halaman ini untuk kesempatan berikutnya.",
+    images: ["/images/logo.png"],
+  },
 };
 
 const PERKS = [

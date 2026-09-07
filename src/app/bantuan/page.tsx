@@ -16,6 +16,24 @@ export const metadata: Metadata = {
   title: "Bantuan",
   description:
     "Pusat bantuan KTD Store: panduan belanja, konfirmasi pembayaran, FAQ, dan kontak Customer Service.",
+  alternates: { canonical: "/bantuan" },
+  openGraph: {
+    type: "website",
+    url: "/bantuan",
+    title: "Pusat Bantuan — KTD Store",
+    description:
+      "Pusat bantuan KTD Store: panduan belanja, konfirmasi pembayaran, FAQ, dan kontak Customer Service.",
+    images: [{ url: "/images/logo.png", width: 512, height: 512, alt: "KTD Store" }],
+    siteName: "KTD Store",
+    locale: "id_ID",
+  },
+  twitter: {
+    card: "summary",
+    title: "Pusat Bantuan — KTD Store",
+    description:
+      "Pusat bantuan KTD Store: panduan belanja, konfirmasi pembayaran, FAQ, dan kontak Customer Service.",
+    images: ["/images/logo.png"],
+  },
 };
 
 const TOPICS = [

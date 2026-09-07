@@ -6,6 +6,24 @@ export const metadata: Metadata = {
   title: "Syarat & Ketentuan",
   description:
     "Syarat dan ketentuan penggunaan layanan KTD Store: ketentuan umum, produk, pemesanan, pengiriman, dan kebijakan pengembalian.",
+  alternates: { canonical: "/syarat-ketentuan" },
+  openGraph: {
+    type: "website",
+    url: "/syarat-ketentuan",
+    title: "Syarat & Ketentuan — KTD Store",
+    description:
+      "Syarat dan ketentuan penggunaan layanan KTD Store: ketentuan umum, produk, pemesanan, pengiriman, dan kebijakan pengembalian.",
+    images: [{ url: "/images/logo.png", width: 512, height: 512, alt: "KTD Store" }],
+    siteName: "KTD Store",
+    locale: "id_ID",
+  },
+  twitter: {
+    card: "summary",
+    title: "Syarat & Ketentuan — KTD Store",
+    description:
+      "Syarat dan ketentuan penggunaan layanan KTD Store: ketentuan umum, produk, pemesanan, pengiriman, dan kebijakan pengembalian.",
+    images: ["/images/logo.png"],
+  },
 };
 
 const SECTIONS: { title: string; body: string[] }[] = [

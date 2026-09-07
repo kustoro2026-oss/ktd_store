@@ -18,6 +18,22 @@ export async function generateMetadata({
   return {
     title: post.title,
     description: post.excerpt,
+    alternates: { canonical: `/tips/${post.slug}` },
+    openGraph: {
+      type: "article",
+      url: `/tips/${post.slug}`,
+      title: post.title,
+      description: post.excerpt,
+      images: [{ url: post.image, alt: post.title }],
+      siteName: "KTD Store",
+      locale: "id_ID",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: post.title,
+      description: post.excerpt,
+      images: [post.image],
+    },
   };
 }
 

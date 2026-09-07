@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import HeroCarousel from "@/components/HeroCarousel";
 import { Features, NewProducts, PopularCategories } from "@/components/HomeSections";
 import { BlogSection, LatestCollections, SeoText } from "@/components/Sections";
@@ -6,6 +7,30 @@ import { anekaClient, type AnekaCategory, type AnekaProduct } from "@/lib/anekad
 // Regenerate the homepage at most every 5 minutes so products stay fresh
 // without scraping anekadropship.id on every single request.
 export const revalidate = 300;
+
+export const metadata: Metadata = {
+  title: { absolute: "KTD Store — Belanja Online Produk Pilihan" },
+  description:
+    "KTD Store adalah toko online produk pilihan langsung dari supplier. Belanja kebutuhan rumah tangga, kecantikan, dan gaya hidup dengan harga terbaik, pesan mudah dan aman via WhatsApp.",
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    url: "/",
+    title: "KTD Store — Belanja Online Produk Pilihan",
+    description:
+      "Produk pilihan langsung dari supplier dengan harga terbaik. Pesan mudah dan aman via WhatsApp.",
+    images: [{ url: "/images/hero/coffee.jpg", alt: "KTD Store — Belanja Online Produk Pilihan" }],
+    siteName: "KTD Store",
+    locale: "id_ID",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "KTD Store — Belanja Online Produk Pilihan",
+    description:
+      "Produk pilihan langsung dari supplier dengan harga terbaik. Pesan mudah dan aman via WhatsApp.",
+    images: ["/images/hero/coffee.jpg"],
+  },
+};
 
 // Module-level cache so ISR regenerations reuse the previous scrape result
 // when the upstream site is slow or unreachable.

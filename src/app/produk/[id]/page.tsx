@@ -54,10 +54,11 @@ export async function generateMetadata({
     const description =
       plainText(detail.descriptionHtml, 160) ||
       `Beli ${detail.name} di KTD Store. Pesan mudah dan aman via WhatsApp.`;
-    const image = detail.images[0] ?? `${SITE_URL}/placeholder.svg`;
     return {
       title: detail.name,
       description,
+      alternates: { canonical: `/produk/${detail.id}` },
+      robots: { index: true, follow: true },
       openGraph: {
         type: "website",
         url: `${SITE_URL}/produk/${detail.id}`,
@@ -71,7 +72,7 @@ export async function generateMetadata({
         card: "summary_large_image",
         title: detail.name,
         description,
-        images: [image],
+        images: detail.images.length ? detail.images : [`${SITE_URL}/placeholder.svg`],
       },
     };
   } catch {
@@ -135,12 +136,30 @@ export default async function ProductDetailPage({
           : "https://schema.org/OutOfStock",
     },
   };
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Beranda", item: SITE_URL },
+      { "@type": "ListItem", position: 2, name: "Produk", item: `${SITE_URL}/produk` },
+      {
+        "@type": "ListItem",
+        position: 3,
+        name: detail.name,
+        item: `${SITE_URL}/produk/${detail.id}`,
+      },
+    ],
+  };
 
   return (
     <>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
       <ProductDetailView detail={detail} />
     </>

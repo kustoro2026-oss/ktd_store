@@ -12,6 +12,24 @@ export const metadata: Metadata = {
   title: "Tentang Kami",
   description:
     "Kenali KTD Store: platform belanja online dengan produk pilihan langsung dari supplier dan transaksi aman via WhatsApp.",
+  alternates: { canonical: "/tentang-kami" },
+  openGraph: {
+    type: "website",
+    url: "/tentang-kami",
+    title: "Tentang Kami — KTD Store",
+    description:
+      "Kenali KTD Store: platform belanja online dengan produk pilihan langsung dari supplier dan transaksi aman via WhatsApp.",
+    images: [{ url: "/images/logo.png", width: 512, height: 512, alt: "KTD Store" }],
+    siteName: "KTD Store",
+    locale: "id_ID",
+  },
+  twitter: {
+    card: "summary",
+    title: "Tentang Kami — KTD Store",
+    description:
+      "Kenali KTD Store: platform belanja online dengan produk pilihan langsung dari supplier dan transaksi aman via WhatsApp.",
+    images: ["/images/logo.png"],
+  },
 };
 
 const VALUES = [

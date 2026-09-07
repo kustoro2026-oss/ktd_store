@@ -13,6 +13,24 @@ export const metadata: Metadata = {
   title: "Cara Belanja",
   description:
     "Panduan lengkap cara belanja di KTD Store: cari produk, pesan via WhatsApp, sampai konfirmasi pembayaran.",
+  alternates: { canonical: "/cara-belanja" },
+  openGraph: {
+    type: "website",
+    url: "/cara-belanja",
+    title: "Cara Belanja di KTD Store",
+    description:
+      "Panduan lengkap cara belanja di KTD Store: cari produk, pesan via WhatsApp, sampai konfirmasi pembayaran.",
+    images: [{ url: "/images/logo.png", width: 512, height: 512, alt: "KTD Store" }],
+    siteName: "KTD Store",
+    locale: "id_ID",
+  },
+  twitter: {
+    card: "summary",
+    title: "Cara Belanja di KTD Store",
+    description:
+      "Panduan lengkap cara belanja di KTD Store: cari produk, pesan via WhatsApp, sampai konfirmasi pembayaran.",
+    images: ["/images/logo.png"],
+  },
 };
 
 const STEPS = [

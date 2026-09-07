@@ -45,11 +45,66 @@ export async function generateMetadata({
   const sp = await searchParams;
   const search = (sp.search ?? "").toString();
   const category = (sp.category ?? "").toString();
-  if (search) return { title: `Cari "${search}"` };
+  const page = Math.max(1, Number((sp.page ?? "1").toString()) || 1);
+
+  const listDescription =
+    "Jelajahi semua produk pilihan KTD Store. Produk langsung dari supplier dengan harga terbaik, pesan mudah dan aman via WhatsApp.";
+
+  // Search results: unique title/description, but keep them out of the index.
+  if (search) {
+    const title = `Cari "${search}"`;
+    const description = `Hasil pencarian produk "${search}" di KTD Store. Temukan produk pilihan dengan harga terbaik dan pesan mudah via WhatsApp.`;
+    return {
+      title,
+      description,
+      alternates: { canonical: "/produk" },
+      robots: { index: false, follow: true },
+      openGraph: {
+        type: "website",
+        url: "/produk",
+        title,
+        description,
+        siteName: "KTD Store",
+        locale: "id_ID",
+      },
+    };
+  }
+
   const cats = await getCategories();
-  const catName = cats?.find((c) => c.slug.toLowerCase() === category.toLowerCase())?.name;
-  if (catName) return { title: `Kategori ${catName}` };
-  return {};
+  const cat = cats?.find((c) => c.slug.toLowerCase() === category.toLowerCase());
+  if (cat) {
+    const title = `Kategori ${cat.name}`;
+    const description = `Jelajahi produk kategori ${cat.name} di KTD Store. Produk pilihan langsung dari supplier dengan harga terbaik, pesan mudah dan aman via WhatsApp.`;
+    return {
+      title,
+      description,
+      alternates: { canonical: `/produk?category=${encodeURIComponent(cat.slug)}` },
+      openGraph: {
+        type: "website",
+        url: `/produk?category=${encodeURIComponent(cat.slug)}`,
+        title,
+        description,
+        siteName: "KTD Store",
+        locale: "id_ID",
+      },
+    };
+  }
+
+  // Base listing — pagination pages stay out of the index to avoid duplicates.
+  return {
+    title: "Semua Produk",
+    description: listDescription,
+    alternates: { canonical: "/produk" },
+    robots: page > 1 ? { index: false, follow: true } : undefined,
+    openGraph: {
+      type: "website",
+      url: "/produk",
+      title: "Semua Produk KTD Store",
+      description: listDescription,
+      siteName: "KTD Store",
+      locale: "id_ID",
+    },
+  };
 }
 
 export default async function ProdukPage({
