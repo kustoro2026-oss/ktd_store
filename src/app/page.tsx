@@ -3,6 +3,7 @@ import HeroCarousel from "@/components/HeroCarousel";
 import { Features, NewProducts, PopularCategories } from "@/components/HomeSections";
 import { BlogSection, LatestCollections, SeoText } from "@/components/Sections";
 import { anekaClient, type AnekaCategory, type AnekaProduct } from "@/lib/anekadropship";
+import { getLocalImages } from "@/lib/localImages";
 
 // Regenerate the homepage at most every 5 minutes so products stay fresh
 // without scraping anekadropship.id on every single request.
@@ -43,10 +44,15 @@ const TTL = 5 * 60_000; // 5 minutes
 
 async function getHomeData() {
   if (cache && Date.now() - cache.ts < TTL) return cache;
-  const [categories, { products }] = await Promise.all([
+  const [categories, { products: raw }] = await Promise.all([
     anekaClient.getCategories(),
     anekaClient.getNewestProducts({ page: 1 }),
   ]);
+  // Gunakan gambar lokal (hasil sinkronisasi) agar tidak ada hotlink eksternal.
+  const products = raw.map((p) => {
+    const local = getLocalImages(p.id);
+    return local.length ? { ...p, image: local[0] } : p;
+  });
   cache = { categories, products, ts: Date.now() };
   return cache;
 }

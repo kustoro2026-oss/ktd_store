@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { anekaClient } from "@/lib/anekadropship";
+import { toLocalImages } from "@/lib/localImages";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,8 @@ export async function GET(
 
   try {
     const detail = await anekaClient.getProductDetail(id);
+    // Gunakan gambar lokal (hasil sinkronisasi) agar tidak ada hotlink eksternal.
+    detail.images = toLocalImages(detail.id, detail.images);
     cache.set(id, { data: detail, ts: Date.now() });
     return NextResponse.json(detail, { headers: CACHE_HEADERS });
   } catch (err) {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { anekaClient } from "@/lib/anekadropship";
 import { filterByRelevance } from "@/lib/search";
+import { getLocalImages } from "@/lib/localImages";
 
 // Never statically optimize this route (it fetches external data at runtime).
 export const dynamic = "force-dynamic";
@@ -37,11 +38,15 @@ export async function GET(req: NextRequest) {
     // never fall back to unrelated upstream results.
     const suggestions: Suggestion[] = filterByRelevance(products, q)
       .slice(0, LIMIT)
-      .map((p) => ({
-        id: p.id,
-        name: p.name,
-        image: p.image,
-      }));
+      .map((p) => {
+        // Gunakan gambar lokal (hasil sinkronisasi) agar tidak ada hotlink eksternal.
+        const local = getLocalImages(p.id);
+        return {
+          id: p.id,
+          name: p.name,
+          image: local.length ? local[0] : p.image,
+        };
+      });
 
     if (cache.size >= MAX_ENTRIES) {
       const oldest = cache.keys().next().value;

@@ -5,6 +5,7 @@ import { Frown } from "lucide-react";
 import ProductDetailView from "@/components/ProductDetailView";
 import { anekaClient, type AnekaProductDetail } from "@/lib/anekadropship";
 import { SITE_URL } from "@/lib/config";
+import { toLocalImages } from "@/lib/localImages";
 
 // Never statically optimize — product data is scraped at request time.
 export const dynamic = "force-dynamic";
@@ -17,6 +18,8 @@ async function fetchDetail(id: string): Promise<AnekaProductDetail> {
   const hit = detailCache.get(id);
   if (hit && Date.now() - hit.ts < TTL) return hit.data;
   const detail = await anekaClient.getProductDetail(id);
+  // Gunakan gambar lokal (hasil sinkronisasi) agar tidak ada hotlink eksternal.
+  detail.images = toLocalImages(detail.id, detail.images);
   detailCache.set(id, { data: detail, ts: Date.now() });
   return detail;
 }
@@ -42,6 +45,11 @@ function priceValue(price: string): number | null {
   return digits ? Number(digits) : null;
 }
 
+/** URL absolut untuk OG/Twitter/JSON-LD. */
+function absoluteImages(images: string[]): string[] {
+  return images.map((i) => (i.startsWith("http") ? i : `${SITE_URL}${i}`));
+}
+
 export async function generateMetadata({
   params,
 }: {
@@ -54,6 +62,9 @@ export async function generateMetadata({
     const description =
       plainText(detail.descriptionHtml, 160) ||
       `Beli ${detail.name} di KTD Store. Pesan mudah dan aman via WhatsApp.`;
+    const ogImages = detail.images.length
+      ? absoluteImages(detail.images)
+      : [`${SITE_URL}/placeholder.svg`];
     return {
       title: detail.name,
       description,
@@ -64,7 +75,7 @@ export async function generateMetadata({
         url: `${SITE_URL}/produk/${detail.id}`,
         title: detail.name,
         description,
-        images: detail.images.length ? detail.images : [`${SITE_URL}/placeholder.svg`],
+        images: ogImages,
         siteName: "KTD Store",
         locale: "id_ID",
       },
@@ -72,7 +83,7 @@ export async function generateMetadata({
         card: "summary_large_image",
         title: detail.name,
         description,
-        images: detail.images.length ? detail.images : [`${SITE_URL}/placeholder.svg`],
+        images: ogImages,
       },
     };
   } catch {
@@ -123,7 +134,7 @@ export default async function ProductDetailPage({
     "@type": "Product",
     name: detail.name,
     sku: detail.id,
-    image: detail.images.length ? detail.images.slice(0, 3) : undefined,
+    image: detail.images.length ? absoluteImages(detail.images.slice(0, 3)) : undefined,
     description: description || undefined,
     offers: {
       "@type": "Offer",

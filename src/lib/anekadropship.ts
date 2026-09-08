@@ -214,6 +214,12 @@ export class AnekaClient {
     await this.login(email, password);
   }
 
+  /** Reset sesi login agar login ulang dengan sesi segar. */
+  resetSession() {
+    this.cookie = "";
+    this.loggedIn = false;
+  }
+
   async getProducts(query: AnekaQuery) {
     const html = await this.fetchHome(query);
     return {

@@ -159,7 +159,11 @@ export async function getRates(input: GetRatesInput): Promise<KARateResult> {
     destination: Number(input.destination),
     weight: input.weight,
   };
-  if (input.itemValue && input.itemValue > 0) payload.item_value = input.itemValue;
+  if (input.itemValue && input.itemValue > 0) {
+    payload.item_value = input.itemValue;
+    // KiriminAja mewajibkan insurance bila item_value dikirim (angka 1 = aktif).
+    payload.insurance = 1;
+  }
   if (input.courier && input.courier.length) payload.courier = input.courier;
 
   const json = await kaPost<KARate>("/api/mitra/v6.1/shipping_price", payload);

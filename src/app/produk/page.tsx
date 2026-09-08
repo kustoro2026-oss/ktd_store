@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import PlpContent from "./PlpContent";
 import { anekaClient, type AnekaCategory, type AnekaProduct } from "@/lib/anekadropship";
 import { filterByRelevance } from "@/lib/search";
+import { getLocalImages } from "@/lib/localImages";
 
 // Regenerate listing pages at most every 5 minutes.
 export const revalidate = 300;
@@ -33,9 +34,17 @@ async function getProducts(search: string, category: string, page: number) {
     const data = await anekaClient.getProducts({ search, category, page });
     // The supplier's search is loose; keep only products whose name actually
     // matches the query so unrelated items never appear in search results.
-    const result = search
+    const filtered = search
       ? { products: filterByRelevance(data.products, search), totalPages: data.totalPages }
       : data;
+    // Gunakan gambar lokal (hasil sinkronisasi) agar tidak ada hotlink eksternal.
+    const result = {
+      ...filtered,
+      products: filtered.products.map((p) => {
+        const local = getLocalImages(p.id);
+        return local.length ? { ...p, image: local[0] } : p;
+      }),
+    };
     listCache.set(key, { data: result, ts: Date.now() });
     return result;
   } catch {
