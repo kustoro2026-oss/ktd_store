@@ -1,4 +1,4 @@
-import { getDistricts } from "@/lib/kiriminaja";
+import { getDistricts, upstreamError } from "@/lib/kiriminaja";
 
 export async function GET(request: Request) {
   const kabupatenId = new URL(request.url).searchParams.get("kabupaten_id");
@@ -9,9 +9,6 @@ export async function GET(request: Request) {
     const districts = await getDistricts(kabupatenId);
     return Response.json({ districts });
   } catch (e) {
-    return Response.json(
-      { error: e instanceof Error ? e.message : "Gagal memuat kecamatan" },
-      { status: 502 }
-    );
+    return upstreamError(e instanceof Error ? e.message : "Gagal memuat kecamatan");
   }
 }

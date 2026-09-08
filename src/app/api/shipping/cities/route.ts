@@ -1,4 +1,4 @@
-import { getCities } from "@/lib/kiriminaja";
+import { getCities, upstreamError } from "@/lib/kiriminaja";
 
 export async function GET(request: Request) {
   const provinsiId = new URL(request.url).searchParams.get("provinsi_id");
@@ -9,9 +9,6 @@ export async function GET(request: Request) {
     const cities = await getCities(provinsiId);
     return Response.json({ cities });
   } catch (e) {
-    return Response.json(
-      { error: e instanceof Error ? e.message : "Gagal memuat kota" },
-      { status: 502 }
-    );
+    return upstreamError(e instanceof Error ? e.message : "Gagal memuat kota");
   }
 }

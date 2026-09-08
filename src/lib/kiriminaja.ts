@@ -147,6 +147,21 @@ export type GetRatesInput = {
 };
 
 /**
+ * Response saat KiriminAja tidak bisa dihubungi/ditolak (mis. sandbox
+ * menolak IP server production dengan "Unauthorized.").
+ *
+ * Di production pakai status 200 + field `error` supaya:
+ *  - Cloudflare TIDAK mengganti body dengan halaman "error code: 502";
+ *  - browser tidak memunculkan galat "Failed to load resource" di console;
+ *  - frontend tetap menampilkan pesan ramah (membaca field `error`).
+ * Di development tetap 502 agar status error asli terlihat saat debugging.
+ */
+export function upstreamError(message: string): Response {
+  const status = process.env.NODE_ENV === "production" ? 200 : 502;
+  return Response.json({ error: message }, { status });
+}
+
+/**
  * Get express shipping prices for a destination district.
  * `origin` comes from KIRIMINAJA_ORIGIN_DISTRICT (the store's district).
  */

@@ -1,4 +1,4 @@
-import { getRates } from "@/lib/kiriminaja";
+import { getRates, upstreamError } from "@/lib/kiriminaja";
 
 export async function POST(request: Request) {
   let body: { destination?: unknown; weight?: unknown; itemValue?: unknown; courier?: unknown };
@@ -31,9 +31,6 @@ export async function POST(request: Request) {
     });
     return Response.json(result);
   } catch (e) {
-    return Response.json(
-      { error: e instanceof Error ? e.message : "Gagal menghitung ongkir" },
-      { status: 502 }
-    );
+    return upstreamError(e instanceof Error ? e.message : "Gagal menghitung ongkir");
   }
 }
