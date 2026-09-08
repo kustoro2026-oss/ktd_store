@@ -38,6 +38,19 @@ const parseRupiah = (s: string) => {
   return d ? Number(d) : 0;
 };
 
+// Pesan ramah saat API ongkir tidak bisa dihubungi (mis. 502 dari CDN).
+const ONGKIR_UNAVAILABLE =
+  "Cek ongkir sementara tidak tersedia. Silakan coba beberapa saat lagi.";
+
+// Baca respons API dengan aman. Saat API error dan CDN ikut campur (mis.
+// Cloudflare mengganti body dengan halaman "error code: 502"), responsnya
+// bukan JSON — tampilkan pesan ramah alih-alih error parsing yang membingungkan.
+async function readJson<T>(res: Response, fallbackMsg: string): Promise<T> {
+  const ct = res.headers.get("content-type") ?? "";
+  if (ct.includes("application/json")) return (await res.json()) as T;
+  throw new Error(fallbackMsg);
+}
+
 // Province list rarely changes — cache it between modal opens.
 let provinceCache: Province[] = [];
 
@@ -104,8 +117,10 @@ export default function WhatsAppOrderModal({ open, onClose, productName, price, 
     }
     setProvincesLoading(true);
     fetch("/api/shipping/provinces")
-      .then((r) => r.json())
-      .then((j: { error?: string; provinces?: Province[] }) => {
+      .then((r) =>
+        readJson<{ error?: string; provinces?: Province[] }>(r, ONGKIR_UNAVAILABLE)
+      )
+      .then((j) => {
         if (j.error) throw new Error(j.error);
         provinceCache = j.provinces ?? [];
         setProvinces(provinceCache);
@@ -140,8 +155,10 @@ export default function WhatsAppOrderModal({ open, onClose, productName, price, 
     if (!v) return;
     setCitiesLoading(true);
     fetch(`/api/shipping/cities?provinsi_id=${encodeURIComponent(v)}`)
-      .then((r) => r.json())
-      .then((j: { error?: string; cities?: City[] }) => {
+      .then((r) =>
+        readJson<{ error?: string; cities?: City[] }>(r, ONGKIR_UNAVAILABLE)
+      )
+      .then((j) => {
         if (j.error) throw new Error(j.error);
         setCities(j.cities ?? []);
       })
@@ -161,8 +178,10 @@ export default function WhatsAppOrderModal({ open, onClose, productName, price, 
     if (!v) return;
     setDistrictsLoading(true);
     fetch(`/api/shipping/districts?kabupaten_id=${encodeURIComponent(v)}`)
-      .then((r) => r.json())
-      .then((j: { error?: string; districts?: District[] }) => {
+      .then((r) =>
+        readJson<{ error?: string; districts?: District[] }>(r, ONGKIR_UNAVAILABLE)
+      )
+      .then((j) => {
         if (j.error) throw new Error(j.error);
         setDistricts(j.districts ?? []);
       })
@@ -207,8 +226,10 @@ export default function WhatsAppOrderModal({ open, onClose, productName, price, 
         itemValue: subtotal,
       }),
     })
-      .then((r) => r.json())
-      .then((j: { error?: string; results?: Rate[] }) => {
+      .then((r) =>
+        readJson<{ error?: string; results?: Rate[] }>(r, ONGKIR_UNAVAILABLE)
+      )
+      .then((j) => {
         if (j.error) throw new Error(j.error);
         setRates(j.results ?? []);
         if (!(j.results ?? []).length) setRatesError("Tidak ada kurir yang melayani tujuan ini.");
