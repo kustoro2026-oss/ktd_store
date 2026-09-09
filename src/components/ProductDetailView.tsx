@@ -89,6 +89,48 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
             </p>
           </div>
 
+          {/* Info pengiriman dari anekadropship (berat/volume/ekspedisi terkunci) */}
+          {(detail.berat || detail.volume || detail.ekspedisi || detail.alamatSeller) && (
+            <div className="mt-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+              <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-2">
+                <Package className="h-3.5 w-3.5 text-brand" />
+                Info Pengiriman
+              </p>
+              <dl className="mt-2 space-y-1.5 text-sm">
+                {detail.berat && (
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-muted-2">Berat</dt>
+                    <dd className="font-medium text-ink">{detail.berat}</dd>
+                  </div>
+                )}
+                {detail.volume && (
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-muted-2">Volume</dt>
+                    <dd className="font-medium text-ink">{detail.volume}</dd>
+                  </div>
+                )}
+                {detail.ekspedisi && (
+                  <div className="flex justify-between gap-3">
+                    <dt className="shrink-0 text-muted-2">Ekspedisi</dt>
+                    <dd className="text-right font-medium text-ink">{detail.ekspedisi}</dd>
+                  </div>
+                )}
+                {detail.sistem && (
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-muted-2">Sistem</dt>
+                    <dd className="font-medium text-ink">{detail.sistem}</dd>
+                  </div>
+                )}
+                {detail.alamatSeller && (
+                  <div className="flex justify-between gap-3">
+                    <dt className="shrink-0 text-muted-2">Dikirim dari</dt>
+                    <dd className="text-right text-xs text-muted">{detail.alamatSeller}</dd>
+                  </div>
+                )}
+              </dl>
+            </div>
+          )}
+
           {/* WhatsApp order */}
           <div className="mt-6">
             <button
@@ -211,6 +253,11 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
         onClose={() => setWaOpen(false)}
         productName={detail.name}
         price={price}
+        weight={detail.beratGram}
+        weightLabel={detail.berat}
+        volume={detail.volume}
+        ekspedisi={detail.ekspedisiList}
+        sellerAddress={detail.alamatSeller}
       />
     </div>
   );

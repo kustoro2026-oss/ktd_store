@@ -82,6 +82,41 @@ export type WhatsAppShipping = {
   total: string;
 };
 
+// ─── Metode pembayaran ───────────────────────────────────────────────────────
+//
+// Pilihan pembayaran pada form pesanan WhatsApp: COD (bayar di tempat) atau
+// transfer bank. Nomor rekening diisi di BANK_ACCOUNTS di bawah.
+
+export type PaymentMethod = {
+  key: "cod" | "transfer";
+  label: string;
+  note: string;
+};
+
+export const PAYMENT_METHODS: PaymentMethod[] = [
+  {
+    key: "cod",
+    label: "COD (Bayar di Tempat)",
+    note: "Bayar tunai saat paket diterima.",
+  },
+  {
+    key: "transfer",
+    label: "Transfer Bank",
+    note: "Transfer ke rekening di bawah, lalu kirim bukti via WhatsApp.",
+  },
+];
+
+export type BankAccount = {
+  bank: string;
+  accountNumber: string;
+  accountName: string;
+};
+
+/** Rekening toko untuk pembayaran transfer bank. */
+export const BANK_ACCOUNTS: BankAccount[] = [
+  { bank: "Mandiri", accountNumber: "1340025493742", accountName: "KUSTORO" },
+];
+
 export type WhatsAppOrderInput = {
   productName: string;
   price: string;
@@ -92,6 +127,8 @@ export type WhatsAppOrderInput = {
   qty: string;
   note: string;
   shipping?: WhatsAppShipping;
+  /** Metode pembayaran yang dipilih pembeli (label tampilan). */
+  payment?: string;
   /** When set (cart checkout), the message lists every item instead of a single product. */
   items?: { name: string; price: string }[];
 };
@@ -114,6 +151,7 @@ export function buildWhatsAppOrderMessage(i: WhatsAppOrderInput): string {
     `Alamat: ${i.address}`,
   );
   if (i.qty) lines.push(`Jumlah: ${i.qty}`);
+  if (i.payment) lines.push(`Metode Pembayaran: ${i.payment}`);
   if (i.shipping) {
     lines.push("", "Pengiriman:", `Kurir: ${i.shipping.courier}`, `Ongkir: ${i.shipping.cost}`, `Total: ${i.shipping.total}`);
   }

@@ -50,6 +50,33 @@ function titleCaseCategory(s: string): string {
 }
 
 /**
+ * Parse teks berat dari halaman produk anekadropship menjadi gram.
+ * Mendukung: "500.00 Gram" → 500, "1.000 Gram" → 1000, "1,5 Kg" → 1500,
+ * "250 gr" → 250, "2 ons" → 200. Return null jika tidak bisa diparse.
+ */
+export function parseWeightToGram(s: string): number | null {
+  if (!s) return null;
+  const m = s.trim().replace(/\s+/g, " ").match(/^([\d.,]+)(?:\s*([a-z]+))?$/i);
+  if (!m) return null;
+  const raw = m[1];
+  let num: number;
+  if (raw.includes(",")) {
+    // Format Indonesia: titik = pemisah ribuan, koma = desimal.
+    num = parseFloat(raw.replace(/\./g, "").replace(",", "."));
+  } else if (/^\d{1,3}(\.\d{3})+$/.test(raw)) {
+    // Titik pemisah ribuan ("1.000").
+    num = parseFloat(raw.replace(/\./g, ""));
+  } else {
+    num = parseFloat(raw);
+  }
+  if (!Number.isFinite(num)) return null;
+  const unit = (m[2] ?? "").toLowerCase();
+  if (unit.startsWith("kg")) return Math.round(num * 1000);
+  if (unit.startsWith("ons")) return Math.round(num * 100);
+  return Math.round(num); // gram (default)
+}
+
+/**
  * Tidy a scraped product description so only product-relevant content is shown:
  * - removes inlined base64 images (massive data URIs from the source page)
  * - cuts the internal "Panduan Aman Upload Produk ke Marketplace" seller guide
@@ -157,6 +184,22 @@ export type AnekaProductDetail = {
   stok: string;
   terjual: string;
   profit: string;
+  /** SKU asli dari anekadropship (mis. "SKU-RAVBUSRE"). */
+  sku: string;
+  /** Teks berat mentah dari halaman produk (mis. "500.00 Gram"). */
+  berat: string;
+  /** Berat dalam gram (untuk hitung ongkir). null jika tidak bisa diparse. */
+  beratGram: number | null;
+  /** Teks volume mentah (mis. "7 x 7 x 23 CM"). */
+  volume: string;
+  /** Teks ekspedisi mentah (mis. "JNE, JNT, Lion, SiCepat, SAP, ID Express, SPX"). */
+  ekspedisi: string;
+  /** Daftar ekspedisi terpisah (["JNE", "JNT", ...]). */
+  ekspedisiList: string[];
+  /** Sistem pengiriman anekadropship (mis. "Pickup"). */
+  sistem: string;
+  /** Alamat penjual/gudang tempat barang dikirim. */
+  alamatSeller: string;
 };
 
 export class AnekaClient {
@@ -322,6 +365,17 @@ export class AnekaClient {
       return val;
     };
 
+    const berat = extractAfter("Berat:");
+    const volume = extractAfter("Volume:");
+    const ekspedisi = extractAfter("Ekspedisi:");
+    const ekspedisiList = ekspedisi
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const sistem = extractAfter("Sistem:");
+    const sku = $("[data-sku]").first().attr("data-sku") ?? "";
+    const alamatSeller = $("[data-address]").first().attr("data-address") ?? "";
+
     return {
       id,
       name,
@@ -332,6 +386,14 @@ export class AnekaClient {
       stok: extractAfter("Stok:", ["•", "Terjual"]),
       terjual: extractAfter("Terjual:", ["•", "Stok"]),
       profit: "",
+      sku,
+      berat,
+      beratGram: parseWeightToGram(berat),
+      volume,
+      ekspedisi,
+      ekspedisiList,
+      sistem,
+      alamatSeller,
     };
   }
 

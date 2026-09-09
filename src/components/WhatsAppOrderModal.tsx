@@ -1,8 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, MapPin, Truck, X } from "lucide-react";
-import { buildWhatsAppOrderMessage, whatsappLink } from "@/lib/config";
+import { Banknote, Loader2, Lock, MapPin, Truck, X } from "lucide-react";
+import {
+  BANK_ACCOUNTS,
+  PAYMENT_METHODS,
+  buildWhatsAppOrderMessage,
+  whatsappLink,
+} from "@/lib/config";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
 
 type Props = {
@@ -12,6 +17,16 @@ type Props = {
   price: string;
   /** When set (cart checkout), the modal orders all items at once. */
   items?: { id: string; name: string; price: string }[];
+  /** Berat produk dalam gram (dari anekadropship). Jika ada, berat terkunci. */
+  weight?: number | null;
+  /** Teks berat asli untuk ditampilkan (mis. "500 Gram"). */
+  weightLabel?: string;
+  /** Volume produk (mis. "7 x 7 x 23 CM"). */
+  volume?: string;
+  /** Ekspedisi yang didukung produk (filter daftar kurir ongkir). */
+  ekspedisi?: string[];
+  /** Alamat penjual tempat barang dikirim. */
+  sellerAddress?: string;
 };
 
 type Province = { id: number | string; provinsi_name: string };
@@ -54,13 +69,25 @@ async function readJson<T>(res: Response, fallbackMsg: string): Promise<T> {
 // Province list rarely changes — cache it between modal opens.
 let provinceCache: Province[] = [];
 
-export default function WhatsAppOrderModal({ open, onClose, productName, price, items }: Props) {
+export default function WhatsAppOrderModal({
+  open,
+  onClose,
+  productName,
+  price,
+  items,
+  weight,
+  weightLabel,
+  volume,
+  ekspedisi,
+  sellerAddress,
+}: Props) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [qty, setQty] = useState("1");
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
+  const [payment, setPayment] = useState("");
 
   // Location & shipping
   const [provinces, setProvinces] = useState<Province[]>(provinceCache);
@@ -74,7 +101,9 @@ export default function WhatsAppOrderModal({ open, onClose, productName, price, 
   const [districtsLoading, setDistrictsLoading] = useState(false);
   const [locationError, setLocationError] = useState("");
 
-  const [weight, setWeight] = useState("1000");
+  // Berat terkunci bila produk punya data berat dari anekadropship.
+  const lockedWeight = typeof weight === "number" && weight > 0 ? weight : null;
+  const [weightStr, setWeightStr] = useState("1000");
   const [rates, setRates] = useState<Rate[]>([]);
   const [selectedRate, setSelectedRate] = useState<number | null>(null);
   const [ratesLoading, setRatesLoading] = useState(false);
@@ -97,7 +126,8 @@ export default function WhatsAppOrderModal({ open, onClose, productName, price, 
       setCityId("");
       setDistrictId("");
       setLocationError("");
-      setWeight("1000");
+      setPayment("");
+      setWeightStr(lockedWeight !== null ? String(lockedWeight) : "1000");
       setRates([]);
       setSelectedRate(null);
       setRatesError("");
@@ -210,7 +240,7 @@ export default function WhatsAppOrderModal({ open, onClose, productName, price, 
       setRatesError("Pilih kecamatan tujuan terlebih dahulu.");
       return;
     }
-    const w = Number(weight);
+    const w = lockedWeight ?? Number(weightStr);
     if (!w || !Number.isFinite(w) || w < 1) {
       setRatesError("Isi berat paket terlebih dahulu (gram).");
       return;
@@ -240,7 +270,21 @@ export default function WhatsAppOrderModal({ open, onClose, productName, price, 
       .finally(() => setRatesLoading(false));
   };
 
-  const selected: Rate | null = selectedRate !== null ? (rates[selectedRate] ?? null) : null;
+  // Kurir yang tampil: filter ke ekspedisi yang didukung produk (jika ada).
+  // Jika tidak ada yang cocok, tampilkan semua supaya ongkir tetap bisa dicek.
+  const visibleRates = (() => {
+    if (!ekspedisi?.length) return rates;
+    const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const allowed = ekspedisi.map(norm);
+    const filtered = rates.filter((r) => {
+      const hay = norm(`${r.service_name} ${r.service}`);
+      return allowed.some((e) => hay.includes(e));
+    });
+    return filtered.length ? filtered : rates;
+  })();
+
+  const selected: Rate | null =
+    selectedRate !== null ? (visibleRates[selectedRate] ?? null) : null;
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -256,6 +300,12 @@ export default function WhatsAppOrderModal({ open, onClose, productName, price, 
       setError("Klik \"Cek Ongkir\" lalu pilih kurir pengiriman.");
       return;
     }
+    if (!payment) {
+      setError("Pilih metode pembayaran (COD atau Transfer Bank).");
+      return;
+    }
+    const paymentLabel =
+      PAYMENT_METHODS.find((p) => p.key === payment)?.label ?? payment;
     const costNum = Number(selected.cost) || 0;
     const total = subtotal + costNum;
     const productUrl = typeof window !== "undefined" ? window.location.href : "";
@@ -269,6 +319,7 @@ export default function WhatsAppOrderModal({ open, onClose, productName, price, 
       address: address.trim(),
       qty: isCart ? "" : qty.trim(),
       note: note.trim(),
+      payment: paymentLabel,
       shipping: {
         courier: selected.service_name + (selected.etd ? ` (estimasi ${selected.etd} hari)` : ""),
         cost: formatRupiah(costNum),
@@ -320,6 +371,11 @@ export default function WhatsAppOrderModal({ open, onClose, productName, price, 
             <>
               <p className="line-clamp-2 text-sm font-medium text-ink">{productName}</p>
               <p className="mt-1 text-base font-bold text-brand">{price}</p>
+              {sellerAddress && (
+                <p className="mt-1 line-clamp-1 text-[11px] text-muted-2">
+                  Dikirim dari: {sellerAddress}
+                </p>
+              )}
             </>
           )}
           <p className="mt-1.5 text-xs text-muted">
@@ -441,19 +497,28 @@ export default function WhatsAppOrderModal({ open, onClose, productName, price, 
               <div className="flex gap-2">
                 <div className="relative w-28 shrink-0">
                   <input
-                    value={weight}
+                    value={lockedWeight !== null ? String(lockedWeight) : weightStr}
                     onChange={(e) => {
-                      setWeight(e.target.value);
+                      setWeightStr(e.target.value);
                       setRates([]);
                       setSelectedRate(null);
                     }}
+                    disabled={lockedWeight !== null}
                     inputMode="numeric"
                     aria-label="Berat paket (gram)"
-                    className={`${inputCls} pr-8`}
+                    className={`${inputCls} pr-8 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-muted-2`}
                   />
                   <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-2">
                     gr
                   </span>
+                  {lockedWeight !== null && (
+                    <span
+                      className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center text-muted-2"
+                      title="Berat mengikuti data produk"
+                    >
+                      <Lock className="h-3.5 w-3.5" />
+                    </span>
+                  )}
                 </div>
                 <button
                   type="button"
@@ -469,17 +534,24 @@ export default function WhatsAppOrderModal({ open, onClose, productName, price, 
                   Cek Ongkir
                 </button>
               </div>
+              {lockedWeight !== null && (
+                <p className="text-[11px] text-muted-2">
+                  Berat {weightLabel ?? `${lockedWeight} gram`}
+                  {volume ? ` · Volume ${volume}` : ""} — sesuai data produk, tidak
+                  bisa diubah.
+                </p>
+              )}
             </div>
 
             {locationError && <p className="mt-2 text-xs font-medium text-red-500">{locationError}</p>}
             {ratesError && <p className="mt-2 text-xs font-medium text-red-500">{ratesError}</p>}
 
-            {rates.length > 0 && (
+            {visibleRates.length > 0 && (
               <div className="mt-3 space-y-1.5">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-2">
                   Pilih kurir
                 </p>
-                {rates.map((r, i) => (
+                {visibleRates.map((r, i) => (
                   <label
                     key={`${r.service}-${r.service_type}-${i}`}
                     className={`flex cursor-pointer items-center gap-2 rounded-lg border bg-white px-3 py-2 transition-colors ${
@@ -508,6 +580,79 @@ export default function WhatsAppOrderModal({ open, onClose, productName, price, 
                     </span>
                   </label>
                 ))}
+              </div>
+            )}
+          </div>
+
+          {/* Metode pembayaran */}
+          <div className="rounded-xl border border-brand/15 bg-brand/5 p-3">
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-bold text-ink">
+              <Banknote className="h-3.5 w-3.5 text-brand" />
+              Metode Pembayaran <span className="text-red-500">*</span>
+            </p>
+            <div className="space-y-1.5">
+              {PAYMENT_METHODS.map((p) => (
+                <label
+                  key={p.key}
+                  className={`flex cursor-pointer items-start gap-2 rounded-lg border bg-white px-3 py-2 transition-colors ${
+                    payment === p.key
+                      ? "border-brand ring-2 ring-brand/20"
+                      : "border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="payment-method"
+                    checked={payment === p.key}
+                    onChange={() => setPayment(p.key)}
+                    className="mt-0.5 h-4 w-4 accent-brand"
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium text-ink">{p.label}</span>
+                    <span className="block text-[11px] text-muted-2">{p.note}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            {payment === "transfer" && (
+              <div className="mt-2 rounded-lg bg-white p-3">
+                {BANK_ACCOUNTS.length > 0 ? (
+                  <div className="space-y-2">
+                    {BANK_ACCOUNTS.map((acc) => (
+                      <div
+                        key={`${acc.bank}-${acc.accountNumber}`}
+                        className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 px-3 py-2"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-ink">
+                            {acc.bank} · a.n. {acc.accountName}
+                          </p>
+                          <p className="truncate font-mono text-sm text-brand">
+                            {acc.accountNumber}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard?.writeText(acc.accountNumber).catch(() => {});
+                          }}
+                          className="shrink-0 rounded-lg border border-gray-200 px-2 py-1 text-[11px] font-semibold text-muted-2 transition-colors hover:border-brand hover:text-brand"
+                        >
+                          Salin
+                        </button>
+                      </div>
+                    ))}
+                    <p className="text-[11px] text-muted-2">
+                      Setelah transfer, kirim bukti pembayaran ke WhatsApp kami untuk
+                      konfirmasi pesanan.
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-muted-2">
+                    Nomor rekening akan dikirimkan admin via WhatsApp setelah pesanan
+                    Anda kami terima.
+                  </p>
+                )}
               </div>
             )}
           </div>
