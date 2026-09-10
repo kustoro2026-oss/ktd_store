@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Boxes, MessageCircle, Package, ShieldCheck, ShoppingBag, Tag } from "lucide-react";
 import { marketplaces } from "@/lib/config";
@@ -12,15 +12,121 @@ import WhatsAppOrderModal from "@/components/WhatsAppOrderModal";
 import RelatedProducts from "@/components/RelatedProducts";
 import type { AnekaProductDetail } from "@/lib/anekadropship";
 
+const SIZE_RE =
+  /^(?:XS|XXS|S|M|L|XL|XXL|XXXL|XXXXL|2XL|3XL|4XL|5XL|6XL|7XL|ALL\s*SIZE|ONE\s*SIZE|FREESIZE|SEMUA\s*UKURAN|JUMBO|KING\s*SIZE|QUEEN\s*SIZE|\d{1,4}(?:[.,]\d+)?\s*(?:CM|MM|INCH|INC|M|GR|G|ML|L)?|US\s*\d+(?:[.,]\d+)?|EU\s*\d+(?:[.,]\d+)?|\d{2,3}(?:-\d{2,3})?)$/i;
+
+const COLOR_WORDS =
+  /black|white|merah|hitam|putih|biru|kuning|hijau|pink|mocca|cream|krem|army|navy|maroon|abu|grey|gray|coklat|gold|golden|silver|orange|ungu|tosca|salem|peach|denim|khaki|mint|grape|latte|beige|olive|brown|red|blue|green|yellow|purple|bordeaux|mustard|cappuccino|dusty|sakura|lilac|sky|emerald|ruby|sapphire/i;
+
+/** Pecah label varian supplier (mis. "BLACK - S") jadi warna + ukuran. */
+function splitVariantLabel(label: string): { warna: string | null; ukuran: string | null } {
+  const name = String(label ?? "").trim();
+  if (!name) return { warna: null, ukuran: null };
+  const parts = name.split(/\s*-\s*/).map((p) => p.trim()).filter(Boolean);
+  if (parts.length >= 2) {
+    const last = parts[parts.length - 1];
+    if (SIZE_RE.test(last)) {
+      return { warna: parts.slice(0, -1).join(" - "), ukuran: last };
+    }
+    if (COLOR_WORDS.test(parts[0]) && SIZE_RE.test(parts[1])) {
+      return { warna: parts[0], ukuran: parts.slice(1).join(" - ") };
+    }
+    return { warna: name, ukuran: null };
+  }
+  if (SIZE_RE.test(name)) return { warna: null, ukuran: name };
+  return { warna: name, ukuran: null };
+}
+
+type VarOpt = { id: string; warna: string | null; ukuran: string | null; label: string; price: number | null; stock: number | null };
+
+const fmtRp = (n: number) => "Rp " + new Intl.NumberFormat("id-ID").format(n);
+
+/** "69000.00" / "89.100,00" -> number|null */
+function parseVariantPrice(s: string): number | null {
+  const m = String(s ?? "").trim().match(/[\d][\d.,]*/);
+  if (!m) return null;
+  const raw = m[0];
+  let n: number;
+  if (raw.includes(",")) {
+    n = parseFloat(raw.replace(/\./g, "").replace(",", "."));
+  } else if (/^\d{1,3}(\.\d{3})+$/.test(raw)) {
+    n = parseFloat(raw.replace(/\./g, ""));
+  } else {
+    n = parseFloat(raw);
+  }
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
+}
+
+/** Varian aktif (stok > 0) -> opsi pilihan. */
+function buildVariantOptions(detail: AnekaProductDetail): VarOpt[] {
+  const out: VarOpt[] = [];
+  for (const v of detail.variants ?? []) {
+    if (v.isActive === false) continue;
+    if (typeof v.stock === "number" && v.stock <= 0) continue;
+    let warna = v.color?.trim() || null;
+    let ukuran = v.size?.trim() || null;
+    if (!warna && !ukuran) {
+      const s = splitVariantLabel(v.name);
+      warna = s.warna;
+      ukuran = s.ukuran;
+    }
+    const price = parseVariantPrice(v.price);
+    out.push({
+      id: v.id,
+      warna,
+      ukuran,
+      label: v.name || [warna, ukuran].filter(Boolean).join(" - "),
+      price,
+      stock: typeof v.stock === "number" && Number.isFinite(v.stock) ? v.stock : null,
+    });
+  }
+  return out;
+}
+
 export default function ProductDetailView({ detail }: { detail: AnekaProductDetail }) {
   const [activeImg, setActiveImg] = useState(0);
   const [waOpen, setWaOpen] = useState(false);
   // Marketplace whose link was clicked but the product isn't uploaded there yet.
   const [missingMp, setMissingMp] = useState<string | null>(null);
 
+  const varOpts = useMemo(() => buildVariantOptions(detail), [detail]);
+  const warnaList = useMemo(
+    () => [...new Set(varOpts.map((v) => v.warna).filter((x): x is string => Boolean(x)))],
+    [varOpts]
+  );
+  const ukuranList = useMemo(
+    () => [...new Set(varOpts.map((v) => v.ukuran).filter((x): x is string => Boolean(x)))],
+    [varOpts]
+  );
+  const labelList = useMemo(
+    () =>
+      warnaList.length || ukuranList.length
+        ? []
+        : [...new Set(varOpts.map((v) => v.label).filter(Boolean))],
+    [varOpts, warnaList, ukuranList]
+  );
+
+  const [selWarna, setSelWarna] = useState<string | null>(null);
+  const [selUkuran, setSelUkuran] = useState<string | null>(null);
+  const [selLabel, setSelLabel] = useState<string | null>(null);
+
+  const activeVariant = useMemo(() => {
+    if (!varOpts.length) return null;
+    if (labelList.length) {
+      return varOpts.find((v) => v.label === (selLabel ?? labelList[0])) ?? varOpts[0];
+    }
+    const warna = warnaList.length ? (selWarna ?? warnaList[0]) : null;
+    const ukuran = ukuranList.length ? (selUkuran ?? ukuranList[0]) : null;
+    const hit = varOpts.find((v) => v.warna === warna && v.ukuran === ukuran);
+    return hit ?? varOpts[0];
+  }, [varOpts, labelList, warnaList, ukuranList, selWarna, selUkuran, selLabel]);
+
   const images = detail.images.length ? detail.images : ["/placeholder.svg"];
   const active = images[Math.min(activeImg, images.length - 1)];
-  const price = detail.rekomendasiJual || "Rp -";
+  const price = activeVariant?.price ? fmtRp(activeVariant.price) : detail.rekomendasiJual || "Rp -";
+  const stokText = activeVariant?.stock != null ? String(activeVariant.stock) : detail.stok;
+  const variantNote = activeVariant && varOpts.length ? activeVariant.label : "";
+
 
   return (
     <div className="container-site py-5 pb-24 lg:pb-6">
@@ -71,10 +177,10 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
                 <b className="text-ink">{detail.terjual}</b> terjual
               </span>
             )}
-            {detail.stok && (
+            {stokText && (
               <span className="inline-flex items-center gap-1.5">
                 <Boxes className="h-4 w-4 text-brand" />
-                Stok <b className="text-ink">{detail.stok}</b>
+                Stok <b className="text-ink">{stokText}</b>
               </span>
             )}
           </div>
@@ -88,6 +194,89 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
               {price}
             </p>
           </div>
+
+          {/* Pemilih varian */}
+          {varOpts.length > 0 && (
+            <div className="mt-4 space-y-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+              <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-2">
+                <Tag className="h-3.5 w-3.5 text-brand" />
+                Pilih Varian
+                {activeVariant && <span className="ml-auto font-semibold normal-case tracking-normal text-brand">{activeVariant.label}</span>}
+              </p>
+              {warnaList.length > 0 && (
+                <div>
+                  <p className="mb-1.5 text-xs font-semibold text-ink">Warna</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {warnaList.map((w) => {
+                      const isSel = (selWarna ?? warnaList[0]) === w;
+                      return (
+                        <button
+                          key={w}
+                          type="button"
+                          onClick={() => setSelWarna(w)}
+                          className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                            isSel
+                              ? "border-brand bg-brand text-white"
+                              : "border-gray-200 bg-white text-ink hover:border-brand"
+                          }`}
+                        >
+                          {w}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {ukuranList.length > 0 && (
+                <div>
+                  <p className="mb-1.5 text-xs font-semibold text-ink">Ukuran</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {ukuranList.map((u) => {
+                      const isSel = (selUkuran ?? ukuranList[0]) === u;
+                      return (
+                        <button
+                          key={u}
+                          type="button"
+                          onClick={() => setSelUkuran(u)}
+                          className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                            isSel
+                              ? "border-brand bg-brand text-white"
+                              : "border-gray-200 bg-white text-ink hover:border-brand"
+                          }`}
+                        >
+                          {u}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {labelList.length > 0 && (
+                <div>
+                  <p className="mb-1.5 text-xs font-semibold text-ink">Varian</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {labelList.map((l) => {
+                      const isSel = (selLabel ?? labelList[0]) === l;
+                      return (
+                        <button
+                          key={l}
+                          type="button"
+                          onClick={() => setSelLabel(l)}
+                          className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                            isSel
+                              ? "border-brand bg-brand text-white"
+                              : "border-gray-200 bg-white text-ink hover:border-brand"
+                          }`}
+                        >
+                          {l}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Info pengiriman dari anekadropship (berat/volume/ekspedisi terkunci) */}
           {(detail.berat || detail.volume || detail.ekspedisi || detail.alamatSeller) && (
@@ -253,6 +442,7 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
         onClose={() => setWaOpen(false)}
         productName={detail.name}
         price={price}
+        variantLabel={variantNote}
         weight={detail.beratGram}
         weightLabel={detail.berat}
         volume={detail.volume}

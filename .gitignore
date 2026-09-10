@@ -46,3 +46,9 @@ next-env.d.ts
 /*.png
 /*.pdf
 /*.docx
+
+# tiktok shop export (data hasil scrape & template milik user)
+/tiktok-export/
+/tiktok-template/
+/tiktok-upload/
+/Tiktoksellercenter_*.xlsx

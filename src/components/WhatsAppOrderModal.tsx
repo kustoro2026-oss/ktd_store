@@ -17,6 +17,8 @@ type Props = {
   price: string;
   /** When set (cart checkout), the modal orders all items at once. */
   items?: { id: string; name: string; price: string }[];
+  /** Label varian terpilih (mis. "BLACK - S") — otomatis isi catatan. */
+  variantLabel?: string;
   /** Berat produk dalam gram (dari anekadropship). Jika ada, berat terkunci. */
   weight?: number | null;
   /** Teks berat asli untuk ditampilkan (mis. "500 Gram"). */
@@ -75,6 +77,7 @@ export default function WhatsAppOrderModal({
   productName,
   price,
   items,
+  variantLabel,
   weight,
   weightLabel,
   volume,
@@ -118,7 +121,7 @@ export default function WhatsAppOrderModal({
       setPhone("");
       setAddress("");
       setQty("1");
-      setNote("");
+      setNote(variantLabel ?? "");
       setError("");
       setCities([]);
       setDistricts([]);
@@ -133,7 +136,7 @@ export default function WhatsAppOrderModal({
       setRatesError("");
     }
     /* eslint-enable react-hooks/set-state-in-effect */
-  }, [open]);
+  }, [open, variantLabel]);
 
   // Load provinces when the modal opens (cached after the first time).
   useEffect(() => {

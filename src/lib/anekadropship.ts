@@ -174,6 +174,24 @@ export type AnekaCategory = {
   slug: string;
 };
 
+export type AnekaVariant = {
+  id: string;
+  /** Label varian gabungan (mis. "BLACK - S"). */
+  name: string;
+  /** Nilai axis warna (null jika supplier tidak memisahkan). */
+  color: string | null;
+  /** Nilai axis ukuran (null jika supplier tidak memisahkan). */
+  size: string | null;
+  /** Harga jual varian (teks, mis. "69000.00"). */
+  price: string;
+  /** Harga modal (hpp) varian (teks, mis. "57000.00"). */
+  hpp: string;
+  /** Stok varian (number). */
+  stock: number;
+  /** Apakah varian aktif dijual. */
+  isActive: boolean;
+};
+
 export type AnekaProductDetail = {
   id: string;
   name: string;
@@ -200,6 +218,10 @@ export type AnekaProductDetail = {
   sistem: string;
   /** Alamat penjual/gudang tempat barang dikirim. */
   alamatSeller: string;
+  /** Apakah produk punya varian (warna/ukuran). */
+  hasVariants: boolean;
+  /** Daftar varian produk (kosong jika tanpa varian). */
+  variants: AnekaVariant[];
 };
 
 export class AnekaClient {
@@ -267,7 +289,7 @@ export class AnekaClient {
     const html = await this.fetchHome(query);
     return {
       products: this.parseProducts(html),
-      totalPages: this.parseTotalPages(html),
+      totalPages: this.parseTotalPages(html, Math.max(1, query.page ?? 1)),
     };
   }
 
@@ -301,7 +323,7 @@ export class AnekaClient {
     }
     return {
       products: this.parseProducts(html),
-      totalPages: this.parseTotalPages(html),
+      totalPages: this.parseTotalPages(html, page),
     };
   }
 
@@ -347,6 +369,12 @@ export class AnekaClient {
       const src = $(el).attr("src") ?? "";
       if (src && !images.includes(src)) images.push(src);
     });
+
+    // Varian produk disimpan di atribut Alpine x-data="productActionDetail(...)"
+    // sebagai JSON ter-encode HTML. Format argumen:
+    //   productActionDetail(paymentId, productId, {productData}, basePrice, barcode, diskon)
+    const variants = this.parseVariants(html);
+
 
     const descriptionHtml = cleanDescription($(".deskripsi-produk").first().html() ?? "");
 
@@ -394,7 +422,43 @@ export class AnekaClient {
       ekspedisiList,
       sistem,
       alamatSeller,
+      hasVariants: variants.length > 0,
+      variants,
     };
+  }
+
+  /**
+   * Ekstrak daftar varian dari JSON productActionDetail di halaman produk.
+   * Return array kosong jika produk tidak punya varian / gagal parse.
+   */
+  private parseVariants(html: string): AnekaVariant[] {
+    const m = html.match(/x-data="productActionDetail\(([^"]+)\)"/);
+    if (!m) return [];
+    const clean = m[1]
+      .replace(/&quot;/g, '"')
+      .replace(/&amp;/g, "&")
+      .replace(/&gt;/g, ">")
+      .replace(/&lt;/g, "<");
+    const braceStart = clean.indexOf("{");
+    const braceEnd = clean.lastIndexOf("}");
+    if (braceStart < 0 || braceEnd <= braceStart) return [];
+    let productData: any;
+    try {
+      productData = JSON.parse(clean.slice(braceStart, braceEnd + 1));
+    } catch {
+      return [];
+    }
+    const raw: any[] = Array.isArray(productData?.variants) ? productData.variants : [];
+    return raw.map((v) => ({
+      id: String(v?.id ?? ""),
+      name: String(v?.name ?? v?.label ?? "").trim(),
+      color: v?.color == null ? null : String(v.color).trim(),
+      size: v?.size == null ? null : String(v.size).trim(),
+      price: String(v?.price ?? ""),
+      hpp: String(v?.hpp ?? ""),
+      stock: Number(v?.stock ?? 0),
+      isActive: v?.is_active !== false,
+    }));
   }
 
   private async fetchHome(query: AnekaQuery) {
@@ -538,13 +602,22 @@ export class AnekaClient {
     return items;
   }
 
-  parseTotalPages(html: string): number {
+  /**
+   * Hitung total halaman dari pagination nav. Nav anekadropship kini hanya
+   * menampilkan jendela (halaman aktif ± 1-2) TANPA tautan ke halaman akhir,
+   * jadi jika masih ada tautan rel="next", totalPages minimal = halaman aktif + 1
+   * (nilai akan "bertumbuh" seiring pengguna membuka halaman berikutnya,
+   * sehingga semua halaman tetap bisa dijelajahi).
+   */
+  parseTotalPages(html: string, currentPage: number): number {
     const $ = cheerio.load(html);
-    let max = 1;
+    let max = currentPage;
     $('nav[aria-label="Pagination Navigation"] a[href*="page="]').each((_, el) => {
       const m = $(el).attr("href")?.match(/page=(\d+)/);
       if (m) max = Math.max(max, parseInt(m[1], 10));
     });
+    const hasNext = $('nav[aria-label="Pagination Navigation"] a[rel="next"]').length > 0;
+    if (hasNext) max = Math.max(max, currentPage + 1);
     return max;
   }
 }
