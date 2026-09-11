@@ -38,27 +38,12 @@ function splitVariantLabel(label: string): { warna: string | null; ukuran: strin
   return { warna: name, ukuran: null };
 }
 
-type VarOpt = { id: string; warna: string | null; ukuran: string | null; label: string; price: number | null; stock: number | null };
+type VarOpt = { id: string; warna: string | null; ukuran: string | null; label: string; stock: number | null };
 
-const fmtRp = (n: number) => "Rp " + new Intl.NumberFormat("id-ID").format(n);
-
-/** "69000.00" / "89.100,00" -> number|null */
-function parseVariantPrice(s: string): number | null {
-  const m = String(s ?? "").trim().match(/[\d][\d.,]*/);
-  if (!m) return null;
-  const raw = m[0];
-  let n: number;
-  if (raw.includes(",")) {
-    n = parseFloat(raw.replace(/\./g, "").replace(",", "."));
-  } else if (/^\d{1,3}(\.\d{3})+$/.test(raw)) {
-    n = parseFloat(raw.replace(/\./g, ""));
-  } else {
-    n = parseFloat(raw);
-  }
-  return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
-}
-
-/** Varian aktif (stok > 0) -> opsi pilihan. */
+/** Varian aktif (stok > 0) -> opsi pilihan.
+ * Catatan: harga varian dari anekadropship adalah HARGA MODAL (yang dibayar
+ * dropshipper), BUKAN harga jual — jadi tidak ditampilkan ke pembeli.
+ * Harga yang ditampilkan selalu detail.rekomendasiJual ("Harga Jual"). */
 function buildVariantOptions(detail: AnekaProductDetail): VarOpt[] {
   const out: VarOpt[] = [];
   for (const v of detail.variants ?? []) {
@@ -71,13 +56,11 @@ function buildVariantOptions(detail: AnekaProductDetail): VarOpt[] {
       warna = s.warna;
       ukuran = s.ukuran;
     }
-    const price = parseVariantPrice(v.price);
     out.push({
       id: v.id,
       warna,
       ukuran,
       label: v.name || [warna, ukuran].filter(Boolean).join(" - "),
-      price,
       stock: typeof v.stock === "number" && Number.isFinite(v.stock) ? v.stock : null,
     });
   }
@@ -136,7 +119,9 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
 
   const images = detail.images.length ? detail.images : ["/placeholder.svg"];
   const active = images[Math.min(activeImg, images.length - 1)];
-  const price = activeVariant?.price ? fmtRp(activeVariant.price) : detail.rekomendasiJual || "Rp -";
+  // Harga yang ditampilkan SELALU "Harga Jual" (rekomendasi jual anekadropship).
+  // Harga varian di JSON supplier adalah harga modal (hpp), bukan harga jual.
+  const price = detail.rekomendasiJual || "Rp -";
   const stokText = activeVariant?.stock != null ? String(activeVariant.stock) : detail.stok;
   const variantNote = activeVariant && varOpts.length ? activeVariant.label : "";
 

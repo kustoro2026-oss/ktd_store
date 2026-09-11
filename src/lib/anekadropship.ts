@@ -182,9 +182,10 @@ export type AnekaVariant = {
   color: string | null;
   /** Nilai axis ukuran (null jika supplier tidak memisahkan). */
   size: string | null;
-  /** Harga jual varian (teks, mis. "69000.00"). */
+  /** Harga MODAL varian (yang dibayar dropshipper, mis. "40000.00").
+   *  BUKAN harga jual — harga jual produk ada di rekomendasiJual. */
   price: string;
-  /** Harga modal (hpp) varian (teks, mis. "57000.00"). */
+  /** Field hpp di JSON supplier — saat ini selalu null (tidak terpakai). */
   hpp: string;
   /** Stok varian (number). */
   stock: number;
@@ -479,13 +480,26 @@ export class AnekaClient {
     const braceStart = clean.indexOf("{");
     const braceEnd = clean.lastIndexOf("}");
     if (braceStart < 0 || braceEnd <= braceStart) return [];
-    let productData: any;
+    type VariantRaw = {
+      id?: unknown;
+      name?: unknown;
+      label?: unknown;
+      color?: unknown;
+      size?: unknown;
+      price?: unknown;
+      hpp?: unknown;
+      stock?: unknown;
+      is_active?: unknown;
+    };
+    let productData: { variants?: VariantRaw[] };
     try {
-      productData = JSON.parse(clean.slice(braceStart, braceEnd + 1));
+      productData = JSON.parse(clean.slice(braceStart, braceEnd + 1)) as {
+        variants?: VariantRaw[];
+      };
     } catch {
       return [];
     }
-    const raw: any[] = Array.isArray(productData?.variants) ? productData.variants : [];
+    const raw: VariantRaw[] = Array.isArray(productData?.variants) ? productData.variants : [];
     return raw.map((v) => ({
       id: String(v?.id ?? ""),
       name: String(v?.name ?? v?.label ?? "").trim(),
