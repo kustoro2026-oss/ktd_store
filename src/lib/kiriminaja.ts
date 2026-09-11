@@ -9,6 +9,10 @@ import https from "https";
 
 const BASE_URL = process.env.KIRIMINAJA_BASE_URL ?? "https://tdev.kiriminaja.com";
 const API_KEY = process.env.KIRIMINAJA_API_KEY ?? "";
+// Gateway KiriminAja memakai nilai X-Forwarded-For sebagai "IP pemanggil"
+// untuk whitelist key (bukan IP socket asli). Karena IP egress Vercel dinamis,
+// kita kirim IP tetap yang terdaftar di key lewat env ini.
+const XFF_IP = process.env.KIRIMINAJA_XFF_IP ?? "";
 
 export type KAProvince = {
   id: number | string;
@@ -76,6 +80,7 @@ async function kaPost<T>(path: string, body?: unknown): Promise<KAResponse<T>> {
           Accept: "application/json",
           "Content-Type": "application/json",
           Authorization: `Bearer ${API_KEY}`,
+          ...(XFF_IP ? { "X-Forwarded-For": XFF_IP } : {}),
           "Content-Length": Buffer.byteLength(payload),
         },
       },
