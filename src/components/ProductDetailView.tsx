@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Boxes, MessageCircle, Package, ShieldCheck, ShoppingBag, Tag } from "lucide-react";
 import { marketplaces } from "@/lib/config";
+import { getTikTokProductLink } from "@/lib/tiktok-product-links";
 import { sanitizeHtml } from "@/lib/sanitize";
 import MarketplaceIcon from "@/components/MarketplaceIcon";
 import MarketplaceNotice from "@/components/MarketplaceNotice";
@@ -88,6 +89,18 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
   const [waOpen, setWaOpen] = useState(false);
   // Marketplace whose link was clicked but the product isn't uploaded there yet.
   const [missingMp, setMissingMp] = useState<string | null>(null);
+
+  /** Buka link marketplace; khusus TikTok Shop pakai link produk dari tokopedia-products.json. */
+  const openMarketplace = (label: string, key: string) => {
+    if (key === "tiktok") {
+      const link = getTikTokProductLink(detail.name);
+      if (link) {
+        window.open(link, "_blank", "noopener,noreferrer");
+        return;
+      }
+    }
+    setMissingMp(label);
+  };
 
   const varOpts = useMemo(() => buildVariantOptions(detail), [detail]);
   const warnaList = useMemo(
@@ -350,7 +363,7 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
                 <button
                   key={m.key}
                   type="button"
-                  onClick={() => setMissingMp(m.label)}
+                  onClick={() => openMarketplace(m.label, m.key)}
                   aria-label={`Beli via ${m.label}`}
                   className="flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:opacity-90"
                   style={{ backgroundColor: m.color }}
@@ -425,7 +438,7 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
               <button
                 key={m.key}
                 type="button"
-                onClick={() => setMissingMp(m.label)}
+                onClick={() => openMarketplace(m.label, m.key)}
                 aria-label={`Pesan via ${m.label}`}
                 className="flex h-11 min-w-0 flex-1 items-center justify-center rounded-xl px-1 text-white shadow-sm transition-opacity hover:opacity-90"
                 style={{ backgroundColor: m.color }}

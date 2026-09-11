@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ShoppingCart, Trash2 } from "lucide-react";
 import { useCart, type CartItem } from "@/lib/cart";
 import { marketplaces } from "@/lib/config";
+import { getTikTokProductLink } from "@/lib/tiktok-product-links";
 import MarketplaceIcon from "@/components/MarketplaceIcon";
 import MarketplaceNotice from "@/components/MarketplaceNotice";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
@@ -25,6 +26,18 @@ export default function CartPage() {
   // Marketplace whose "Beli via" button was clicked but the product isn't there yet.
   const [missingMp, setMissingMp] = useState<string | null>(null);
   const total = items.reduce((s, it) => s + parseRupiah(it.price), 0);
+
+  /** Buka link marketplace; khusus TikTok Shop pakai link produk dari tokopedia-products.json. */
+  const openMarketplace = (label: string, key: string, productName: string) => {
+    if (key === "tiktok") {
+      const link = getTikTokProductLink(productName);
+      if (link) {
+        window.open(link, "_blank", "noopener,noreferrer");
+        return;
+      }
+    }
+    setMissingMp(label);
+  };
 
   return (
     <div className="container-site py-5">
@@ -102,7 +115,7 @@ export default function CartPage() {
                       <button
                         key={m.key}
                         type="button"
-                        onClick={() => setMissingMp(m.label)}
+                        onClick={() => openMarketplace(m.label, m.key, item.name)}
                         aria-label={`Beli ${item.name} via ${m.label}`}
                         className="flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-[11px] font-semibold text-ink transition-colors hover:border-brand hover:text-brand"
                       >

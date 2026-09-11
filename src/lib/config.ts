@@ -2,6 +2,8 @@
 //
 // Products are sourced from anekadropship.id, but the actual ordering is done
 // through external marketplaces (Shopee / TikTok Shop / Lazada).
+// Catatan: Tokopedia sudah merger dengan TikTok Shop (ShopTokopedia),
+// jadi marketplace Tokopedia tidak ditampilkan terpisah.
 //
 // By default the buttons search the product name on each marketplace. To point
 // to your own store instead, replace the base URL below with your store link
