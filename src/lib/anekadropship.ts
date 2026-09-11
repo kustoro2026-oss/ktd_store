@@ -227,6 +227,8 @@ export type AnekaProductDetail = {
 export class AnekaClient {
   private cookie = "";
   private loggedIn = false;
+  /** Antrian login bersama: request paralel hanya memicu SATU proses login. */
+  private loginPromise: Promise<void> | null = null;
 
   /** Merge Set-Cookie headers into a single Cookie header. */
   private grab(res: Response) {
@@ -241,32 +243,54 @@ export class AnekaClient {
 
   /** Standard Laravel form login (CSRF via hidden _token). */
   async login(email: string, password: string) {
-    const page = await fetch(`${BASE}/login`, { redirect: "manual" });
-    this.grab(page);
-    const $ = cheerio.load(await page.text());
-    const token = $('input[name="_token"]').attr("value") ?? "";
+    let lastErr: unknown = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        // Mulai dengan cookie jar BERSIH: cookie lama (termasuk cookie
+        // Cloudflare yang kedaluwarsa/konflik) bisa membuat POST /login
+        // kena challenge → redirect balik ke /login.
+        this.cookie = "";
+        const page = await fetch(`${BASE}/login`, { redirect: "manual" });
+        this.grab(page);
+        const pageText = await page.text();
+        const $ = cheerio.load(pageText);
+        const token = $('input[name="_token"]').attr("value") ?? "";
 
-    const res = await fetch(`${BASE}/login`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Cookie: this.cookie,
-      },
-      body: new URLSearchParams({ _token: token, email, password }),
-      redirect: "manual",
-    });
-    this.grab(res);
-    // 419 = CSRF "Page Expired"; 3xx back to /login = rejected credentials
-    // (or a Cloudflare challenge). Treat both as a failed login instead of
-    // pretending the session is valid.
-    const location = res.headers.get("location") ?? "";
-    const failed =
-      res.status === 419 ||
-      (res.status >= 300 && res.status < 400 && location.includes("/login"));
-    if (failed) {
-      throw new Error("Login anekadropship gagal (kredensial ditolak atau sesi terblokir)");
+        // Halaman challenge Cloudflare tidak berisi form login (token kosong).
+        if (!token) {
+          throw new Error("Halaman login tanpa token CSRF (kemungkinan challenge Cloudflare)");
+        }
+
+        const res = await fetch(`${BASE}/login`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            Cookie: this.cookie,
+          },
+          body: new URLSearchParams({ _token: token, email, password }),
+          redirect: "manual",
+        });
+        this.grab(res);
+        // 419 = CSRF "Page Expired"; 3xx back to /login = rejected credentials
+        // (atau challenge Cloudflare). Keduanya dianggap login gagal.
+        const location = res.headers.get("location") ?? "";
+        const failed =
+          res.status === 419 ||
+          (res.status >= 300 && res.status < 400 && location.includes("/login"));
+        if (!failed) {
+          this.loggedIn = true;
+          return;
+        }
+        lastErr = new Error("Login anekadropship gagal (kredensial ditolak atau sesi terblokir)");
+      } catch (e) {
+        lastErr = e;
+      }
+      // Jeda sebelum percobaan berikutnya (hindari throttle login Laravel).
+      if (attempt === 0) await new Promise((r) => setTimeout(r, 1200));
     }
-    this.loggedIn = true;
+    throw lastErr instanceof Error
+      ? lastErr
+      : new Error("Login anekadropship gagal");
   }
 
   async ensureLoggedIn() {
@@ -276,7 +300,20 @@ export class AnekaClient {
     if (!email || !password) {
       throw new Error("ANEKA_EMAIL / ANEKA_PASSWORD env vars are not set");
     }
-    await this.login(email, password);
+    // Serialisasi login: beberapa request API paralel tidak boleh login
+    // bersamaan. Login paralel memicu race CSRF — token dari GET yang satu
+    // dikirim bersama cookie sesi dari GET lain → 419 "Page Expired".
+    if (!this.loginPromise) {
+      this.loginPromise = this.login(email, password)
+        .catch((e) => {
+          this.resetSession();
+          throw e;
+        })
+        .finally(() => {
+          this.loginPromise = null;
+        });
+    }
+    await this.loginPromise;
   }
 
   /** Reset sesi login agar login ulang dengan sesi segar. */
