@@ -82,6 +82,8 @@ export type WhatsAppShipping = {
   courier: string;
   cost: string;
   total: string;
+  /** Multi-paket (keranjang beda seller): satu entri per paket. */
+  groups?: { label: string; courier: string; cost: string }[];
 };
 
 // ─── Metode pembayaran ───────────────────────────────────────────────────────
@@ -155,7 +157,15 @@ export function buildWhatsAppOrderMessage(i: WhatsAppOrderInput): string {
   if (i.qty) lines.push(`Jumlah: ${i.qty}`);
   if (i.payment) lines.push(`Metode Pembayaran: ${i.payment}`);
   if (i.shipping) {
-    lines.push("", "Pengiriman:", `Kurir: ${i.shipping.courier}`, `Ongkir: ${i.shipping.cost}`, `Total: ${i.shipping.total}`);
+    if (i.shipping.groups && i.shipping.groups.length > 1) {
+      lines.push("", "Pengiriman:");
+      i.shipping.groups.forEach((g, idx) =>
+        lines.push(`Paket ${idx + 1} (${g.label}): ${g.courier} — ${g.cost}`)
+      );
+      lines.push(`Ongkir Total: ${i.shipping.cost}`, `Total: ${i.shipping.total}`);
+    } else {
+      lines.push("", "Pengiriman:", `Kurir: ${i.shipping.courier}`, `Ongkir: ${i.shipping.cost}`, `Total: ${i.shipping.total}`);
+    }
   }
   if (i.note) lines.push(`Catatan: ${i.note}`);
   return lines.join("\n");

@@ -179,6 +179,7 @@ export default function CartPage() {
             onClose={() => setWaSingle(null)}
             productName={waSingle?.name ?? ""}
             price={waSingle?.price ?? ""}
+            productId={waSingle?.id}
           />
         </>
       )}

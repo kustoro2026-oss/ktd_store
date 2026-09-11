@@ -15,6 +15,8 @@ type Props = {
   onClose: () => void;
   productName: string;
   price: string;
+  /** ID produk untuk resolusi origin seller di server (halaman detail). */
+  productId?: string;
   /** When set (cart checkout), the modal orders all items at once. */
   items?: { id: string; name: string; price: string }[];
   /** Label varian terpilih (mis. "BLACK - S") — otomatis isi catatan. */
@@ -41,6 +43,14 @@ type Rate = {
   cost: string;
   etd: string;
   cod: boolean;
+};
+/** Satu paket kiriman (produk dari seller yang sama). */
+type RateGroup = {
+  origin: number;
+  label: string;
+  weight: number;
+  estimated?: boolean;
+  results: Rate[];
 };
 
 const inputCls =
@@ -76,6 +86,7 @@ export default function WhatsAppOrderModal({
   onClose,
   productName,
   price,
+  productId,
   items,
   variantLabel,
   weight,
@@ -107,8 +118,9 @@ export default function WhatsAppOrderModal({
   // Berat terkunci bila produk punya data berat dari anekadropship.
   const lockedWeight = typeof weight === "number" && weight > 0 ? weight : null;
   const [weightStr, setWeightStr] = useState("1000");
-  const [rates, setRates] = useState<Rate[]>([]);
-  const [selectedRate, setSelectedRate] = useState<number | null>(null);
+  // Paket pengiriman per kelompok seller (biasanya 1; keranjang bisa banyak).
+  const [groups, setGroups] = useState<RateGroup[]>([]);
+  const [selectedByGroup, setSelectedByGroup] = useState<Record<number, number>>({});
   const [ratesLoading, setRatesLoading] = useState(false);
   const [ratesError, setRatesError] = useState("");
 
@@ -131,8 +143,8 @@ export default function WhatsAppOrderModal({
       setLocationError("");
       setPayment("");
       setWeightStr(lockedWeight !== null ? String(lockedWeight) : "1000");
-      setRates([]);
-      setSelectedRate(null);
+      setGroups([]);
+      setSelectedByGroup({});
       setRatesError("");
     }
     /* eslint-enable react-hooks/set-state-in-effect */
@@ -182,8 +194,8 @@ export default function WhatsAppOrderModal({
     setDistrictId("");
     setCities([]);
     setDistricts([]);
-    setRates([]);
-    setSelectedRate(null);
+    setGroups([]);
+    setSelectedByGroup({});
     setRatesError("");
     if (!v) return;
     setCitiesLoading(true);
@@ -205,8 +217,8 @@ export default function WhatsAppOrderModal({
     setCityId(v);
     setDistrictId("");
     setDistricts([]);
-    setRates([]);
-    setSelectedRate(null);
+    setGroups([]);
+    setSelectedByGroup({});
     setRatesError("");
     if (!v) return;
     setDistrictsLoading(true);
@@ -226,8 +238,8 @@ export default function WhatsAppOrderModal({
 
   const onDistrictChange = (v: string) => {
     setDistrictId(v);
-    setRates([]);
-    setSelectedRate(null);
+    setGroups([]);
+    setSelectedByGroup({});
     setRatesError("");
   };
 
@@ -244,28 +256,40 @@ export default function WhatsAppOrderModal({
       return;
     }
     const w = lockedWeight ?? Number(weightStr);
-    if (!w || !Number.isFinite(w) || w < 1) {
+    if (!isCart && (!w || !Number.isFinite(w) || w < 1)) {
       setRatesError("Isi berat paket terlebih dahulu (gram).");
       return;
     }
     setRatesLoading(true);
     setRatesError("");
+    // Origin di-resolve di server per produk (lokasi seller anekadropship);
+    // klien hanya mengirim id produk + tujuan + nilai barang.
+    const payload: Record<string, unknown> = {
+      destination: districtId,
+      itemValue: subtotal,
+    };
+    if (isCart) {
+      payload.productIds = (items ?? []).map((it) => it.id);
+    } else {
+      if (productId) payload.productId = productId;
+      payload.weight = Math.round(w);
+    }
     fetch("/api/shipping/rates", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        destination: districtId,
-        weight: Math.round(w),
-        itemValue: subtotal,
-      }),
+      body: JSON.stringify(payload),
     })
       .then((r) =>
-        readJson<{ error?: string; results?: Rate[] }>(r, ONGKIR_UNAVAILABLE)
+        readJson<{ error?: string; groups?: RateGroup[] }>(r, ONGKIR_UNAVAILABLE)
       )
       .then((j) => {
         if (j.error) throw new Error(j.error);
-        setRates(j.results ?? []);
-        if (!(j.results ?? []).length) setRatesError("Tidak ada kurir yang melayani tujuan ini.");
+        const gs = j.groups ?? [];
+        setGroups(gs);
+        setSelectedByGroup({});
+        if (!gs.length || gs.every((g) => !(g.results ?? []).length)) {
+          setRatesError("Tidak ada kurir yang melayani tujuan ini.");
+        }
       })
       .catch((e: unknown) =>
         setRatesError(e instanceof Error ? e.message : "Gagal menghitung ongkir")
@@ -273,21 +297,34 @@ export default function WhatsAppOrderModal({
       .finally(() => setRatesLoading(false));
   };
 
-  // Kurir yang tampil: filter ke ekspedisi yang didukung produk (jika ada).
-  // Jika tidak ada yang cocok, tampilkan semua supaya ongkir tetap bisa dicek.
-  const visibleRates = (() => {
-    if (!ekspedisi?.length) return rates;
+  // Kurir yang tampil per paket: filter ke ekspedisi yang didukung produk
+  // (khusus halaman detail). Jika tidak ada yang cocok, tampilkan semua.
+  const ratesFor = (g: RateGroup): Rate[] => {
+    if (isCart || !ekspedisi?.length) return g.results ?? [];
     const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
     const allowed = ekspedisi.map(norm);
-    const filtered = rates.filter((r) => {
+    const filtered = (g.results ?? []).filter((r) => {
       const hay = norm(`${r.service_name} ${r.service}`);
       return allowed.some((e) => hay.includes(e));
     });
-    return filtered.length ? filtered : rates;
-  })();
+    return filtered.length ? filtered : g.results ?? [];
+  };
 
-  const selected: Rate | null =
-    selectedRate !== null ? (visibleRates[selectedRate] ?? null) : null;
+  /** Kurir terpilih untuk paket ke-i (null jika belum dipilih). */
+  const selectedFor = (idx: number): Rate | null => {
+    const list = groups[idx] ? ratesFor(groups[idx]) : [];
+    const sel = selectedByGroup[idx];
+    return typeof sel === "number" ? (list[sel] ?? null) : null;
+  };
+
+  /** Total ongkir semua paket yang sudah dipilih. */
+  const totalOngkir = groups.reduce((s, g, idx) => {
+    const sel = selectedFor(idx);
+    return s + (sel ? Number(sel.cost) || 0 : 0);
+  }, 0);
+
+  const allSelected =
+    groups.length > 0 && groups.every((_, idx) => selectedFor(idx) !== null);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -299,8 +336,8 @@ export default function WhatsAppOrderModal({
       setError("Pilih provinsi, kota, dan kecamatan tujuan.");
       return;
     }
-    if (!selected) {
-      setError("Klik \"Cek Ongkir\" lalu pilih kurir pengiriman.");
+    if (!allSelected) {
+      setError("Klik \"Cek Ongkir\" lalu pilih kurir untuk setiap paket.");
       return;
     }
     if (!payment) {
@@ -309,9 +346,10 @@ export default function WhatsAppOrderModal({
     }
     const paymentLabel =
       PAYMENT_METHODS.find((p) => p.key === payment)?.label ?? payment;
-    const costNum = Number(selected.cost) || 0;
-    const total = subtotal + costNum;
+    const total = subtotal + totalOngkir;
     const productUrl = typeof window !== "undefined" ? window.location.href : "";
+    const selectedRates = groups.map((g, idx) => ({ g, r: selectedFor(idx)! }));
+    const first = selectedRates[0];
     const message = buildWhatsAppOrderMessage({
       productName: isCart ? "Checkout Keranjang" : productName,
       price: isCart ? formatRupiah(subtotal) : price,
@@ -324,9 +362,18 @@ export default function WhatsAppOrderModal({
       note: note.trim(),
       payment: paymentLabel,
       shipping: {
-        courier: selected.service_name + (selected.etd ? ` (estimasi ${selected.etd} hari)` : ""),
-        cost: formatRupiah(costNum),
+        courier:
+          first.r.service_name + (first.r.etd ? ` (estimasi ${first.r.etd} hari)` : ""),
+        cost: formatRupiah(totalOngkir),
         total: formatRupiah(total),
+        groups:
+          selectedRates.length > 1
+            ? selectedRates.map(({ g, r }) => ({
+                label: g.label,
+                courier: r.service_name + (r.etd ? ` (estimasi ${r.etd} hari)` : ""),
+                cost: formatRupiah(Number(r.cost) || 0),
+              }))
+            : undefined,
       },
     });
     window.open(whatsappLink(message), "_blank", "noopener,noreferrer");
@@ -384,10 +431,10 @@ export default function WhatsAppOrderModal({
           <p className="mt-1.5 text-xs text-muted">
             Subtotal ({isCart ? (items ?? []).length : qtyNum} produk): {formatRupiah(subtotal)}
           </p>
-          {selected && (
+          {allSelected && totalOngkir > 0 && (
             <p className="mt-1 text-xs text-muted">
-              Ongkir ({selected.service_name}): {formatRupiah(Number(selected.cost) || 0)}{" "}
-              — <b className="text-brand">Total: {formatRupiah(subtotal + (Number(selected.cost) || 0))}</b>
+              Ongkir{groups.length > 1 ? ` (${groups.length} paket)` : ""}: {formatRupiah(totalOngkir)}{" "}
+              — <b className="text-brand">Total: {formatRupiah(subtotal + totalOngkir)}</b>
             </p>
           )}
         </div>
@@ -497,37 +544,53 @@ export default function WhatsAppOrderModal({
                 </select>
               </div>
 
-              <div className="flex gap-2">
-                <div className="relative w-28 shrink-0">
-                  <input
-                    value={lockedWeight !== null ? String(lockedWeight) : weightStr}
-                    onChange={(e) => {
-                      setWeightStr(e.target.value);
-                      setRates([]);
-                      setSelectedRate(null);
-                    }}
-                    disabled={lockedWeight !== null}
-                    inputMode="numeric"
-                    aria-label="Berat paket (gram)"
-                    className={`${inputCls} pr-8 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-muted-2`}
-                  />
-                  <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-2">
-                    gr
-                  </span>
-                  {lockedWeight !== null && (
-                    <span
-                      className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center text-muted-2"
-                      title="Berat mengikuti data produk"
-                    >
-                      <Lock className="h-3.5 w-3.5" />
+              {!isCart ? (
+                <div className="flex gap-2">
+                  <div className="relative w-28 shrink-0">
+                    <input
+                      value={lockedWeight !== null ? String(lockedWeight) : weightStr}
+                      onChange={(e) => {
+                        setWeightStr(e.target.value);
+                        setGroups([]);
+                        setSelectedByGroup({});
+                      }}
+                      disabled={lockedWeight !== null}
+                      inputMode="numeric"
+                      aria-label="Berat paket (gram)"
+                      className={`${inputCls} pr-8 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-muted-2`}
+                    />
+                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-2">
+                      gr
                     </span>
-                  )}
+                    {lockedWeight !== null && (
+                      <span
+                        className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center text-muted-2"
+                        title="Berat mengikuti data produk"
+                      >
+                        <Lock className="h-3.5 w-3.5" />
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={checkRates}
+                    disabled={ratesLoading || !districtId}
+                    className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {ratesLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Truck className="h-4 w-4" />
+                    )}
+                    Cek Ongkir
+                  </button>
                 </div>
+              ) : (
                 <button
                   type="button"
                   onClick={checkRates}
                   disabled={ratesLoading || !districtId}
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {ratesLoading ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -536,12 +599,18 @@ export default function WhatsAppOrderModal({
                   )}
                   Cek Ongkir
                 </button>
-              </div>
-              {lockedWeight !== null && (
+              )}
+              {!isCart && lockedWeight !== null && (
                 <p className="text-[11px] text-muted-2">
                   Berat {weightLabel ?? `${lockedWeight} gram`}
                   {volume ? ` · Volume ${volume}` : ""} — sesuai data produk, tidak
                   bisa diubah.
+                </p>
+              )}
+              {isCart && groups.length > 0 && (
+                <p className="text-[11px] text-muted-2">
+                  Berat paket dihitung dari data produk ({groups.length}{" "}
+                  {groups.length > 1 ? "paket terpisah sesuai seller" : "paket"}).
                 </p>
               )}
             </div>
@@ -549,42 +618,54 @@ export default function WhatsAppOrderModal({
             {locationError && <p className="mt-2 text-xs font-medium text-red-500">{locationError}</p>}
             {ratesError && <p className="mt-2 text-xs font-medium text-red-500">{ratesError}</p>}
 
-            {visibleRates.length > 0 && (
-              <div className="mt-3 space-y-1.5">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-2">
-                  Pilih kurir
-                </p>
-                {visibleRates.map((r, i) => (
-                  <label
-                    key={`${r.service}-${r.service_type}-${i}`}
-                    className={`flex cursor-pointer items-center gap-2 rounded-lg border bg-white px-3 py-2 transition-colors ${
-                      selectedRate === i
-                        ? "border-brand ring-2 ring-brand/20"
-                        : "border-gray-200 hover:border-gray-300"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="shipping-rate"
-                      checked={selectedRate === i}
-                      onChange={() => setSelectedRate(i)}
-                      className="h-4 w-4 accent-brand"
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium text-ink">
-                        {r.service_name}
+            {groups.map((g, gi) => {
+              const list = ratesFor(g);
+              if (!list.length) return null;
+              return (
+                <div key={g.origin} className="mt-3 space-y-1.5">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-2">
+                    {groups.length > 1 ? `Paket ${gi + 1} — pilih kurir` : "Pilih kurir"}
+                  </p>
+                  {groups.length > 1 && (
+                    <p className="line-clamp-2 text-[11px] text-muted-2">
+                      {g.label} · Berat {g.weight} gram
+                      {g.estimated ? " (estimasi)" : ""}
+                    </p>
+                  )}
+                  {list.map((r, i) => (
+                    <label
+                      key={`${r.service}-${r.service_type}-${i}`}
+                      className={`flex cursor-pointer items-center gap-2 rounded-lg border bg-white px-3 py-2 transition-colors ${
+                        selectedByGroup[gi] === i
+                          ? "border-brand ring-2 ring-brand/20"
+                          : "border-gray-200 hover:border-gray-300"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name={`shipping-rate-${gi}`}
+                        checked={selectedByGroup[gi] === i}
+                        onChange={() =>
+                          setSelectedByGroup((prev) => ({ ...prev, [gi]: i }))
+                        }
+                        className="h-4 w-4 accent-brand"
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium text-ink">
+                          {r.service_name}
+                        </span>
+                        <span className="block text-[11px] text-muted-2">
+                          {r.etd ? `Estimasi ${r.etd} hari` : "Estimasi menyusul"}
+                        </span>
                       </span>
-                      <span className="block text-[11px] text-muted-2">
-                        {r.etd ? `Estimasi ${r.etd} hari` : "Estimasi menyusul"}
+                      <span className="shrink-0 text-sm font-bold text-brand">
+                        {formatRupiah(Number(r.cost) || 0)}
                       </span>
-                    </span>
-                    <span className="shrink-0 text-sm font-bold text-brand">
-                      {formatRupiah(Number(r.cost) || 0)}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            )}
+                    </label>
+                  ))}
+                </div>
+              );
+            })}
           </div>
 
           {/* Metode pembayaran */}
@@ -671,8 +752,8 @@ export default function WhatsAppOrderModal({
                   value={qty}
                   onChange={(e) => {
                     setQty(e.target.value);
-                    setRates([]);
-                    setSelectedRate(null);
+                    setGroups([]);
+                    setSelectedByGroup({});
                   }}
                   inputMode="numeric"
                   className={inputCls}

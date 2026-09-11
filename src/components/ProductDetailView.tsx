@@ -440,6 +440,7 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
         onClose={() => setWaOpen(false)}
         productName={detail.name}
         price={price}
+        productId={detail.id}
         variantLabel={variantNote}
         weight={detail.beratGram}
         weightLabel={detail.berat}

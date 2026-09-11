@@ -3,29 +3,16 @@ import { cache } from "react";
 import Link from "next/link";
 import { Frown } from "lucide-react";
 import ProductDetailView from "@/components/ProductDetailView";
-import { anekaClient, type AnekaProductDetail } from "@/lib/anekadropship";
+import { getDetailCached } from "@/lib/detail-cache";
+import type { AnekaProductDetail } from "@/lib/anekadropship";
 import { SITE_URL } from "@/lib/config";
 import { toLocalImages } from "@/lib/localImages";
 
 // Never statically optimize — product data is scraped at request time.
 export const dynamic = "force-dynamic";
 
-// In-memory cache shared across requests (per server instance).
-const detailCache = new Map<string, { data: AnekaProductDetail; ts: number }>();
-const TTL = 5 * 60_000; // 5 minutes
-
-async function fetchDetail(id: string): Promise<AnekaProductDetail> {
-  const hit = detailCache.get(id);
-  if (hit && Date.now() - hit.ts < TTL) return hit.data;
-  const detail = await anekaClient.getProductDetail(id);
-  // Gunakan gambar lokal (hasil sinkronisasi) agar tidak ada hotlink eksternal.
-  detail.images = toLocalImages(detail.id, detail.images);
-  detailCache.set(id, { data: detail, ts: Date.now() });
-  return detail;
-}
-
 // Dedupe the fetch between generateMetadata and the page body.
-const getDetail = cache(fetchDetail);
+const getDetail = cache(async (id: string) => getDetailCached(id));
 
 /** Strip HTML tags and collapse whitespace (for meta descriptions / JSON-LD). */
 function plainText(html: string, max = 300): string {
@@ -58,12 +45,14 @@ export async function generateMetadata({
   const { id } = await params;
   try {
     const detail = await getDetail(id);
-    if (!detail.name) return { title: "Produk Tidak Ditemukan" };
+    if (!detail?.name) return { title: "Produk Tidak Ditemukan" };
     const description =
       plainText(detail.descriptionHtml, 160) ||
       `Beli ${detail.name} di KTD Store. Pesan mudah dan aman via WhatsApp.`;
-    const ogImages = detail.images.length
-      ? absoluteImages(detail.images)
+    // Gambar lokal (hasil sinkronisasi) agar OG/JSON-LD tidak hotlink eksternal.
+    const localImages = toLocalImages(detail.id, detail.images);
+    const ogImages = localImages.length
+      ? absoluteImages(localImages)
       : [`${SITE_URL}/placeholder.svg`];
     return {
       title: detail.name,
@@ -129,12 +118,15 @@ export default async function ProductDetailPage({
 
   const price = priceValue(detail.rekomendasiJual);
   const description = plainText(detail.descriptionHtml, 500);
+  // Gambar lokal untuk tampilan (cache bersama tidak boleh dimutasi).
+  const localImages = toLocalImages(detail.id, detail.images);
+  const viewDetail = { ...detail, images: localImages };
   const productJsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
     name: detail.name,
     sku: detail.id,
-    image: detail.images.length ? absoluteImages(detail.images.slice(0, 3)) : undefined,
+    image: localImages.length ? absoluteImages(localImages.slice(0, 3)) : undefined,
     description: description || undefined,
     offers: {
       "@type": "Offer",
@@ -172,7 +164,7 @@ export default async function ProductDetailPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
-      <ProductDetailView detail={detail} />
+      <ProductDetailView detail={viewDetail} />
     </>
   );
 }

@@ -144,6 +144,8 @@ export type GetRatesInput = {
   weight: number;
   itemValue?: number;
   courier?: string[];
+  /** ID kecamatan pengirim. Default: KIRIMINAJA_ORIGIN_DISTRICT (toko). */
+  origin?: number | string;
 };
 
 /**
@@ -163,14 +165,18 @@ export function upstreamError(message: string): Response {
 
 /**
  * Get express shipping prices for a destination district.
- * `origin` comes from KIRIMINAJA_ORIGIN_DISTRICT (the store's district).
+ * `origin` default dari KIRIMINAJA_ORIGIN_DISTRICT (kecamatan toko);
+ * bisa dioverride per produk sesuai lokasi seller (origin-resolver.ts).
  */
 export async function getRates(input: GetRatesInput): Promise<KARateResult> {
-  const origin = process.env.KIRIMINAJA_ORIGIN_DISTRICT;
-  if (!origin) throw new Error("KIRIMINAJA_ORIGIN_DISTRICT belum diatur di .env.local");
+  const originRaw = input.origin ?? process.env.KIRIMINAJA_ORIGIN_DISTRICT;
+  const origin = Number(originRaw);
+  if (!origin || !Number.isFinite(origin)) {
+    throw new Error("KIRIMINAJA_ORIGIN_DISTRICT belum diatur di .env.local");
+  }
 
   const payload: Record<string, unknown> = {
-    origin: Number(origin),
+    origin,
     destination: Number(input.destination),
     weight: input.weight,
   };
@@ -183,7 +189,7 @@ export async function getRates(input: GetRatesInput): Promise<KARateResult> {
 
   const json = await kaPost<KARate>("/api/mitra/v6.1/shipping_price", payload);
   return {
-    origin: Number(origin),
+    origin,
     destination: Number(input.destination),
     weight: input.weight,
     results: json.results ?? [],
