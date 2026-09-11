@@ -9,7 +9,7 @@
  *     Perbaikan: semua kolom wajib diisi dari products.json.
  *  3. Kategori harus path valid dari dropdown (sheet Category template).
  *
- * Output: tiktok-upload/TIKTOK-KESEHATAN-FIX.xlsx
+ * Output: tiktok-upload/t1-Kesehatan-FIX.xlsx
  * Jalankan: node scripts/tiktok-kesehatan-fix.ts
  */
 import * as fs from "node:fs";
@@ -19,7 +19,7 @@ import { toVariantRows, sanitizeAxis } from "./tiktok-variant-util.ts";
 const XLSX: any = (XLSXNS as any).default ?? XLSXNS;
 
 const TPL = path.resolve("Tiktoksellercenter_batchupload_20260910_template.xlsx");
-const OUT = path.resolve("tiktok-upload/TIKTOK-KESEHATAN-FIX.xlsx");
+const OUT = path.resolve("tiktok-upload/t1-Kesehatan-FIX.xlsx");
 const PRODUCTS_FILE = path.resolve("tiktok-export/products.json");
 
 // 16 produk Kesehatan (Grainvit 1565 & Olimex 1805 DIKELUARKAN:
@@ -169,8 +169,15 @@ for (const id of IDS) {
   }
 }
 
-// Tulis mulai sheet baris 5 (0-based 4) -> menimpa baris contoh template
-XLSX.utils.sheet_add_aoa(ws, rows, { origin: 4 });
+// Tulis mulai sheet baris 6 (0-based 5) -> baris instruksi template (0-based 4)
+// WAJIB dipertahankan; TikTok menolak file yang struktur barisnya berubah
+// (muncul pesan "Pastikan untuk melengkapi semua info wajib").
+for (const k of Object.keys(ws)) {
+  if (k[0] === "!") continue;
+  const c = XLSX.utils.decode_cell(k);
+  if (c.r >= 5) delete ws[k];
+}
+XLSX.utils.sheet_add_aoa(ws, rows, { origin: 5 });
 for (const sn of wb.SheetNames) fixRef(wb.Sheets[sn]);
 XLSX.writeFile(wb, OUT);
 

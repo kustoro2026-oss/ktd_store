@@ -9,7 +9,7 @@
  *    varian. Perbaikan: satu baris per varian dengan harga/stok/SKU masing-
  *    masing (kolom 13-17 + SKU unik di kolom 43).
  *
- * Output: tiktok-upload/TIKTOK-PAKAIAN-ANAK-FIX.xlsx
+ * Output: tiktok-upload/t2-Pakaian Anak-FIX.xlsx
  * Jalankan: node scripts/tiktok-pakaian-fix.ts
  */
 import * as fs from "node:fs";
@@ -19,7 +19,7 @@ import { toVariantRows, sanitizeAxis } from "./tiktok-variant-util.ts";
 const XLSX: any = (XLSXNS as any).default ?? XLSXNS;
 
 const TPL = path.resolve("tiktok-upload/t2-Pakaian Anak.xlsx");
-const OUT = path.resolve("tiktok-upload/TIKTOK-PAKAIAN-ANAK-FIX.xlsx");
+const OUT = path.resolve("tiktok-upload/t2-Pakaian Anak-FIX.xlsx");
 const PRODUCTS_FILE = path.resolve("tiktok-export/products.json");
 
 // Produk yang masuk file ini (kategori tersedia di template t2 Pakaian Anak):
@@ -193,8 +193,15 @@ for (const id of IDS) {
   }
 }
 
-// Tulis mulai sheet baris 5 (0-based 4) -> menimpa baris contoh template
-XLSX.utils.sheet_add_aoa(ws, rows, { origin: 4 });
+// Tulis mulai sheet baris 6 (0-based 5) -> baris instruksi template (0-based 4)
+// WAJIB dipertahankan; TikTok menolak file yang struktur barisnya berubah
+// (muncul pesan "Pastikan untuk melengkapi semua info wajib").
+for (const k of Object.keys(ws)) {
+  if (k[0] === "!") continue;
+  const c = XLSX.utils.decode_cell(k);
+  if (c.r >= 5) delete ws[k];
+}
+XLSX.utils.sheet_add_aoa(ws, rows, { origin: 5 });
 for (const sn of wb.SheetNames) fixRef(wb.Sheets[sn]);
 XLSX.writeFile(wb, OUT);
 
