@@ -97,16 +97,16 @@ export function getBlogPost(slug: string): BlogPost | undefined {
 }
 
 export const heroSlides: { title: string; subtitle: string; icon: IconKey; image: string }[] = [
-  { title: "", subtitle: "", icon: "home", image: "/images/hero/1.png" },
-  { title: "", subtitle: "", icon: "home", image: "/images/hero/2.png" },
-  { title: "", subtitle: "", icon: "home", image: "/images/hero/3.png" },
-  { title: "", subtitle: "", icon: "home", image: "/images/hero/4.png" },
-  { title: "", subtitle: "", icon: "home", image: "/images/hero/5.png" },
-  { title: "", subtitle: "", icon: "home", image: "/images/hero/6.png" },
-  { title: "", subtitle: "", icon: "home", image: "/images/hero/7.png" },
-  { title: "", subtitle: "", icon: "home", image: "/images/hero/8.png" },
-  { title: "", subtitle: "", icon: "home", image: "/images/hero/9.png" },
-  { title: "", subtitle: "", icon: "home", image: "/images/hero/10.png" },
+  { title: "", subtitle: "", icon: "home", image: "/images/hero/1.webp" },
+  { title: "", subtitle: "", icon: "home", image: "/images/hero/2.webp" },
+  { title: "", subtitle: "", icon: "home", image: "/images/hero/3.webp" },
+  { title: "", subtitle: "", icon: "home", image: "/images/hero/4.webp" },
+  { title: "", subtitle: "", icon: "home", image: "/images/hero/5.webp" },
+  { title: "", subtitle: "", icon: "home", image: "/images/hero/6.webp" },
+  { title: "", subtitle: "", icon: "home", image: "/images/hero/7.webp" },
+  { title: "", subtitle: "", icon: "home", image: "/images/hero/8.webp" },
+  { title: "", subtitle: "", icon: "home", image: "/images/hero/9.webp" },
+  { title: "", subtitle: "", icon: "home", image: "/images/hero/10.webp" },
 ];
 
 export const recentSearches = ["Powerbank", "Lampu LED", "Pembersih", "Kesehatan"];

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { heroSlides } from "@/lib/data";
@@ -23,12 +24,14 @@ export default function HeroCarousel() {
       {/* Image area — fixed aspect ratio for smooth transitions */}
       <div className="group relative aspect-[4/3] sm:aspect-[21/9]">
         <div key={slide.image} className="absolute inset-0 animate-fade-in">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <Image
             src={slide.image}
             alt=""
             aria-hidden="true"
-            className="h-full w-full object-contain"
+            fill
+            sizes="(max-width: 640px) 100vw, 1200px"
+            className="object-contain"
+            priority={index === 0}
           />
         </div>
 
