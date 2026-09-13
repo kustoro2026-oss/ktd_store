@@ -28,7 +28,7 @@ export default function HeroCarousel() {
             src={slide.image}
             alt=""
             aria-hidden="true"
-            className="h-full w-full object-cover"
+            className="h-full w-full object-contain"
           />
         </div>
 
