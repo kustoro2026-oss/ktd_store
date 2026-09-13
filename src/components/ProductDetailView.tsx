@@ -212,11 +212,10 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
                           key={w}
                           type="button"
                           onClick={() => setSelWarna(w)}
-                          className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-                            isSel
+                          className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${isSel
                               ? "border-brand bg-brand text-white"
                               : "border-gray-200 bg-white text-ink hover:border-brand"
-                          }`}
+                            }`}
                         >
                           {w}
                         </button>
@@ -236,11 +235,10 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
                           key={u}
                           type="button"
                           onClick={() => setSelUkuran(u)}
-                          className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-                            isSel
+                          className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${isSel
                               ? "border-brand bg-brand text-white"
                               : "border-gray-200 bg-white text-ink hover:border-brand"
-                          }`}
+                            }`}
                         >
                           {u}
                         </button>
@@ -260,11 +258,10 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
                           key={l}
                           type="button"
                           onClick={() => setSelLabel(l)}
-                          className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-                            isSel
+                          className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${isSel
                               ? "border-brand bg-brand text-white"
                               : "border-gray-200 bg-white text-ink hover:border-brand"
-                          }`}
+                            }`}
                         >
                           {l}
                         </button>
@@ -358,10 +355,6 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
                 </button>
               ))}
             </div>
-            <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-2">
-              <ShieldCheck className="h-4 w-4 text-brand" />
-              Untuk saat ini pemesanan dilayani melalui WhatsApp.
-            </p>
           </div>
 
           {/* Trust badges */}
