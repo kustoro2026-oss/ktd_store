@@ -52,11 +52,19 @@ export function marketplaceLink(m: Marketplace, productName: string): string {
 
 // ─── Site URL ────────────────────────────────────────────────────────────────
 //
-// Used for canonical/OG URLs, robots.txt and the sitemap. Set
-// NEXT_PUBLIC_SITE_URL in .env.local when deploying (e.g. https://ktdstore.id).
+// Used for canonical/OG URLs, robots.txt and the sitemap.
+// Priority: NEXT_PUBLIC_SITE_URL > VERCEL_PROJECT_PRODUCTION_URL > VERCEL_URL > localhost
 
-export const SITE_URL =
-  (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(/\/+$/, "");
+function resolveSiteUrl(): string {
+  if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL;
+  // Vercel production URL (e.g. toko.kustoro2026.com)
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+  // Vercel preview URL (e.g. project-git-branch.vercel.app)
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  return "http://localhost:3000";
+}
+
+export const SITE_URL = resolveSiteUrl().replace(/\/+$/, "");
 
 // ─── WhatsApp ordering ────────────────────────────────────────────────────────
 //
