@@ -13,7 +13,7 @@ export default function FooterMarketplace() {
         <div>
             <h3 className="text-base font-bold text-ink">Belanja di Marketplace</h3>
             <p className="mt-3 text-sm text-muted">
-                Pesan melalui WhatsApp — marketplace resmi segera menyusul.
+                Kunjungi toko resmi kami di marketplace pilihan Anda, atau pesan langsung melalui WhatsApp.
             </p>
             {missingMp && (
                 <div className="mt-3">
@@ -30,20 +30,36 @@ export default function FooterMarketplace() {
                 </div>
             )}
             <div className="mt-4 flex flex-col gap-2">
-                {marketplaces.map((m) => (
-                    <button
-                        key={m.key}
-                        type="button"
-                        onClick={() => setMissingMp(m.label)}
-                        className="flex items-center gap-3 rounded-xl bg-white px-3 py-2.5 text-sm font-semibold shadow-sm ring-1 ring-gray-200 transition-all hover:-translate-y-0.5 hover:shadow-md"
-                    >
-                        <span className="flex h-9 w-20 shrink-0 items-center justify-center">
-                            <MarketplaceIcon name={m.key} className="h-5 w-auto max-w-full object-contain" />
-                        </span>
-                        <span className="text-ink">{m.label}</span>
-                        <ArrowRight className="ml-auto h-4 w-4 text-muted-2" aria-hidden="true" />
-                    </button>
-                ))}
+                {marketplaces.map((m) =>
+                    m.storeUrl ? (
+                        <a
+                            key={m.key}
+                            href={m.storeUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-3 rounded-xl bg-white px-3 py-2.5 text-sm font-semibold shadow-sm ring-1 ring-gray-200 transition-all hover:-translate-y-0.5 hover:shadow-md"
+                        >
+                            <span className="flex h-9 w-20 shrink-0 items-center justify-center">
+                                <MarketplaceIcon name={m.key} className="h-5 w-auto max-w-full object-contain" />
+                            </span>
+                            <span className="text-ink">{m.label}</span>
+                            <ArrowRight className="ml-auto h-4 w-4 text-muted-2" aria-hidden="true" />
+                        </a>
+                    ) : (
+                        <button
+                            key={m.key}
+                            type="button"
+                            onClick={() => setMissingMp(m.label)}
+                            className="flex items-center gap-3 rounded-xl bg-white px-3 py-2.5 text-sm font-semibold shadow-sm ring-1 ring-gray-200 transition-all hover:-translate-y-0.5 hover:shadow-md"
+                        >
+                            <span className="flex h-9 w-20 shrink-0 items-center justify-center">
+                                <MarketplaceIcon name={m.key} className="h-5 w-auto max-w-full object-contain" />
+                            </span>
+                            <span className="text-ink">{m.label}</span>
+                            <ArrowRight className="ml-auto h-4 w-4 text-muted-2" aria-hidden="true" />
+                        </button>
+                    ),
+                )}
             </div>
         </div>
     );

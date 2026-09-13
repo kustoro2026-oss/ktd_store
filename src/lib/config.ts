@@ -20,6 +20,8 @@ export type Marketplace = {
   color: string;
   /** Base URL that accepts a search query appended to the end. */
   searchUrl: string;
+  /** Optional direct store URL. When set, footer button links here instead of showing "not available" notice. */
+  storeUrl?: string;
 };
 
 export const marketplaces: Marketplace[] = [
@@ -34,6 +36,7 @@ export const marketplaces: Marketplace[] = [
     label: "TikTok Shop",
     color: "#111111",
     searchUrl: "https://www.tiktok.com/search?q=",
+    storeUrl: "https://vt.tiktok.com/ZSqHkP3o1/?page=Mall",
   },
   {
     key: "lazada",
