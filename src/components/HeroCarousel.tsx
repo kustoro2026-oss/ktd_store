@@ -106,16 +106,16 @@ export default function HeroCarousel() {
 
       {/* Mobile: buttons + marketplace below image (separate section) */}
       <div className="flex flex-col items-center gap-3 px-4 py-4 sm:hidden">
-        <div className="flex flex-wrap items-center justify-center gap-2">
+        <div className="flex items-center justify-center gap-2">
           <Link
             href="/produk"
-            className="rounded-xl bg-black px-5 py-2.5 text-sm font-bold text-white shadow-lg transition-all hover:-translate-y-0.5 hover:bg-gray-900"
+            className="rounded-xl bg-black px-4 py-2.5 text-xs font-bold text-white shadow-lg transition-all hover:-translate-y-0.5 hover:bg-gray-900 sm:text-sm sm:px-5"
           >
             Belanja Sekarang
           </Link>
           <Link
             href="/produk"
-            className="rounded-xl border border-white/40 px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-white/10"
+            className="rounded-xl border border-white/40 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-white/10 sm:text-sm sm:px-5"
           >
             Lihat Kategori
           </Link>
