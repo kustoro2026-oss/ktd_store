@@ -1,9 +1,15 @@
 import type { Metadata } from "next";
+import dynamic from "next/dynamic";
 import HeroCarousel from "@/components/HeroCarousel";
-import { Features, NewProducts, PopularCategories } from "@/components/HomeSections";
-import { BlogSection, LatestCollections, SeoText } from "@/components/Sections";
+import Features from "@/components/Features";
+import { NewProducts, PopularCategories } from "@/components/HomeSections";
 import { anekaClient, type AnekaCategory, type AnekaProduct } from "@/lib/anekadropship";
 import { getLocalImages } from "@/lib/localImages";
+
+// Lazy-load below-fold sections — they don't need to block first paint
+const BlogSection = dynamic(() => import("@/components/Sections").then((m) => ({ default: m.BlogSection })));
+const LatestCollections = dynamic(() => import("@/components/Sections").then((m) => ({ default: m.LatestCollections })));
+const SeoText = dynamic(() => import("@/components/Sections").then((m) => ({ default: m.SeoText })));
 
 // Regenerate the homepage at most every 5 minutes so products stay fresh
 // without scraping anekadropship.id on every single request.

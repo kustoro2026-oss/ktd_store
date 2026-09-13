@@ -1,41 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { MessageCircle, ShieldCheck, ShoppingCart, Tag } from "lucide-react";
 import ProductCard from "./ProductCard";
 import { useApi } from "@/lib/useApi";
 import CategoryIcon from "@/components/CategoryIcon";
 import type { AnekaCategory, AnekaProduct } from "@/lib/anekadropship";
-
-/* Trust / value proposition strip */
-export function Features() {
-  const items = [
-    { icon: Tag, title: "Langsung dari supplier", desc: "" },
-    { icon: ShoppingCart, title: "Pesan via WhatsApp", desc: "Cepat & praktis" },
-    { icon: ShieldCheck, title: "Transaksi Aman", desc: "Pesanan terlindungi" },
-    { icon: MessageCircle, title: "CS Siap Bantu", desc: "Setiap hari via WhatsApp" },
-  ];
-  return (
-    <section className="container-site mt-6">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        {items.map((it) => (
-          <div
-            key={it.title}
-            className="flex items-center gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm"
-          >
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand/5 text-brand">
-              <it.icon className="h-5 w-5" />
-            </span>
-            <div className="min-w-0">
-              <p className="line-clamp-2 text-sm font-semibold leading-snug text-ink">{it.title}</p>
-              {it.desc ? <p className="truncate text-xs text-muted-2">{it.desc}</p> : null}
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
 
 /* Kategori (real categories from anekadropship.id) */
 export function PopularCategories({

@@ -1,11 +1,7 @@
-"use client";
-
-import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
-import { marketplaces, WHATSAPP_NUMBER, whatsappDisplay } from "@/lib/config";
-import MarketplaceIcon from "@/components/MarketplaceIcon";
-import MarketplaceNotice from "@/components/MarketplaceNotice";
+import Image from "next/image";
+import { WHATSAPP_NUMBER, whatsappDisplay } from "@/lib/config";
+import FooterMarketplace from "@/components/FooterMarketplace";
 
 const payments = [
   { name: "BCA", src: "/images/footer/bca.png" },
@@ -39,9 +35,6 @@ const shippings = [
 ];
 
 export default function Footer() {
-  // Marketplace whose store link was clicked but the store isn't there yet.
-  const [missingMp, setMissingMp] = useState<string | null>(null);
-
   return (
     <footer className="mt-14 border-t border-gray-100 bg-white">
       {/* Link Lainnya */}
@@ -51,7 +44,7 @@ export default function Footer() {
         <Link href="/karir" className="transition-colors hover:text-brand">Karir</Link>
         <Link href="/tips" className="transition-colors hover:text-brand">Blog</Link>
         <Link href="/bantuan" className="transition-colors hover:text-brand">Bantuan</Link>
-        <Link href="/syarat-ketentuan" className="transition-colors hover:text-brand">Syarat &amp; Ketentuan</Link>
+        <Link href="/syarat-ketentuan" className="transition-colors hover:text-brand">Syarat & Ketentuan</Link>
       </div>
 
       <div className="bg-gray-50/70">
@@ -59,11 +52,12 @@ export default function Footer() {
           {/* Brand + newsletter */}
           <div>
             <Link href="/" className="flex items-center gap-2">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <Image
                 src="/images/logo.png"
                 alt="KTD Store"
-                className="h-9 w-9 rounded-xl bg-brand object-contain"
+                width={36}
+                height={36}
+                className="rounded-xl bg-brand object-contain"
               />
               <span className="text-xl font-extrabold tracking-tight text-ink">
                 KTD Store
@@ -97,43 +91,8 @@ export default function Footer() {
             </p>
           </div>
 
-          {/* Marketplace */}
-          <div>
-            <h3 className="text-base font-bold text-ink">Belanja di Marketplace</h3>
-            <p className="mt-3 text-sm text-muted">
-              Pesan melalui WhatsApp — marketplace resmi segera menyusul.
-            </p>
-            {missingMp && (
-              <div className="mt-3">
-                <MarketplaceNotice
-                  label={missingMp}
-                  onClose={() => setMissingMp(null)}
-                  message={
-                    <>
-                      Toko KTD Store belum tersedia di <b>{missingMp}</b>. Silakan
-                      pesan melalui WhatsApp untuk saat ini.
-                    </>
-                  }
-                />
-              </div>
-            )}
-            <div className="mt-4 flex flex-col gap-2">
-              {marketplaces.map((m) => (
-                <button
-                  key={m.key}
-                  type="button"
-                  onClick={() => setMissingMp(m.label)}
-                  className="flex items-center gap-3 rounded-xl bg-white px-3 py-2.5 text-sm font-semibold shadow-sm ring-1 ring-gray-200 transition-all hover:-translate-y-0.5 hover:shadow-md"
-                >
-                  <span className="flex h-9 w-20 shrink-0 items-center justify-center">
-                    <MarketplaceIcon name={m.key} className="h-5 w-auto max-w-full object-contain" />
-                  </span>
-                  <span className="text-ink">{m.label}</span>
-                  <ArrowRight className="ml-auto h-4 w-4 text-muted-2" aria-hidden="true" />
-                </button>
-              ))}
-            </div>
-          </div>
+          {/* Marketplace — client component for interactivity */}
+          <FooterMarketplace />
         </div>
 
         {/* Payments & shipping */}
@@ -146,10 +105,11 @@ export default function Footer() {
                 title={p.name}
                 className="flex h-10 w-16 items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-white p-1.5"
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+                <Image
                   src={p.src}
                   alt={p.name}
+                  width={64}
+                  height={40}
                   loading="lazy"
                   className="max-h-full max-w-full object-contain"
                 />
@@ -164,10 +124,11 @@ export default function Footer() {
                 title={s.name}
                 className="flex h-10 w-16 items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-white p-1.5"
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+                <Image
                   src={s.src}
                   alt={s.name}
+                  width={64}
+                  height={40}
                   loading="lazy"
                   className="max-h-full max-w-full object-contain"
                 />

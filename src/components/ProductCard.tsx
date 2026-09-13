@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { Check, ShoppingCart } from "lucide-react";
 import type { AnekaProduct } from "@/lib/anekadropship";
@@ -22,13 +23,12 @@ export default function ProductCard({ p }: { p: AnekaProduct }) {
         href={`/produk/${p.id}`}
         className="relative block aspect-[4/3] w-full overflow-hidden bg-gray-50"
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <Image
           src={p.image}
           alt={p.name}
-          loading="lazy"
-          decoding="async"
-          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+          fill
+          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+          className="object-cover transition-transform duration-500 group-hover:scale-105"
         />
         {lowStock && (
           <span className="absolute left-2 top-2 rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
@@ -62,11 +62,10 @@ export default function ProductCard({ p }: { p: AnekaProduct }) {
             type="button"
             onClick={() => toggleItem({ id: p.id, name: p.name, image: p.image, price })}
             aria-label={inCart ? "Hapus dari Keranjang" : "Masukkan Keranjang"}
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition-colors ${
-              inCart
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition-colors ${inCart
                 ? "border-brand bg-brand text-white"
                 : "border-gray-200 text-ink hover:border-brand hover:text-brand"
-            }`}
+              }`}
           >
             {inCart ? <Check className="h-4 w-4" /> : <ShoppingCart className="h-4 w-4" />}
           </button>
