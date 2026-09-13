@@ -20,15 +20,15 @@ export default function HeroCarousel() {
 
   return (
     <div className="overflow-hidden rounded-2xl bg-gradient-to-br from-brand via-brand to-[#c41f05] text-white shadow-lg">
-      {/* Image area */}
-      <div className="group relative">
-        <div key={slide.image} className="animate-fade-in">
+      {/* Image area — fixed aspect ratio for smooth transitions */}
+      <div className="group relative aspect-[4/3] sm:aspect-[21/9]">
+        <div key={slide.image} className="absolute inset-0 animate-fade-in">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={slide.image}
             alt=""
             aria-hidden="true"
-            className="block w-full h-auto"
+            className="h-full w-full object-cover"
           />
         </div>
 
