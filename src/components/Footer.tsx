@@ -79,8 +79,8 @@ export default function Footer() {
             </p>
             <p className="mt-3 text-sm">
               <span className="text-muted">Email: </span>
-              <a href="mailto:support@ktdstore.com" className="font-medium transition-colors hover:text-brand">
-                support@ktdstore.com
+              <a href="mailto:info@kustoro2026.com" className="font-medium transition-colors hover:text-brand">
+                info@kustoro2026.com
               </a>
             </p>
             <p className="mt-1.5 text-sm">

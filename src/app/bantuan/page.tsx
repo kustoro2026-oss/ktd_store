@@ -61,8 +61,8 @@ const TOPICS = [
   {
     icon: Mail,
     title: "Email Kami",
-    desc: "Pertanyaan lengkap? Kirim email ke support@ktdstore.com.",
-    href: "mailto:support@ktdstore.com",
+    desc: "Pertanyaan lengkap? Kirim email ke info@kustoro2026.com.",
+    href: "mailto:info@kustoro2026.com",
     cta: "Kirim Email",
   },
 ];
