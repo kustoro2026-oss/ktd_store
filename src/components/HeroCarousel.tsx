@@ -2,32 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Coffee,
-  CookingPot,
-  Fish,
-  Flashlight,
-  Gift,
-  Home,
-  Mic,
-  Tent,
-  type LucideIcon,
-} from "lucide-react";
-import { heroSlides, type IconKey } from "@/lib/data";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { heroSlides } from "@/lib/data";
 import { marketplaces, marketplaceLink, whatsappLink } from "@/lib/config";
-
-const HERO_ICONS: Partial<Record<IconKey, LucideIcon>> = {
-  home: Home,
-  cooking: CookingPot,
-  flashlight: Flashlight,
-  fish: Fish,
-  tent: Tent,
-  coffee: Coffee,
-  mic: Mic,
-  gift: Gift,
-};
 
 export default function HeroCarousel() {
   const [index, setIndex] = useState(0);
@@ -40,14 +17,13 @@ export default function HeroCarousel() {
 
   const go = (i: number) => setIndex((i + total) % total);
   const slide = heroSlides[index];
-  const SlideIcon = HERO_ICONS[slide.icon] ?? Home;
 
   return (
     <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-brand via-brand to-[#c41f05] text-white shadow-lg">
       {/* Slide background image */}
       <div key={slide.image} className="absolute inset-0 animate-fade-in">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={slide.image} alt="" aria-hidden="true" className="h-full w-full object-cover" />
+        <img src={slide.image} alt="" aria-hidden="true" className="h-full w-full object-contain" />
         {/* Overlay untuk keterbacaan teks */}
         <div className="absolute inset-0 bg-gradient-to-r from-[#4a0e02]/90 via-[#7a1a05]/70 to-[#a32004]/55" />
       </div>
@@ -57,21 +33,7 @@ export default function HeroCarousel() {
       <div className="pointer-events-none absolute -bottom-24 right-24 h-72 w-72 rounded-full bg-white/5" />
       <div className="pointer-events-none absolute left-1/2 top-0 h-40 w-40 -translate-x-1/2 rounded-full bg-white/5 blur-2xl" />
 
-      <div className="relative flex min-h-[320px] flex-col items-center justify-center px-6 py-12 text-center sm:min-h-[360px] sm:px-12">
-        <span className="mb-4 inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-1 text-xs font-semibold tracking-wide backdrop-blur">
-          <span className="h-1.5 w-1.5 rounded-full bg-yellow-300" />
-          Belanja Online Mudah &amp; Aman
-        </span>
-
-        <span key={slide.icon} className="flex h-20 w-20 items-center justify-center rounded-2xl bg-white/15 backdrop-blur animate-fade-in-up">
-          <SlideIcon className="h-11 w-11" />
-        </span>
-
-        <h2 key={`t-${index}`} className="mt-5 max-w-2xl text-3xl font-extrabold leading-tight sm:text-4xl animate-fade-in-up">
-          {slide.title}
-        </h2>
-        <p className="mt-2 max-w-xl text-sm text-white/85 sm:text-base">{slide.subtitle}</p>
-
+      <div className="relative flex aspect-[4/3] min-h-[320px] flex-col items-center justify-end px-6 pb-2 pt-12 text-center sm:aspect-[21/9] sm:min-h-[360px] sm:pr-16 sm:px-12">
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
           <Link
             href="/produk"
@@ -129,13 +91,13 @@ export default function HeroCarousel() {
       </button>
 
       {/* Dots */}
-      <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 gap-1.5">
+      <div className="absolute right-4 top-1/2 flex -translate-y-1/2 flex-col gap-1.5">
         {heroSlides.map((_, i) => (
           <button
             key={i}
             onClick={() => go(i)}
             aria-label={`Slide ${i + 1}`}
-            className={`h-2 rounded-full transition-all ${i === index ? "w-6 bg-white" : "w-2 bg-white/50 hover:bg-white/70"}`}
+            className={`w-2 rounded-full transition-all ${i === index ? "h-6 bg-white" : "h-2 bg-white/50 hover:bg-white/70"}`}
           />
         ))}
       </div>

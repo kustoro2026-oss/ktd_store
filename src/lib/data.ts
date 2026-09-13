@@ -97,14 +97,16 @@ export function getBlogPost(slug: string): BlogPost | undefined {
 }
 
 export const heroSlides: { title: string; subtitle: string; icon: IconKey; image: string }[] = [
-  { title: "Alat Rumah Tangga", subtitle: "Kebutuhan harian rumah Anda", icon: "home", image: "/images/hero/party.jpg" },
-  { title: "Peralatan Dapur", subtitle: "Perlengkapan memasak lengkap", icon: "cooking", image: "/images/hero/cooking.jpg" },
-  { title: "Koleksi Headlamp", subtitle: "Penerangan untuk aktivitas outdoor", icon: "flashlight", image: "/images/hero/flashlight.jpg" },
-  { title: "Perlengkapan Memancing", subtitle: "Kotak perkakas pancing", icon: "fish", image: "/images/hero/fish.jpg" },
-  { title: "Alat Masak Camping", subtitle: "Peralatan outdoor", icon: "tent", image: "/images/hero/tent.jpg" },
-  { title: "Aksesoris Kopi", subtitle: "Wadah ampas kopi", icon: "coffee", image: "/images/hero/coffee.jpg" },
-  { title: "Condenser Microphone", subtitle: "Peralatan rekaman", icon: "mic", image: "/images/hero/mic.jpg" },
-  { title: "Berbagai Kategori Pilihan", subtitle: "Produk pilihan untuk kebutuhan Anda", icon: "gift", image: "/images/hero/gift.jpg" },
+  { title: "", subtitle: "", icon: "home", image: "/images/hero/1.png" },
+  { title: "", subtitle: "", icon: "home", image: "/images/hero/2.png" },
+  { title: "", subtitle: "", icon: "home", image: "/images/hero/3.png" },
+  { title: "", subtitle: "", icon: "home", image: "/images/hero/4.png" },
+  { title: "", subtitle: "", icon: "home", image: "/images/hero/5.png" },
+  { title: "", subtitle: "", icon: "home", image: "/images/hero/6.png" },
+  { title: "", subtitle: "", icon: "home", image: "/images/hero/7.png" },
+  { title: "", subtitle: "", icon: "home", image: "/images/hero/8.png" },
+  { title: "", subtitle: "", icon: "home", image: "/images/hero/9.png" },
+  { title: "", subtitle: "", icon: "home", image: "/images/hero/10.png" },
 ];
 
 export const recentSearches = ["Powerbank", "Lampu LED", "Pembersih", "Kesehatan"];
