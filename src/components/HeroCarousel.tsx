@@ -27,10 +27,10 @@ export default function HeroCarousel() {
           src={slide.image}
           alt=""
           aria-hidden="true"
-          className="h-full w-full object-cover"
+          className="h-full w-full object-contain"
         />
         {/* Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/25 to-black/20" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
       </div>
 
       {/* Decorative shapes */}
@@ -104,8 +104,8 @@ export default function HeroCarousel() {
             onClick={() => go(i)}
             aria-label={`Slide ${i + 1}`}
             className={`rounded-full transition-all ${i === index
-                ? "bg-white"
-                : "bg-white/50 hover:bg-white/70"
+              ? "bg-white"
+              : "bg-white/50 hover:bg-white/70"
               } h-2 w-2 sm:h-2 sm:w-2 ${i === index ? "w-6 sm:w-2 sm:h-6" : ""
               }`}
           />
