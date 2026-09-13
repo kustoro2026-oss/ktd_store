@@ -223,6 +223,8 @@ export type AnekaProductDetail = {
   hasVariants: boolean;
   /** Daftar varian produk (kosong jika tanpa varian). */
   variants: AnekaVariant[];
+  /** Link Google Drive marketing kit (null jika tidak ada). */
+  marketingKitUrl: string | null;
 };
 
 export class AnekaClient {
@@ -402,8 +404,13 @@ export class AnekaClient {
     const $ = cheerio.load(html);
     const name = cleanProductName($("h1").first().text());
 
+    // Hanya ambil gambar dari kartu produk utama (bg-white rounded-xl shadow-md),
+    // BUKAN dari seluruh halaman. Ini mencegah gambar "Produk Terkait" ikut
+    // masuk ke galeri produk.
     const images: string[] = [];
-    $('img[src*="/uploads/products"]').each((_, el) => {
+    const productCard = $(".bg-white.rounded-xl.shadow-md").first();
+    const galleryScope = productCard.length ? productCard : $("body");
+    galleryScope.find('img[src*="/uploads/products"]').each((_, el) => {
       const src = $(el).attr("src") ?? "";
       if (src && !images.includes(src)) images.push(src);
     });
@@ -442,6 +449,10 @@ export class AnekaClient {
     const sku = $("[data-sku]").first().attr("data-sku") ?? "";
     const alamatSeller = $("[data-address]").first().attr("data-address") ?? "";
 
+    // Ekstrak link Google Drive marketing kit (jika ada).
+    const marketingKitUrl =
+      $('a[href*="drive.google.com"]').first().attr("href") ?? null;
+
     return {
       id,
       name,
@@ -462,6 +473,7 @@ export class AnekaClient {
       alamatSeller,
       hasVariants: variants.length > 0,
       variants,
+      marketingKitUrl,
     };
   }
 
