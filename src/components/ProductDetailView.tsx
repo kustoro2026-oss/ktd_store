@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Boxes, MessageCircle, Package, ShieldCheck, ShoppingBag, Tag } from "lucide-react";
+import { Boxes, MessageCircle, Package, Share2, ShieldCheck, ShoppingBag, Tag } from "lucide-react";
 import { marketplaces } from "@/lib/config";
 import { getTikTokProductLink } from "@/lib/tiktok-product-links";
 import { sanitizeHtml } from "@/lib/sanitize";
@@ -72,6 +72,35 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
   const [waOpen, setWaOpen] = useState(false);
   // Marketplace whose link was clicked but the product isn't uploaded there yet.
   const [missingMp, setMissingMp] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  /** Bagikan halaman produk via Web Share API (mobile) atau salin link (desktop). */
+  const handleShare = async () => {
+    const url = window.location.href;
+    const title = detail.name;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title, url });
+      } catch {
+        // User cancelled
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(url);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch {
+        const input = document.createElement("input");
+        input.value = url;
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand("copy");
+        document.body.removeChild(input);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }
+    }
+  };
 
   /** Buka link marketplace; khusus TikTok Shop pakai link produk dari tokopedia-products.json. */
   const openMarketplace = (label: string, key: string) => {
@@ -166,7 +195,20 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
 
         {/* Info */}
         <div className="min-w-0">
-          <h1 className="text-xl font-bold leading-snug text-ink sm:text-2xl">{detail.name}</h1>
+          <div className="flex items-start justify-between gap-3">
+            <h1 className="text-xl font-bold leading-snug text-ink sm:text-2xl">{detail.name}</h1>
+            <button
+              type="button"
+              onClick={handleShare}
+              title={copied ? "Link disalin!" : "Bagikan produk"}
+              className="shrink-0 rounded-xl border border-gray-200 bg-white p-2.5 text-muted-2 transition-all hover:border-brand hover:text-brand hover:shadow-sm"
+            >
+              <Share2 className="h-5 w-5" />
+            </button>
+          </div>
+          {copied && (
+            <p className="mt-1 text-xs font-medium text-brand animate-pulse">Link berhasil disalin!</p>
+          )}
 
           <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-muted-2">
             {detail.terjual && (
@@ -213,8 +255,8 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
                           type="button"
                           onClick={() => setSelWarna(w)}
                           className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${isSel
-                              ? "border-brand bg-brand text-white"
-                              : "border-gray-200 bg-white text-ink hover:border-brand"
+                            ? "border-brand bg-brand text-white"
+                            : "border-gray-200 bg-white text-ink hover:border-brand"
                             }`}
                         >
                           {w}
@@ -236,8 +278,8 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
                           type="button"
                           onClick={() => setSelUkuran(u)}
                           className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${isSel
-                              ? "border-brand bg-brand text-white"
-                              : "border-gray-200 bg-white text-ink hover:border-brand"
+                            ? "border-brand bg-brand text-white"
+                            : "border-gray-200 bg-white text-ink hover:border-brand"
                             }`}
                         >
                           {u}
@@ -259,8 +301,8 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
                           type="button"
                           onClick={() => setSelLabel(l)}
                           className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${isSel
-                              ? "border-brand bg-brand text-white"
-                              : "border-gray-200 bg-white text-ink hover:border-brand"
+                            ? "border-brand bg-brand text-white"
+                            : "border-gray-200 bg-white text-ink hover:border-brand"
                             }`}
                         >
                           {l}
