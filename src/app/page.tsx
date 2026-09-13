@@ -26,7 +26,7 @@ export const metadata: Metadata = {
     title: "KTD Store — Belanja Online Produk Pilihan",
     description:
       "Produk pilihan langsung dari supplier dengan harga terbaik. Pesan mudah dan aman via WhatsApp.",
-    images: [{ url: "/images/hero/coffee.jpg", alt: "KTD Store — Belanja Online Produk Pilihan" }],
+    images: [{ url: "/images/logo.png", width: 512, height: 512, alt: "KTD Store — Belanja Online Produk Pilihan" }],
     siteName: "KTD Store",
     locale: "id_ID",
   },
@@ -35,7 +35,7 @@ export const metadata: Metadata = {
     title: "KTD Store — Belanja Online Produk Pilihan",
     description:
       "Produk pilihan langsung dari supplier dengan harga terbaik. Pesan mudah dan aman via WhatsApp.",
-    images: ["/images/hero/coffee.jpg"],
+    images: ["/images/logo.png"],
   },
 };
 

@@ -52,16 +52,25 @@ export async function generateMetadata({
     // Gambar lokal (hasil sinkronisasi) agar OG/JSON-LD tidak hotlink eksternal.
     const localImages = toLocalImages(detail.id, detail.images);
     const ogImages = localImages.length
-      ? absoluteImages(localImages)
-      : [`${SITE_URL}/placeholder.svg`];
+      ? absoluteImages(localImages).map((url) => ({
+        url,
+        width: 800,
+        height: 800,
+        alt: detail.name,
+      }))
+      : [{ url: `${SITE_URL}/placeholder.svg`, width: 800, height: 800, alt: detail.name }];
+    const price = priceValue(detail.rekomendasiJual);
+    const inStock = Number(String(detail.stok).replace(/\D/g, "") || "0") > 0;
+    const productUrl = `${SITE_URL}/produk/${detail.id}`;
     return {
       title: detail.name,
       description,
+      keywords: [detail.name, "KTD Store", "belanja online", "dropship Indonesia"],
       alternates: { canonical: `/produk/${detail.id}` },
       robots: { index: true, follow: true },
       openGraph: {
         type: "website",
-        url: `${SITE_URL}/produk/${detail.id}`,
+        url: productUrl,
         title: detail.name,
         description,
         images: ogImages,
@@ -72,7 +81,15 @@ export async function generateMetadata({
         card: "summary_large_image",
         title: detail.name,
         description,
-        images: ogImages,
+        images: ogImages.map((img) => img.url),
+      },
+      other: {
+        "product:price.amount": price ? String(price) : "",
+        "product:price.currency": "IDR",
+        "product:availability": inStock ? "in stock" : "out of stock",
+        "product:condition": "new",
+        "product:brand": "KTD Store",
+        "product:retailer_item_id": detail.id,
       },
     };
   } catch {
