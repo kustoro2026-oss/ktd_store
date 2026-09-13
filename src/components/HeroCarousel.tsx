@@ -19,44 +19,39 @@ export default function HeroCarousel() {
   const slide = heroSlides[index];
 
   return (
-    <div className="group relative h-[300px] overflow-hidden rounded-2xl bg-gradient-to-br from-brand via-brand to-[#c41f05] text-white shadow-lg sm:h-[400px] lg:h-[500px]">
-      {/* Slide background image */}
-      <div key={slide.image} className="absolute inset-0 animate-fade-in">
+    <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-brand via-brand to-[#c41f05] text-white shadow-lg">
+      {/* Slide background image — natural size, full width */}
+      <div key={slide.image} className="relative animate-fade-in">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={slide.image}
           alt=""
           aria-hidden="true"
-          className="h-full w-full object-contain"
+          className="block w-full h-auto"
         />
-        {/* Overlay */}
+        {/* Overlay — dark only at bottom for button readability */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
       </div>
 
-      {/* Decorative shapes */}
-      <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-white/10" />
-      <div className="pointer-events-none absolute -bottom-24 right-24 h-72 w-72 rounded-full bg-white/5" />
-      <div className="pointer-events-none absolute left-1/2 top-0 h-40 w-40 -translate-x-1/2 rounded-full bg-white/5 blur-2xl" />
-
       {/* Buttons + Marketplace — absolute bottom */}
-      <div className="absolute bottom-0 left-0 right-0 flex flex-col items-center px-6 pb-4 sm:pb-6">
-        <div className="flex flex-wrap items-center justify-center gap-3">
+      <div className="absolute bottom-0 left-0 right-0 flex flex-col items-center px-4 pb-3">
+        <div className="flex flex-wrap items-center justify-center gap-2">
           <Link
             href="/produk"
-            className="rounded-xl bg-black px-6 py-3 text-sm font-bold text-white shadow-lg transition-all hover:-translate-y-0.5 hover:bg-gray-900"
+            className="rounded-xl bg-black px-5 py-2.5 text-sm font-bold text-white shadow-lg transition-all hover:-translate-y-0.5 hover:bg-gray-900"
           >
             Belanja Sekarang
           </Link>
           <Link
             href="/produk"
-            className="rounded-xl border border-white/40 px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-white/10"
+            className="rounded-xl border border-white/40 px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-white/10"
           >
             Lihat Kategori
           </Link>
         </div>
 
         {/* Marketplace strip */}
-        <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+        <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5">
           <span className="text-xs text-white/70">Pesan melalui:</span>
           <a
             href={whatsappLink("Halo KTD Store, saya ingin bertanya tentang produk Anda.")}
@@ -80,7 +75,7 @@ export default function HeroCarousel() {
         </div>
       </div>
 
-      {/* Arrows */}
+      {/* Arrows — hidden on mobile */}
       <button
         onClick={() => go(index - 1)}
         aria-label="Slide sebelumnya"
@@ -97,15 +92,13 @@ export default function HeroCarousel() {
       </button>
 
       {/* Dots — bottom-center on mobile, right-center on desktop */}
-      <div className="absolute bottom-14 left-1/2 flex -translate-x-1/2 gap-1.5 sm:bottom-auto sm:left-auto sm:right-4 sm:top-1/2 sm:-translate-y-1/2 sm:-translate-x-0 sm:flex-col">
+      <div className="absolute bottom-12 left-1/2 flex -translate-x-1/2 gap-1.5 sm:bottom-auto sm:left-auto sm:right-4 sm:top-1/2 sm:-translate-y-1/2 sm:-translate-x-0 sm:flex-col">
         {heroSlides.map((_, i) => (
           <button
             key={i}
             onClick={() => go(i)}
             aria-label={`Slide ${i + 1}`}
-            className={`rounded-full transition-all ${i === index
-              ? "bg-white"
-              : "bg-white/50 hover:bg-white/70"
+            className={`rounded-full transition-all ${i === index ? "bg-white" : "bg-white/50 hover:bg-white/70"
               } h-2 w-2 sm:h-2 sm:w-2 ${i === index ? "w-6 sm:w-2 sm:h-6" : ""
               }`}
           />
