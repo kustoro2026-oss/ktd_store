@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import {
   BANK_ACCOUNTS,
+  COD_FEE,
   PAYMENT_METHODS,
   buildWhatsAppOrderMessage,
   whatsappLink,
@@ -374,7 +375,8 @@ export default function WhatsAppOrderModal({
   const allSelected =
     groups.length > 0 && groups.every((_, idx) => selectedFor(idx) !== null);
 
-  const grandTotal = subtotal + totalOngkir;
+  const codFeeAmount = payment === "cod" ? COD_FEE : 0;
+  const grandTotal = subtotal + totalOngkir + codFeeAmount;
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -411,6 +413,7 @@ export default function WhatsAppOrderModal({
       qty: isCart ? "" : qty.trim(),
       note: note.trim(),
       payment: paymentLabel,
+      codFee: codFeeAmount || undefined,
       shipping: {
         courier:
           first.r.service_name +
@@ -965,6 +968,14 @@ export default function WhatsAppOrderModal({
                 </span>
                 <span className="font-semibold text-ink">
                   {formatRupiah(totalOngkir)}
+                </span>
+              </div>
+            )}
+            {codFeeAmount > 0 && (
+              <div className="flex justify-between">
+                <span className="text-muted-2">Biaya COD</span>
+                <span className="font-semibold text-ink">
+                  {formatRupiah(codFeeAmount)}
                 </span>
               </div>
             )}

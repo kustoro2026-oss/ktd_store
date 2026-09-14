@@ -121,6 +121,9 @@ export const PAYMENT_METHODS: PaymentMethod[] = [
   },
 ];
 
+/** Biaya tambahan untuk metode pembayaran COD (Cash on Delivery). */
+export const COD_FEE = 2500;
+
 export type BankAccount = {
   bank: string;
   accountNumber: string;
@@ -144,6 +147,8 @@ export type WhatsAppOrderInput = {
   shipping?: WhatsAppShipping;
   /** Metode pembayaran yang dipilih pembeli (label tampilan). */
   payment?: string;
+  /** Biaya COD (Rp) jika pembeli memilih COD. */
+  codFee?: number;
   /** When set (cart checkout), the message lists every item instead of a single product. */
   items?: { name: string; price: string }[];
 };
@@ -167,6 +172,7 @@ export function buildWhatsAppOrderMessage(i: WhatsAppOrderInput): string {
   );
   if (i.qty) lines.push(`Jumlah: ${i.qty}`);
   if (i.payment) lines.push(`Metode Pembayaran: ${i.payment}`);
+  if (i.codFee && i.codFee > 0) lines.push(`Biaya COD: Rp ${i.codFee.toLocaleString("id-ID")}`);
   if (i.shipping) {
     if (i.shipping.groups && i.shipping.groups.length > 1) {
       lines.push("", "Pengiriman:");
