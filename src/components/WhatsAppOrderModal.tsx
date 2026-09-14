@@ -28,6 +28,8 @@ type Props = {
   productName: string;
   price: string;
   productId?: string;
+  /** Gambar produk (thumbnail) untuk ditampilkan di ringkasan. */
+  productImage?: string;
   items?: { id: string; name: string; price: string }[];
   variantLabel?: string;
   weight?: number | null;
@@ -85,6 +87,7 @@ export default function WhatsAppOrderModal({
   productName,
   price,
   productId,
+  productImage,
   items,
   variantLabel,
   weight,
@@ -178,6 +181,52 @@ export default function WhatsAppOrderModal({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
+
+  // Auto cek ongkir begitu kecamatan dipilih
+  useEffect(() => {
+    if (!open || !districtId) return;
+    const w = lockedWeight ?? Number(weightStr);
+    if (!isCart && (!w || !Number.isFinite(w) || w < 1)) return;
+    setRatesLoading(true);
+    setRatesError("");
+    const payload: Record<string, unknown> = {
+      destination: districtId,
+      itemValue: subtotal,
+    };
+    if (isCart) {
+      payload.productIds = (items ?? []).map((it) => it.id);
+    } else {
+      if (productId) payload.productId = productId;
+      payload.weight = Math.round(w);
+    }
+    fetch("/api/shipping/rates", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+      .then((r) =>
+        readJson<{ error?: string; groups?: RateGroup[] }>(
+          r,
+          ONGKIR_UNAVAILABLE
+        )
+      )
+      .then((j) => {
+        if (j.error) throw new Error(j.error);
+        const gs = j.groups ?? [];
+        setGroups(gs);
+        setSelectedByGroup({});
+        if (!gs.length || gs.every((g) => !(g.results ?? []).length)) {
+          setRatesError("Tidak ada kurir yang melayani tujuan ini.");
+        }
+      })
+      .catch((e: unknown) =>
+        setRatesError(
+          e instanceof Error ? e.message : "Gagal menghitung ongkir"
+        )
+      )
+      .finally(() => setRatesLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, districtId, qty, weightStr]);
 
   if (!open) return null;
 
@@ -576,9 +625,20 @@ export default function WhatsAppOrderModal({
               ) : (
                 <div>
                   <div className="flex items-start gap-3">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-brand/5">
-                      <Package className="h-5 w-5 text-brand" />
-                    </div>
+                    {productImage ? (
+                      <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-gray-100 bg-gray-50">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={productImage}
+                          alt={productName}
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-brand/5">
+                        <Package className="h-5 w-5 text-brand" />
+                      </div>
+                    )}
                     <div className="min-w-0 flex-1">
                       <p className="line-clamp-2 text-sm font-semibold text-ink">
                         {productName}
@@ -634,71 +694,51 @@ export default function WhatsAppOrderModal({
             </div>
 
             <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-4">
+              {/* Info berat + status loading ongkir */}
               {!isCart && (
-                <div className="mb-3 flex gap-2">
-                  <div className="relative w-28 shrink-0">
-                    <input
-                      value={
-                        lockedWeight !== null
-                          ? String(lockedWeight)
-                          : weightStr
-                      }
-                      onChange={(e) => {
-                        setWeightStr(e.target.value);
-                        setGroups([]);
-                        setSelectedByGroup({});
-                      }}
-                      disabled={lockedWeight !== null}
-                      inputMode="numeric"
-                      aria-label="Berat paket (gram)"
-                      className={`${inputCls} pr-8 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-muted-2`}
-                    />
-                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-2">
-                      gr
+                <div className="mb-3 flex items-center gap-3">
+                  <div className="flex items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-sm">
+                    {lockedWeight !== null ? (
+                      <Lock className="h-3.5 w-3.5 text-muted-2" />
+                    ) : null}
+                    <span className="font-semibold text-ink">
+                      {lockedWeight !== null
+                        ? `${lockedWeight} gr`
+                        : `${weightStr || "1000"} gr`}
                     </span>
-                    {lockedWeight !== null && (
-                      <span
-                        className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center text-muted-2"
-                        title="Berat mengikuti data produk"
-                      >
-                        <Lock className="h-3.5 w-3.5" />
-                      </span>
+                    {!lockedWeight && (
+                      <input
+                        value={weightStr}
+                        onChange={(e) => setWeightStr(e.target.value)}
+                        inputMode="numeric"
+                        aria-label="Berat paket (gram)"
+                        className="ml-1 w-16 rounded border border-gray-200 px-1.5 py-0.5 text-xs outline-none focus:border-brand"
+                      />
                     )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={checkRates}
-                    disabled={ratesLoading || !districtId}
-                    className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {ratesLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Truck className="h-4 w-4" />
-                    )}
-                    Cek Ongkir
-                  </button>
+                  {volume && (
+                    <span className="text-xs text-muted-2">
+                      Volume {volume}
+                    </span>
+                  )}
+                  {ratesLoading && (
+                    <span className="inline-flex items-center gap-1 text-xs text-brand">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Memuat ongkir…
+                    </span>
+                  )}
                 </div>
               )}
-              {isCart && (
-                <button
-                  type="button"
-                  onClick={checkRates}
-                  disabled={ratesLoading || !districtId}
-                  className="mb-3 flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-2 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {ratesLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Truck className="h-4 w-4" />
-                  )}
-                  Cek Ongkir
-                </button>
+              {isCart && ratesLoading && (
+                <div className="mb-3 flex items-center gap-2 text-xs text-brand">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Memuat ongkir…
+                </div>
               )}
 
               {!isCart && lockedWeight !== null && (
                 <p className="mb-2 text-[11px] text-muted-2">
-                  Berat {weightLabel ?? `${lockedWeight} gram`}
+                  {weightLabel ?? `${lockedWeight} gram`}
                   {volume ? ` · Volume ${volume}` : ""} — sesuai data produk
                 </p>
               )}
@@ -709,6 +749,12 @@ export default function WhatsAppOrderModal({
                     ? "paket terpisah sesuai seller"
                     : "paket"}
                   ).
+                </p>
+              )}
+
+              {!districtId && (
+                <p className="text-[11px] text-muted-2">
+                  Pilih kecamatan tujuan untuk melihat ongkir
                 </p>
               )}
 
@@ -739,8 +785,8 @@ export default function WhatsAppOrderModal({
                         <label
                           key={`${r.service}-${r.service_type}-${i}`}
                           className={`flex cursor-pointer items-center gap-3 rounded-lg border bg-white px-3 py-2.5 transition-all ${selectedByGroup[gi] === i
-                              ? "border-brand ring-2 ring-brand/20 shadow-sm"
-                              : "border-gray-200 hover:border-gray-300"
+                            ? "border-brand ring-2 ring-brand/20 shadow-sm"
+                            : "border-gray-200 hover:border-gray-300"
                             }`}
                         >
                           <input
@@ -795,8 +841,8 @@ export default function WhatsAppOrderModal({
                   <label
                     key={p.key}
                     className={`flex cursor-pointer items-start gap-3 rounded-lg border bg-white px-4 py-3 transition-all ${payment === p.key
-                        ? "border-brand ring-2 ring-brand/20 shadow-sm"
-                        : "border-gray-200 hover:border-gray-300"
+                      ? "border-brand ring-2 ring-brand/20 shadow-sm"
+                      : "border-gray-200 hover:border-gray-300"
                       }`}
                   >
                     <input
@@ -884,7 +930,7 @@ export default function WhatsAppOrderModal({
                 id="wa-note"
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                placeholder="Contoh: Tolong dipacking dengan bubble wrap ya kak..."
+                placeholder="Warna, ukuran, atau catatan tambahan untuk penjual..."
                 rows={2}
                 className={inputCls}
               />

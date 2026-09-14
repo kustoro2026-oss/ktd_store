@@ -476,6 +476,7 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
         productName={detail.name}
         price={price}
         productId={detail.id}
+        productImage={detail.images?.[0]}
         variantLabel={variantNote}
         weight={detail.beratGram}
         weightLabel={detail.berat}
