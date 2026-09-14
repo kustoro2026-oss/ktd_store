@@ -146,17 +146,41 @@ async function main() {
   }
 
   const districtCache = new Map<string, DistrictEntry[]>();
-  async function districtsOf(city: CityEntry): Promise<DistrictEntry[]> {
+
+  /** Retry wrapper: coba ulang hingga 3x dengan jeda bertambah. */
+  async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        return await fn();
+      } catch (e) {
+        if (attempt < 2) {
+          const wait = 2000 * (attempt + 1);
+          console.log(`  ⚠ Retry ${attempt + 1}/2 ${label} (tunggu ${wait / 1000}s)...`);
+          await sleep(wait);
+        } else {
+          throw e;
+        }
+      }
+    }
+    throw new Error("unreachable");
+  }
+
+  async function districtsOf(city: CityEntry): Promise<DistrictEntry[] | null> {
     const key = String(city.id);
     const hit = districtCache.get(key);
     if (hit) return hit;
-    const ds = await getDistricts(city.id);
-    await sleep(150);
-    const list: DistrictEntry[] = ds
-      .map((d) => ({ id: d.id, name: String(d.kecamatan_name ?? "").trim() }))
-      .filter((d) => d.name);
-    districtCache.set(key, list);
-    return list;
+    try {
+      const ds = await withRetry(() => getDistricts(city.id), `districtsOf(${city.name})`);
+      await sleep(500);
+      const list: DistrictEntry[] = ds
+        .map((d) => ({ id: d.id, name: String(d.kecamatan_name ?? "").trim() }))
+        .filter((d) => d.name);
+      districtCache.set(key, list);
+      return list;
+    } catch {
+      console.log(`  ✗ Gagal ambil kecamatan ${city.name} (skip)`);
+      return null;
+    }
   }
 
   /** Cari kecamatan dari teks alamat, di dalam kota tertentu. */
@@ -164,6 +188,7 @@ async function main() {
     const t = norm(text);
     if (!t) return null;
     const ds = await districtsOf(city);
+    if (!ds) return null;
     const matches: DistrictEntry[] = [];
     for (const d of ds) {
       const names = wordOrders(norm(stripPrefix(d.name)));
@@ -179,11 +204,50 @@ async function main() {
   const unresolved: { id: string; location: string; address: string }[] = [];
   const cityDistrictSet: Record<string, Set<number>> = {}; // lokasi -> himpunan district
 
-  let matched = 0;
+  const outPath = path.resolve("src/lib/seller-origins.json");
+
+  /** Simpan hasil sementara (incremental) agar tidak hilang saat gagal. */
+  function saveProgress() {
+    fs.writeFileSync(
+      outPath,
+      JSON.stringify(
+        {
+          byProductId: sortObj(byProductId),
+          byAddress: sortObj(byAddress),
+          byLocation: sortObj(byLocationCurrent()),
+        },
+        null,
+        2
+      ) + "\n"
+    );
+  }
+
+  function byLocationCurrent(): Record<string, number> {
+    const m: Record<string, number> = {};
+    for (const [key, ids] of Object.entries(cityDistrictSet)) {
+      if (ids.size === 1) m[key] = Array.from(ids)[0];
+    }
+    return m;
+  }
+
+  // Resume dari hasil sebelumnya (jika ada).
+  const prevPath = path.resolve("src/lib/seller-origins.json");
+  if (fs.existsSync(prevPath)) {
+    const prev = JSON.parse(fs.readFileSync(prevPath, "utf8"));
+    Object.assign(byProductId, prev.byProductId ?? {});
+    Object.assign(byAddress, prev.byAddress ?? {});
+    const prevCount = Object.keys(byProductId).length;
+    if (prevCount > 0) console.log(`Resume dari ${prevCount} produk yang sudah ter-resolve.`);
+  }
+
+  let matched = Object.keys(byProductId).length;
   let idx = 0;
   const entries = Object.entries(addresses);
   for (const [id, info] of entries) {
     idx++;
+    // Skip produk yang sudah ter-resolve sebelumnya.
+    if (byProductId[id]) continue;
+
     const address = String(info.address ?? "").trim();
     const location = String(info.location ?? "").trim();
     let districtId: number | null = null;
@@ -202,14 +266,16 @@ async function main() {
       if (city) {
         const key = norm(location);
         const ds = await districtsOf(city);
-        const matchedDs = ds.filter((d) =>
-          wordOrders(norm(stripPrefix(d.name))).some((n) => containsPhrase(key, n))
-        );
-        if (matchedDs.length === 1) {
-          districtId = Number(matchedDs[0].id);
-        } else {
-          const set = (cityDistrictSet[key] ??= new Set<number>());
-          for (const d of ds) set.add(Number(d.id));
+        if (ds) {
+          const matchedDs = ds.filter((d) =>
+            wordOrders(norm(stripPrefix(d.name))).some((n) => containsPhrase(key, n))
+          );
+          if (matchedDs.length === 1) {
+            districtId = Number(matchedDs[0].id);
+          } else {
+            const set = (cityDistrictSet[key] ??= new Set<number>());
+            for (const d of ds) set.add(Number(d.id));
+          }
         }
       }
     }
@@ -224,7 +290,10 @@ async function main() {
     } else {
       unresolved.push({ id, location, address });
     }
-    if (idx % 50 === 0) console.log(`  ${idx}/${entries.length}...`);
+    if (idx % 50 === 0) {
+      console.log(`  ${idx}/${entries.length}... (save checkpoint)`);
+      saveProgress();
+    }
   }
 
   // byLocation: hanya lokasi yang konsisten ke satu kecamatan di semua produknya.
@@ -233,8 +302,7 @@ async function main() {
     if (ids.size === 1) byLocation[key] = Array.from(ids)[0];
   }
 
-  // ─── 5) Tulis hasil ─────────────────────────────────────────────────────────
-  const outPath = path.resolve("src/lib/seller-origins.json");
+  // ─── 5) Tulis hasil final ───────────────────────────────────────────────────
   fs.writeFileSync(
     outPath,
     JSON.stringify(
