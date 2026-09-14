@@ -66,66 +66,97 @@ export type KARate = {
 // dinormalisasi (lowercase, non‑alphanumeric dihapus), value adalah kode KA.
 
 export const COURIER_NAME_TO_KA_CODE: Record<string, string> = {
-  // JNE
+  // JNE — semua varian umum anekadropship
   jne: "jne",
   jneexpress: "jne",
+  jnereg: "jne",
+  jnectc: "jne",
+  jnecitytocity: "jne",
   jalurnugrahaekakurir: "jne",
+  jneoke: "jne",
+  jneyes: "jne",
   // J&T
   jt: "jnt",
   jnt: "jnt",
   jtexpress: "jnt",
   jntexpress: "jnt",
+  jtez: "jnt",
+  jntregular: "jnt",
   // Sicepat
   sicepat: "sicepat",
   sicepatekspres: "sicepat",
+  sicepatreg: "sicepat",
+  sicepatbest: "sicepat",
+  sicepatcargo: "sicepat",
   // TIKI
   tiki: "tiki",
+  tikireguler: "tiki",
+  tikieconomy: "tiki",
+  tikions: "tiki",
+  titipankilat: "tiki",
   citravantitipankilat: "tiki",
   // SPX / Shopee Express
   spx: "spx",
   shopeexpress: "spx",
   shopexspress: "spx",
+  shopeexspress: "spx",
   // AnterAja
   anteraja: "anteraja",
   anterajasameday: "anteraja",
+  anterajaregular: "anteraja",
   // Lion Parcel
   lion: "lion",
   lionparcel: "lion",
+  lionexpress: "lion",
+  regpack: "lion",
+  jagopack: "lion",
+  bosspack: "lion",
+  bigpack: "lion",
   // SAP
   sap: "sap",
   sapexpress: "sap",
+  sapsatria: "sap",
   // J&T Cargo
   jtcargo: "jtcargo",
   jntcargo: "jtcargo",
+  jtcargoreguler: "jtcargo",
   // NCS
   ncs: "ncs",
+  ncsregular: "ncs",
   // ID Express
   idx: "idx",
   idexpress: "idx",
   idekspres: "idx",
+  idstandard: "idx",
   // Ninja
   ninja: "ninja",
   ninjavan: "ninja",
   ninjaxpress: "ninja",
+  ninjastandard: "ninja",
   // Pos Indonesia
   pos: "pos",
   posindonesia: "pos",
   ptposindonesia: "pos",
+  poskilat: "pos",
   // Wahana
   wahana: "wahana",
+  wahanareguler: "wahana",
   // JET Express
   jet: "jet",
   jetexpress: "jet",
   // Indah Logistik
   indah: "indah",
   indahlogistik: "indah",
+  indahcargo: "indah",
   // PCP
   pcp: "pcp",
+  pcpexpress: "pcp",
   // Pandu
   pandu: "pandu",
   pandulogistik: "pandu",
   // REX
   rex: "rex",
+  rexexpress: "rex",
 };
 
 /**
@@ -151,20 +182,50 @@ export function mapEkspedisiToCourierCodes(ekspedisi: string[]): string[] {
   return [...codes];
 }
 
+/** Semua kode kurir KiriminAja yang dikenal — untuk fuzzy matching fallback. */
+const ALL_KA_CODES = [...new Set(Object.values(COURIER_NAME_TO_KA_CODE))];
+
 /**
  * Cek apakah sebuah rate dari KiriminAja cocok dengan salah satu nama
  * ekspedisi produk. Dipakai untuk client‑side filtering di form order.
+ *
+ * Strategi pencocokan (berurutan, berhenti saat pertama cocok):
+ * 1. Kode KA hasil mapping = `rate.service` → exact match
+ * 2. Nama ekspedisi (mentah) muncul di dalam `service_name` rate
+ * 3. Kombinasi `service_name` + `service` mengandung kode KA
+ * 4. Salah satu kata dari nama ekspedisi adalah substring dari `service_name`
  */
 export function matchEkspedisi(rate: { service: string; service_name: string }, ekspedisiList: string[]): boolean {
   const kaCode = rate.service.toLowerCase();
-  const codes = mapEkspedisiToCourierCodes(ekspedisiList);
-  return codes.some((c) => {
-    // Cocok langsung
-    if (c === kaCode) return true;
-    // Cek juga kombinasi service_name + service (lebih longgar)
-    const hay = normalizeCourierName(`${rate.service_name} ${rate.service}`);
-    return hay.includes(c) || c.includes(hay.split(" ")[0]);
-  });
+  const hay = normalizeCourierName(`${rate.service_name} ${rate.service}`);
+
+  for (const raw of ekspedisiList) {
+    const norm = normalizeCourierName(raw);
+    // 1) Kode KA hasil mapping → cocok langsung dengan service
+    const ka = COURIER_NAME_TO_KA_CODE[norm] ?? norm;
+    if (ka === kaCode) return true;
+
+    // 2) Kombinasi service_name+service mengandung kode KA (atau sebaliknya)
+    if (hay.includes(ka) || ka.includes(hay)) return true;
+
+    // 3) Fuzzy: HANYA jika nama tidak dikenali (tidak ada di mapping),
+    //    coba cek apakah nama mengandung kode KA yang dikenal sbg substring.
+    if (!COURIER_NAME_TO_KA_CODE[norm]) {
+      for (const code of ALL_KA_CODES) {
+        if (code.length < 3) continue; // kode terlalu pendek rawan false positive
+        if (norm.includes(code) && code === kaCode) return true;
+      }
+    }
+
+    // 4) Fuzzy longgar: kata dari service_name (min 3 karakter) muncul di nama ekspedisi
+    //    HANYA jika kode KA hasil mapping tidak dikenal (fallback untuk nama custom)
+    if (!COURIER_NAME_TO_KA_CODE[norm]) {
+      const serviceWords = normalizeCourierName(rate.service_name).split(/\s+/);
+      if (serviceWords.some((w) => w.length >= 3 && norm.includes(w))) return true;
+    }
+  }
+
+  return false;
 }
 
 export type KARateResult = {
