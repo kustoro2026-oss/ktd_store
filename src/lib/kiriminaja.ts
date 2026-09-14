@@ -4,14 +4,25 @@
 // Auth: Authorization: Bearer {api_key}
 // Sandbox:    https://tdev.kiriminaja.com
 // Production: https://client.kiriminaja.com
+//
+// IP Whitelist Bypass:
+// KiriminAja mewajibkan IP statis untuk API key. Karena Vercel memiliki IP
+// egress dinamis, kita bisa menggunakan Cloudflare Worker sebagai proxy.
+// Set KIRIMINAJA_PROXY_URL ke URL Worker (contoh: https://ka-proxy.namamu.workers.dev)
+// Worker akan meneruskan request dengan X-Forwarded-For yang sesuai.
+// Jika proxy tidak diset, fallback ke panggilan langsung dengan XFF dari env.
 
 import https from "https";
 
 const BASE_URL = process.env.KIRIMINAJA_BASE_URL ?? "https://tdev.kiriminaja.com";
 const API_KEY = process.env.KIRIMINAJA_API_KEY ?? "";
+// Opsional: Cloudflare Worker proxy URL untuk bypass IP whitelist.
+// Jika diset, semua panggilan API akan melalui proxy ini.
+const PROXY_URL = process.env.KIRIMINAJA_PROXY_URL ?? "";
 // Gateway KiriminAja memakai nilai X-Forwarded-For sebagai "IP pemanggil"
 // untuk whitelist key (bukan IP socket asli). Karena IP egress Vercel dinamis,
 // kita kirim IP tetap yang terdaftar di key lewat env ini.
+// Catatan: XFF hanya dipakai jika TIDAK menggunakan proxy (proxy yang handle XFF).
 const XFF_IP = process.env.KIRIMINAJA_XFF_IP ?? "";
 
 export type KAProvince = {
@@ -66,6 +77,12 @@ type KAResponse<T> = {
 async function kaPost<T>(path: string, body?: unknown): Promise<KAResponse<T>> {
   if (!API_KEY) throw new Error("KIRIMINAJA_API_KEY belum diatur di .env.local");
 
+  // Jika proxy URL diset, gunakan proxy (Cloudflare Worker) sebagai perantara.
+  // Proxy akan menangani X-Forwarded-For sehingga request lolos IP whitelist.
+  if (PROXY_URL) {
+    return kaPostViaProxy<T>(path, body);
+  }
+
   const url = new URL(path, BASE_URL);
   const payload = JSON.stringify(body ?? {});
 
@@ -104,6 +121,44 @@ async function kaPost<T>(path: string, body?: unknown): Promise<KAResponse<T>> {
 
   if (json?.status === false) {
     throw new Error(json?.text ?? "KiriminAja menolak permintaan");
+  }
+  return json;
+}
+
+/** Panggil KiriminAja lewat Cloudflare Worker proxy (bypass IP whitelist). */
+async function kaPostViaProxy<T>(path: string, body?: unknown): Promise<KAResponse<T>> {
+  const proxyUrl = `${PROXY_URL.replace(/\/+$/, "")}${path}`;
+  const payload = JSON.stringify(body ?? {});
+
+  const res = await fetch(proxyUrl, {
+    method: "POST",
+    headers: {
+      "Accept": "application/json",
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${API_KEY}`,
+      "Content-Length": String(Buffer.byteLength(payload)),
+    },
+    body: payload,
+    signal: AbortSignal.timeout(15000),
+  });
+
+  if (!res.ok && res.status !== 200) {
+    const text = await res.text();
+    try {
+      const json = JSON.parse(text);
+      if (json?.status === false) {
+        throw new Error(json?.text ?? "KiriminAja menolak permintaan (via proxy)");
+      }
+    } catch {
+      // bukan JSON
+    }
+    throw new Error(`Proxy KiriminAja error (HTTP ${res.status}): ${text.slice(0, 200)}`);
+  }
+
+  const json = (await res.json()) as KAResponse<T>;
+
+  if (json?.status === false) {
+    throw new Error(json?.text ?? "KiriminAja menolak permintaan (via proxy)");
   }
   return json;
 }
