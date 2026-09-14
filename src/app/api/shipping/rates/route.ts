@@ -89,6 +89,9 @@ export async function POST(request: Request) {
 /**
  * Hitung ongkir per kelompok seller: setiap produk dipetakan ke kecamatan
  * asal seller-nya, lalu barang dengan origin sama digabung jadi satu paket.
+ *
+ * ⚡ Optimasi: fetch detail produk dan tarif secara paralel (Promise.all)
+ * supaya latency tidak menumpuk (sebelumnya sequential for‑of).
  */
 async function rateGroupsForProducts(opts: {
   ids: string[];
@@ -98,15 +101,24 @@ async function rateGroupsForProducts(opts: {
   fallbackWeight: number;
 }): Promise<RateGroup[]> {
   const { ids, destination, itemValue, courier, fallbackWeight } = opts;
+  const uniqueIds = [...new Set(ids)];
 
-  // 1) Kumpulkan origin + berat tiap produk (detail di-cache 5 menit).
+  // 1) Fetch semua detail produk secara paralel.
+  const detailResults = await Promise.all(
+    uniqueIds.map(async (id) => {
+      const detail = await getDetailCached(id);
+      return { id, detail };
+    })
+  );
+
+  // 2) Kumpulkan origin + berat tiap produk.
   const entries = new Map<
     number,
     { origin: number; label: string; weight: number; estimated: boolean; count: number }
   >();
-  for (const id of [...new Set(ids)]) {
-    const detail = await getDetailCached(id);
-    if (!detail?.name) continue; // produk tidak ditemukan — lewati
+
+  for (const { id, detail } of detailResults) {
+    if (!detail?.name) continue;
 
     const origin = resolveOriginDistrict({
       productId: id,
@@ -145,30 +157,29 @@ async function rateGroupsForProducts(opts: {
     throw new Error("Produk tidak ditemukan. Coba muat ulang halaman produk.");
   }
 
-  // 2) Hitung tarif per grup (origin berbeda = pengiriman terpisah).
-  const groups: RateGroup[] = [];
+  // 3) Hitung tarif per grup secara paralel.
   const multi = entries.size > 1;
   const fallbackPerItem = fallbackWeight > 0 ? fallbackWeight / ids.length : 0;
-  for (const g of entries.values()) {
-    // Berat total minimal 1 gram. Item tanpa data berat pakai estimasi
-    // (default 1000 gr atau rata-rata berat input manual bila tersedia).
-    const weight = Math.max(1, Math.round(g.weight));
-    const result = await getRates({
-      origin: g.origin,
-      destination,
-      weight,
-      // Asuransi hanya untuk paket tunggal (nilai item tidak bisa dipecah per paket).
-      itemValue: multi ? undefined : itemValue,
-      courier,
-    });
-    groups.push({
-      origin: g.origin,
-      label: g.label,
-      weight: g.count === 1 ? weight : Math.round(g.weight) || weight,
-      estimated: g.estimated || Boolean(fallbackPerItem),
-      results: result.results,
-    });
-  }
 
-  return groups;
+  const groupResults = await Promise.all(
+    [...entries.values()].map(async (g) => {
+      const weight = Math.max(1, Math.round(g.weight));
+      const result = await getRates({
+        origin: g.origin,
+        destination,
+        weight,
+        itemValue: multi ? undefined : itemValue,
+        courier,
+      });
+      return {
+        origin: g.origin,
+        label: g.label,
+        weight: g.count === 1 ? weight : Math.round(g.weight) || weight,
+        estimated: g.estimated || Boolean(fallbackPerItem),
+        results: result.results,
+      } satisfies RateGroup;
+    })
+  );
+
+  return groupResults;
 }

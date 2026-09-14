@@ -346,23 +346,29 @@ export async function getRates(input: GetRatesInput): Promise<KARateResult> {
     throw new Error("KIRIMINAJA_ORIGIN_DISTRICT belum diatur di .env.local");
   }
 
-  const payload: Record<string, unknown> = {
-    origin,
-    destination: Number(input.destination),
-    weight: input.weight,
-  };
-  if (input.itemValue && input.itemValue > 0) {
-    payload.item_value = input.itemValue;
-    // KiriminAja mewajibkan insurance bila item_value dikirim (angka 1 = aktif).
-    payload.insurance = 1;
-  }
-  if (input.courier && input.courier.length) payload.courier = input.courier;
+  const destination = Number(input.destination);
+  const courierKey = input.courier?.length ? input.courier.sort().join(",") : "all";
+  const cacheKey = `rates:${origin}:${destination}:${input.weight}:${input.itemValue ?? 0}:${courierKey}`;
 
-  const json = await kaPost<KARate>("/api/mitra/v6.1/shipping_price", payload);
-  return {
-    origin,
-    destination: Number(input.destination),
-    weight: input.weight,
-    results: json.results ?? [],
-  };
+  return cached(cacheKey, async () => {
+    const payload: Record<string, unknown> = {
+      origin,
+      destination,
+      weight: input.weight,
+    };
+    if (input.itemValue && input.itemValue > 0) {
+      payload.item_value = input.itemValue;
+      // KiriminAja mewajibkan insurance bila item_value dikirim (angka 1 = aktif).
+      payload.insurance = 1;
+    }
+    if (input.courier && input.courier.length) payload.courier = input.courier;
+
+    const json = await kaPost<KARate>("/api/mitra/v6.1/shipping_price", payload);
+    return {
+      origin,
+      destination,
+      weight: input.weight,
+      results: json.results ?? [],
+    };
+  });
 }
