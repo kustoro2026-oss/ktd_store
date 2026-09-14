@@ -56,6 +56,117 @@ export type KARate = {
   insurance: number | string;
 };
 
+// ─── Mapping nama ekspedisi produk → kode kurir KiriminAja ──────────────
+//
+// Produk anekadropship punya field "Ekspedisi" yang berisi nama kurir dalam
+// berbagai format (contoh: "JNE", "J&T", "Ninja Van"). KiriminAja API
+// memakai kode pendek: "jne", "jnt", "ninja", dll.
+//
+// Map ini menjembatani kedua format. Key adalah nama yang sudah
+// dinormalisasi (lowercase, non‑alphanumeric dihapus), value adalah kode KA.
+
+export const COURIER_NAME_TO_KA_CODE: Record<string, string> = {
+  // JNE
+  jne: "jne",
+  jneexpress: "jne",
+  jalurnugrahaekakurir: "jne",
+  // J&T
+  jt: "jnt",
+  jnt: "jnt",
+  jtexpress: "jnt",
+  jntexpress: "jnt",
+  // Sicepat
+  sicepat: "sicepat",
+  sicepatekspres: "sicepat",
+  // TIKI
+  tiki: "tiki",
+  citravantitipankilat: "tiki",
+  // SPX / Shopee Express
+  spx: "spx",
+  shopeexpress: "spx",
+  shopexspress: "spx",
+  // AnterAja
+  anteraja: "anteraja",
+  anterajasameday: "anteraja",
+  // Lion Parcel
+  lion: "lion",
+  lionparcel: "lion",
+  // SAP
+  sap: "sap",
+  sapexpress: "sap",
+  // J&T Cargo
+  jtcargo: "jtcargo",
+  jntcargo: "jtcargo",
+  // NCS
+  ncs: "ncs",
+  // ID Express
+  idx: "idx",
+  idexpress: "idx",
+  idekspres: "idx",
+  // Ninja
+  ninja: "ninja",
+  ninjavan: "ninja",
+  ninjaxpress: "ninja",
+  // Pos Indonesia
+  pos: "pos",
+  posindonesia: "pos",
+  ptposindonesia: "pos",
+  // Wahana
+  wahana: "wahana",
+  // JET Express
+  jet: "jet",
+  jetexpress: "jet",
+  // Indah Logistik
+  indah: "indah",
+  indahlogistik: "indah",
+  // PCP
+  pcp: "pcp",
+  // Pandu
+  pandu: "pandu",
+  pandulogistik: "pandu",
+  // REX
+  rex: "rex",
+};
+
+/**
+ * Normalisasi string: lowercase + hapus semua karakter non‑alphanumeric.
+ * Cocok untuk mencocokkan nama ekspedisi secara longgar.
+ */
+export function normalizeCourierName(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+/**
+ * Konversi daftar nama ekspedisi dari produk (contoh: ["JNE", "J&T", "Ninja Van"])
+ * menjadi kode kurir KiriminAja (contoh: ["jne", "jnt", "ninja"]).
+ * Nama yang tidak dikenali akan dikembalikan apa adanya (sudah dinormalisasi).
+ */
+export function mapEkspedisiToCourierCodes(ekspedisi: string[]): string[] {
+  const codes = new Set<string>();
+  for (const e of ekspedisi) {
+    const norm = normalizeCourierName(e);
+    const code = COURIER_NAME_TO_KA_CODE[norm] ?? norm;
+    codes.add(code);
+  }
+  return [...codes];
+}
+
+/**
+ * Cek apakah sebuah rate dari KiriminAja cocok dengan salah satu nama
+ * ekspedisi produk. Dipakai untuk client‑side filtering di form order.
+ */
+export function matchEkspedisi(rate: { service: string; service_name: string }, ekspedisiList: string[]): boolean {
+  const kaCode = rate.service.toLowerCase();
+  const codes = mapEkspedisiToCourierCodes(ekspedisiList);
+  return codes.some((c) => {
+    // Cocok langsung
+    if (c === kaCode) return true;
+    // Cek juga kombinasi service_name + service (lebih longgar)
+    const hay = normalizeCourierName(`${rate.service_name} ${rate.service}`);
+    return hay.includes(c) || c.includes(hay.split(" ")[0]);
+  });
+}
+
 export type KARateResult = {
   origin: number;
   destination: number;

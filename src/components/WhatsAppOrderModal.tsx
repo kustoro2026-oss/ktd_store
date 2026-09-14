@@ -21,6 +21,7 @@ import {
   buildWhatsAppOrderMessage,
   whatsappLink,
 } from "@/lib/config";
+import { mapEkspedisiToCourierCodes, matchEkspedisi } from "@/lib/kiriminaja";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
 
 type Props = {
@@ -190,10 +191,14 @@ export default function WhatsAppOrderModal({
     if (!isCart && (!w || !Number.isFinite(w) || w < 1)) return;
     setRatesLoading(true);
     setRatesError("");
+    const courierCodes = ekspedisi?.length
+      ? mapEkspedisiToCourierCodes(ekspedisi)
+      : undefined;
     const payload: Record<string, unknown> = {
       destination: districtId,
       itemValue: subtotal,
     };
+    if (courierCodes) payload.courier = courierCodes;
     if (isCart) {
       payload.productIds = (items ?? []).map((it) => it.id);
     } else {
@@ -312,10 +317,14 @@ export default function WhatsAppOrderModal({
     }
     setRatesLoading(true);
     setRatesError("");
+    const courierCodes = ekspedisi?.length
+      ? mapEkspedisiToCourierCodes(ekspedisi)
+      : undefined;
     const payload: Record<string, unknown> = {
       destination: districtId,
       itemValue: subtotal,
     };
+    if (courierCodes) payload.courier = courierCodes;
     if (isCart) {
       payload.productIds = (items ?? []).map((it) => it.id);
     } else {
@@ -352,12 +361,7 @@ export default function WhatsAppOrderModal({
 
   const ratesFor = (g: RateGroup): Rate[] => {
     if (isCart || !ekspedisi?.length) return g.results ?? [];
-    const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
-    const allowed = ekspedisi.map(norm);
-    const filtered = (g.results ?? []).filter((r) => {
-      const hay = norm(`${r.service_name} ${r.service}`);
-      return allowed.some((e) => hay.includes(e));
-    });
+    const filtered = (g.results ?? []).filter((r) => matchEkspedisi(r, ekspedisi));
     return filtered.length ? filtered : g.results ?? [];
   };
 
