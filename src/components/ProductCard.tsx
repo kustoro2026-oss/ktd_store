@@ -63,15 +63,16 @@ export default function ProductCard({ p }: { p: AnekaProduct }) {
             onClick={() => toggleItem({ id: p.id, name: p.name, image: p.image, price })}
             aria-label={inCart ? "Hapus dari Keranjang" : "Masukkan Keranjang"}
             className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition-colors ${inCart
-                ? "border-brand bg-brand text-white"
-                : "border-gray-200 text-ink hover:border-brand hover:text-brand"
+              ? "border-brand bg-brand text-white"
+              : "border-gray-200 text-ink hover:border-brand hover:text-brand"
               }`}
           >
             {inCart ? <Check className="h-4 w-4" /> : <ShoppingCart className="h-4 w-4" />}
           </button>
           <Link
             href={`/produk/${p.id}`}
-            className="flex min-w-[96px] flex-1 items-center justify-center whitespace-nowrap rounded-lg bg-brand px-2 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-2"
+            className="flex min-w-[96px] flex-1 items-center justify-center whitespace-nowrap rounded-lg bg-brand px-2 py-2 text-sm font-semibold transition-colors hover:bg-brand-2"
+            style={{ color: "#ffffff" }}
           >
             Lihat Detail
           </Link>
