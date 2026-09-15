@@ -135,6 +135,30 @@ export function formatDescription(html: string): string {
         }
     }
 
+    // ── 2c. Fix invalid nested lists (ul inside ol without li wrapper) ──
+    //    e.g. <ol><ul><li>...</li></ul></ol> → <ol><li>...</li></ol>
+    $("ol > ul, ol > ol, ul > ol, ul > ul").each((_, el) => {
+        const $inner = $(el);
+        const $outer = $inner.parent();
+        $inner.children().each((_, child) => {
+            $outer.append(child);
+        });
+        $inner.remove();
+    });
+
+    // ── 2d. Unwrap redundant single-child lists ────────────────────────
+    //    e.g. <li><ul><li>text</li></ul></li> → <li>text</li>
+    $("li > ul, li > ol").each((_, el) => {
+        const $inner = $(el);
+        const $outerLi = $inner.parent();
+        // Only unwrap if the inner list has exactly one <li> child
+        if ($inner.children("li").length === 1) {
+            const $innerLi = $inner.children("li").first();
+            // Move the inner <li>'s content to the outer <li>, then remove inner list
+            $outerLi.html($innerLi.html() ?? "");
+        }
+    });
+
     // ── 3. Downgrade <h1> → <strong> (suppliers use <h1> for content) ──
     $("h1").each((_, el) => {
         const $el = $(el);
