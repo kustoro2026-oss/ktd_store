@@ -50,68 +50,153 @@ a {
   overflow: hidden;
 }
 
-/* Scraped product description styles */
+/* ── Product description (scraped + formatted) ── */
+.deskripsi-produk {
+  color: #2c2b2e;
+  line-height: 1.75;
+}
+
+/* Paragraphs */
 .deskripsi-produk p {
-  margin: 0.5rem 0;
+  margin: 0.6rem 0;
 }
-.deskripsi-produk ol {
-  list-style: decimal outside;
-  padding-left: 1.5rem;
-  margin: 0.5rem 0;
-}
-.deskripsi-produk ul {
-  list-style: disc outside;
-  padding-left: 1.5rem;
-  margin: 0.5rem 0;
-}
-.deskripsi-produk li {
-  margin: 0.15rem 0;
-}
-.deskripsi-produk img {
-  max-width: 100%;
-  height: auto;
-  border-radius: 0.5rem;
-  margin: 0.5rem 0;
-}
+
+/* Headings */
 .deskripsi-produk h1 {
   font-size: 1.5rem;
   font-weight: 700;
-  margin: 0.75rem 0 0.5rem;
+  margin: 1.25rem 0 0.6rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 2px solid #f0f0f0;
+  color: #1a1a1a;
 }
+
 .deskripsi-produk h2 {
   font-size: 1.25rem;
   font-weight: 700;
-  margin: 0.75rem 0 0.5rem;
+  margin: 1rem 0 0.5rem;
+  color: #1a1a1a;
 }
+
 .deskripsi-produk h3 {
-  font-size: 1.1rem;
-  font-weight: 600;
-  margin: 0.5rem 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 1rem 0 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: #f9fafb;
+  border-left: 4px solid #f2300c;
+  border-radius: 0 0.5rem 0.5rem 0;
+  color: #1a1a1a;
 }
+
+.deskripsi-produk h3:first-child {
+  margin-top: 0;
+}
+
+/* Bold / strong */
 .deskripsi-produk strong,
 .deskripsi-produk b {
   font-weight: 700;
+  color: #1a1a1a;
 }
+
+/* Ordered lists */
+.deskripsi-produk ol {
+  list-style: decimal outside;
+  padding-left: 1.75rem;
+  margin: 0.6rem 0;
+}
+
+/* Unordered lists */
+.deskripsi-produk ul {
+  list-style: none;
+  padding-left: 0.25rem;
+  margin: 0.6rem 0;
+}
+
+.deskripsi-produk ul li {
+  position: relative;
+  padding-left: 1.5rem;
+  margin: 0.35rem 0;
+}
+
+.deskripsi-produk ul li::before {
+  content: "•";
+  position: absolute;
+  left: 0.25rem;
+  color: #f2300c;
+  font-weight: 700;
+}
+
+.deskripsi-produk ol li {
+  margin: 0.35rem 0;
+}
+
+/* Images */
+.deskripsi-produk img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.75rem;
+  margin: 0.75rem 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* Links */
 .deskripsi-produk a {
   color: #f2300c;
   text-decoration: underline;
+  text-underline-offset: 2px;
 }
+
+.deskripsi-produk a:hover {
+  color: #d9280a;
+}
+
+/* Tables */
 .deskripsi-produk table {
   border-collapse: collapse;
   width: 100%;
-  margin: 0.5rem 0;
+  margin: 0.75rem 0;
   font-size: 0.875rem;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
+
 .deskripsi-produk th,
 .deskripsi-produk td {
   border: 1px solid #e5e7eb;
-  padding: 0.4rem 0.6rem;
+  padding: 0.5rem 0.75rem;
   text-align: left;
   vertical-align: top;
 }
+
 .deskripsi-produk th {
   background: #f9fafb;
   font-weight: 600;
+  color: #1a1a1a;
+}
+
+.deskripsi-produk tr:nth-child(even) td {
+  background: #fafafa;
+}
+
+/* Horizontal rules / dividers */
+.deskripsi-produk hr {
+  border: none;
+  border-top: 1px solid #e5e7eb;
+  margin: 1rem 0;
+}
+
+/* Blockquotes (for important notes / warnings) */
+.deskripsi-produk blockquote {
+  margin: 0.75rem 0;
+  padding: 0.75rem 1rem;
+  background: #fff8f6;
+  border-left: 4px solid #f2300c;
+  border-radius: 0 0.5rem 0.5rem 0;
+  color: #5c2d24;
+  font-size: 0.925rem;
 }
 
 /* ---------- Global polish ---------- */
@@ -141,6 +226,7 @@ html {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
 .clamp-3 {
   display: -webkit-box;
   -webkit-line-clamp: 3;
@@ -153,6 +239,7 @@ html {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
@@ -162,9 +249,11 @@ html {
   scrollbar-width: thin;
   scrollbar-color: #d6d5d8 transparent;
 }
+
 .thin-scroll::-webkit-scrollbar {
   width: 6px;
 }
+
 .thin-scroll::-webkit-scrollbar-thumb {
   background: #d6d5d8;
   border-radius: 3px;
@@ -176,11 +265,13 @@ html {
     opacity: 0;
     transform: translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
   }
 }
+
 .animate-fade-in-up {
   animation: fadeInUp 0.45s ease-out both;
 }
@@ -189,10 +280,12 @@ html {
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
 }
+
 .animate-fade-in {
   animation: fadeIn 0.25s ease-out both;
 }

@@ -1,4 +1,5 @@
 import * as cheerio from "cheerio";
+import { formatDescription } from "./format-description";
 
 const BASE = "https://anekadropship.id";
 
@@ -421,7 +422,7 @@ export class AnekaClient {
     const variants = this.parseVariants(html);
 
 
-    const descriptionHtml = cleanDescription($(".deskripsi-produk").first().html() ?? "");
+    const descriptionHtml = formatDescription(cleanDescription($(".deskripsi-produk").first().html() ?? ""));
 
     const extractAfter = (label: string, stops: string[] = []): string => {
       let val = "";
