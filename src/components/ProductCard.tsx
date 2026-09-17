@@ -16,7 +16,7 @@ export default function ProductCard({ p }: { p: AnekaProduct }) {
   const stock = parseStock(p.stok);
   const lowStock = stock > 0 && stock < 50;
   const price = p.rekomendasiJual || "Rp -";
-  const promo = isProdukPromo(p.terjual) ? hitungHargaCoret(p.rekomendasiJual) : null;
+  const promo = isProdukPromo(p.rekomendasiJual) ? hitungHargaCoret(p.rekomendasiJual) : null;
 
   return (
     <div className="group flex flex-col overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-gray-200 hover:shadow-lg">

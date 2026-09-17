@@ -164,7 +164,7 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
   const variantNote = activeVariant && varOpts.length ? activeVariant.label : "";
 
   // Promo: harga coret +10% hanya untuk produk dengan terjual >= threshold
-  const promo = isProdukPromo(detail.terjual) ? hitungHargaCoret(detail.rekomendasiJual) : null;
+  const promo = isProdukPromo(detail.rekomendasiJual) ? hitungHargaCoret(detail.rekomendasiJual) : null;
   const hematNominal = promo ? parseRupiah(promo.coret) - parseRupiah(price) : 0;
 
 

@@ -3,12 +3,12 @@
  *
  * Logika:
  * - Harga coret = rekomendasiJual + MARKUP_PERCENT%
- * - Hanya berlaku untuk produk dengan jumlah terjual >= THRESHOLD
+ * - Hanya berlaku untuk produk dengan harga >= MIN_PRICE
  * - Threshold & persentase bisa diubah di sini.
  */
 
-/** Minimum jumlah terjual agar produk mendapat badge promo + harga coret. */
-export const PROMO_THRESHOLD = 50;
+/** Minimum harga (dalam rupiah) agar produk mendapat badge promo + harga coret. */
+export const PROMO_MIN_PRICE = 50000;
 
 /** Persentase markup harga coret dari harga jual (10 = 10%). */
 export const PROMO_MARKUP_PERCENT = 10;
@@ -59,9 +59,10 @@ export function formatRupiah(num: number): string {
 
 /**
  * Cek apakah produk layak dapat promo (harga coret + badge diskon).
+ * Syarat: harga >= PROMO_MIN_PRICE (default Rp 50.000).
  */
-export function isProdukPromo(terjual: string): boolean {
-    return parseTerjual(terjual) >= PROMO_THRESHOLD;
+export function isProdukPromo(rekomendasiJual: string): boolean {
+    return parseRupiah(rekomendasiJual) >= PROMO_MIN_PRICE;
 }
 
 /**
