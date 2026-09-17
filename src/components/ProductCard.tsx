@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Check, ShoppingCart } from "lucide-react";
 import type { AnekaProduct } from "@/lib/anekadropship";
 import { useCart } from "@/lib/cart";
+import { isProdukPromo, hitungHargaCoret } from "@/lib/promo";
 
 function parseStock(stok: string): number {
   const n = parseInt(stok.replace(/[^0-9]/g, ""), 10);
@@ -15,6 +16,7 @@ export default function ProductCard({ p }: { p: AnekaProduct }) {
   const stock = parseStock(p.stok);
   const lowStock = stock > 0 && stock < 50;
   const price = p.rekomendasiJual || "Rp -";
+  const promo = isProdukPromo(p.terjual) ? hitungHargaCoret(p.rekomendasiJual) : null;
 
   return (
     <div className="group flex flex-col overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-gray-200 hover:shadow-lg">
@@ -30,8 +32,19 @@ export default function ProductCard({ p }: { p: AnekaProduct }) {
           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
           className="object-cover transition-transform duration-500 group-hover:scale-105"
         />
-        {lowStock && (
+        {/* Badge diskon (pojok kiri atas) — prioritas di atas "Hampir Habis" */}
+        {promo && (
+          <span className="absolute left-2 top-2 rounded-full bg-brand px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
+            -{promo.persen}%
+          </span>
+        )}
+        {!promo && lowStock && (
           <span className="absolute left-2 top-2 rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
+            Hampir Habis
+          </span>
+        )}
+        {promo && lowStock && (
+          <span className="absolute left-2 top-8 rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
             Hampir Habis
           </span>
         )}
@@ -51,7 +64,16 @@ export default function ProductCard({ p }: { p: AnekaProduct }) {
         </Link>
 
         {/* Price */}
-        <div className="mt-2 text-lg font-bold text-brand">{price}</div>
+        <div className="mt-2">
+          {promo ? (
+            <div className="flex flex-wrap items-baseline gap-x-1.5">
+              <span className="text-lg font-bold text-brand">{price}</span>
+              <span className="text-xs text-muted-2 line-through">{promo.coret}</span>
+            </div>
+          ) : (
+            <div className="text-lg font-bold text-brand">{price}</div>
+          )}
+        </div>
 
         {/* Sold */}
         <div className="mt-1 text-xs text-muted-2">{p.terjual || "0"} terjual</div>

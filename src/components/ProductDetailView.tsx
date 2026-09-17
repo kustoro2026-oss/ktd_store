@@ -2,11 +2,12 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Boxes, MessageCircle, Package, Share2, ShieldCheck, ShoppingBag, Tag } from "lucide-react";
+import { Boxes, MessageCircle, Package, Percent, Share2, ShieldCheck, ShoppingBag, Tag } from "lucide-react";
 import { marketplaces } from "@/lib/config";
 import { getTikTokProductLink } from "@/lib/tiktok-product-links";
 import { getLazadaProductLink } from "@/lib/lazada-product-links";
 import { sanitizeHtml } from "@/lib/sanitize";
+import { isProdukPromo, hitungHargaCoret, parseRupiah, formatRupiah } from "@/lib/promo";
 import MarketplaceIcon from "@/components/MarketplaceIcon";
 import MarketplaceNotice from "@/components/MarketplaceNotice";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
@@ -162,6 +163,10 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
   const stokText = activeVariant?.stock != null ? String(activeVariant.stock) : detail.stok;
   const variantNote = activeVariant && varOpts.length ? activeVariant.label : "";
 
+  // Promo: harga coret +10% hanya untuk produk dengan terjual >= threshold
+  const promo = isProdukPromo(detail.terjual) ? hitungHargaCoret(detail.rekomendasiJual) : null;
+  const hematNominal = promo ? parseRupiah(promo.coret) - parseRupiah(price) : 0;
+
 
   return (
     <div className="container-site py-5 pb-24 lg:pb-6">
@@ -235,12 +240,32 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
 
           {/* Price card */}
           <div className="mt-5 rounded-2xl border border-brand/15 bg-brand/5 p-5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-2">
-              Harga
-            </p>
-            <p className="mt-1 text-3xl font-extrabold text-brand sm:text-4xl">
-              {price}
-            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-2">
+                Harga
+              </p>
+              {promo && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-brand px-2 py-0.5 text-[10px] font-bold text-white">
+                  <Percent className="h-3 w-3" />
+                  -{promo.persen}%
+                </span>
+              )}
+            </div>
+            <div className="mt-1 flex flex-wrap items-baseline gap-x-3">
+              <p className="text-3xl font-extrabold text-brand sm:text-4xl">
+                {price}
+              </p>
+              {promo && (
+                <p className="text-base text-muted-2 line-through sm:text-lg">
+                  {promo.coret}
+                </p>
+              )}
+            </div>
+            {promo && hematNominal > 0 && (
+              <p className="mt-2 text-xs font-medium text-green-600">
+                Hemat {formatRupiah(hematNominal)}
+              </p>
+            )}
           </div>
 
           {/* Pemilih varian */}
@@ -450,7 +475,12 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
         <div className="mx-auto flex max-w-2xl items-center gap-2">
           <div className="shrink-0">
             <p className="text-[10px] uppercase tracking-wide text-muted-2">Harga</p>
-            <p className="max-w-28 truncate text-base font-extrabold text-brand">{price}</p>
+            <div className="flex items-baseline gap-1.5">
+              <p className="max-w-28 truncate text-base font-extrabold text-brand">{price}</p>
+              {promo && (
+                <p className="text-[10px] text-muted-2 line-through">{promo.coret}</p>
+              )}
+            </div>
           </div>
           <div className="ml-auto flex min-w-0 flex-1 max-w-sm items-center justify-end gap-1.5">
             <button
