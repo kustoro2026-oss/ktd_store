@@ -7,6 +7,7 @@ import { anekaClient, type AnekaCategory, type AnekaProduct } from "@/lib/anekad
 import { getLocalImages } from "@/lib/localImages";
 
 // Lazy-load below-fold sections — they don't need to block first paint
+const FlashSale = dynamic(() => import("@/components/FlashSale"));
 const BlogSection = dynamic(() => import("@/components/Sections").then((m) => ({ default: m.BlogSection })));
 const LatestCollections = dynamic(() => import("@/components/Sections").then((m) => ({ default: m.LatestCollections })));
 const SeoText = dynamic(() => import("@/components/Sections").then((m) => ({ default: m.SeoText })));
@@ -85,6 +86,9 @@ export default async function Home() {
 
       {/* Trust strip */}
       <Features />
+
+      {/* 3. Flash Sale — produk stok terbatas dengan diskon besar + countdown */}
+      <FlashSale initialProducts={products} />
 
       {/* Kategori (real) */}
       <PopularCategories initialCategories={categories} />

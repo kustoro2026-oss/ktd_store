@@ -5,6 +5,10 @@
  * - Harga coret = rekomendasiJual + MARKUP_PERCENT%
  * - Hanya berlaku untuk produk dengan harga >= MIN_PRICE
  * - Threshold & persentase bisa diubah di sini.
+ *
+ * Flash Sale:
+ * - Diskon lebih besar (FLASH_SALE_MARKUP_PERCENT) untuk produk stok rendah.
+ * - Countdown timer reset setiap hari pukul 00:00 WIB.
  */
 
 /** Minimum harga (dalam rupiah) agar produk mendapat badge promo + harga coret. */
@@ -12,6 +16,20 @@ export const PROMO_MIN_PRICE = 50000;
 
 /** Persentase markup harga coret dari harga jual (10 = 10%). */
 export const PROMO_MARKUP_PERCENT = 10;
+
+// ─── Flash Sale ───────────────────────────────────────────────────────────
+
+/** Minimum harga agar produk bisa masuk Flash Sale. */
+export const FLASH_SALE_MIN_PRICE = 30000;
+
+/** Maksimum stok agar produk bisa masuk Flash Sale (menciptakan urgency). */
+export const FLASH_SALE_MAX_STOCK = 50;
+
+/** Persentase diskon Flash Sale (lebih besar dari promo biasa). */
+export const FLASH_SALE_DISCOUNT_PERCENT = 20;
+
+/** Jumlah maksimum produk yang ditampilkan di section Flash Sale. */
+export const FLASH_SALE_MAX_ITEMS = 12;
 
 /**
  * Parse string "terjual" dari anekadropship ke number.
@@ -58,6 +76,15 @@ export function formatRupiah(num: number): string {
 }
 
 /**
+ * Parse string stok ke number (mis. "1.234" → 1234, "50" → 50).
+ */
+export function parseStock(stok: string): number {
+    if (!stok) return 0;
+    const n = parseInt(stok.replace(/[^0-9]/g, ""), 10);
+    return Number.isNaN(n) ? 0 : n;
+}
+
+/**
  * Cek apakah produk layak dapat promo (harga coret + badge diskon).
  * Syarat: harga >= PROMO_MIN_PRICE (default Rp 50.000).
  */
@@ -82,4 +109,51 @@ export function hitungHargaCoret(
         coret: formatRupiah(coret),
         persen: PROMO_MARKUP_PERCENT,
     };
+}
+
+// ─── Flash Sale helpers ───────────────────────────────────────────────────
+
+/**
+ * Cek apakah produk layak masuk Flash Sale.
+ * Syarat: harga >= FLASH_SALE_MIN_PRICE DAN stok <= FLASH_SALE_MAX_STOCK DAN stok > 0.
+ */
+export function isFlashSaleProduct(rekomendasiJual: string, stok: string): boolean {
+    const harga = parseRupiah(rekomendasiJual);
+    const stock = parseStock(stok);
+    return harga >= FLASH_SALE_MIN_PRICE && stock > 0 && stock <= FLASH_SALE_MAX_STOCK;
+}
+
+/**
+ * Hitung harga flash sale (harga setelah diskon flash sale).
+ * Return null jika harga tidak valid.
+ *
+ * Contoh: rekomendasiJual = "Rp 50.000", FLASH_SALE_DISCOUNT = 20
+ * → { flashPrice: "Rp 40.000", coret: "Rp 50.000", persen: 20, hemat: "Rp 10.000" }
+ */
+export function hitungFlashSale(
+    rekomendasiJual: string,
+): { flashPrice: string; coret: string; persen: number; hemat: string } | null {
+    const harga = parseRupiah(rekomendasiJual);
+    if (harga <= 0) return null;
+    const diskon = Math.round(harga * (FLASH_SALE_DISCOUNT_PERCENT / 100));
+    const flashPrice = harga - diskon;
+    return {
+        flashPrice: formatRupiah(flashPrice),
+        coret: formatRupiah(harga),
+        persen: FLASH_SALE_DISCOUNT_PERCENT,
+        hemat: formatRupiah(diskon),
+    };
+}
+
+/**
+ * Hitung sisa detik hingga pukul 00:00 WIB (UTC+7) berikutnya.
+ * Dipakai untuk countdown timer Flash Sale.
+ */
+export function secondsUntilMidnightWIB(): number {
+    const now = new Date();
+    // WIB = UTC+7
+    const wibNow = new Date(now.getTime() + 7 * 3600_000);
+    const midnight = new Date(wibNow);
+    midnight.setHours(24, 0, 0, 0);
+    return Math.floor((midnight.getTime() - wibNow.getTime()) / 1000);
 }
