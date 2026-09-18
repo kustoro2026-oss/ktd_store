@@ -8,6 +8,7 @@ import {
   Lock,
   MapPin,
   MessageCircle,
+  Navigation,
   Package,
   ShoppingBag,
   Truck,
@@ -23,6 +24,35 @@ import {
 } from "@/lib/config";
 import { mapEkspedisiToCourierCodes, matchEkspedisi } from "@/lib/kiriminaja";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
+
+// ─── localStorage: simpan data pembeli untuk auto-fill ──────────────────
+
+const BUYER_DATA_KEY = "ktd-store-buyer";
+
+type SavedBuyerData = {
+  name: string;
+  phone: string;
+  address: string;
+  provinceId: string;
+  cityId: string;
+  districtId: string;
+};
+
+function loadBuyerData(): SavedBuyerData | null {
+  try {
+    const raw = localStorage.getItem(BUYER_DATA_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object") return parsed as SavedBuyerData;
+  } catch { /* corrupt */ }
+  return null;
+}
+
+function saveBuyerData(data: SavedBuyerData) {
+  try {
+    localStorage.setItem(BUYER_DATA_KEY, JSON.stringify(data));
+  } catch { /* quota */ }
+}
 
 type Props = {
   open: boolean;
@@ -126,19 +156,69 @@ export default function WhatsAppOrderModal({
   const [ratesLoading, setRatesLoading] = useState(false);
   const [ratesError, setRatesError] = useState("");
 
+  // Auto-fill & geolocation
+  const [dataLoaded, setDataLoaded] = useState(false);
+  const [geoLoading, setGeoLoading] = useState(false);
+
+  /** Isi form dari data pembeli sebelumnya (localStorage). */
+  const fillSavedData = (saved: SavedBuyerData) => {
+    setName(saved.name || "");
+    setPhone(saved.phone || "");
+    setAddress(saved.address || "");
+    setProvinceId(saved.provinceId || "");
+    setCityId(saved.cityId || "");
+    setDistrictId(saved.districtId || "");
+    setDataLoaded(true);
+  };
+
+  /** Tombol "Gunakan Lokasi Saya" — isi alamat dari GPS. */
+  const handleGeolocation = () => {
+    if (!navigator.geolocation) {
+      setLocationError("Browser tidak mendukung geolokasi.");
+      return;
+    }
+    setGeoLoading(true);
+    setLocationError("");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        setAddress(
+          `(GPS: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}) — lengkapi detail alamat`
+        );
+        setGeoLoading(false);
+      },
+      (err) => {
+        setLocationError(
+          err.code === 1
+            ? "Izin lokasi ditolak. Silakan isi alamat manual."
+            : "Gagal mendapatkan lokasi. Coba lagi."
+        );
+        setGeoLoading(false);
+      },
+      { timeout: 10000, enableHighAccuracy: false }
+    );
+  };
+
   useEffect(() => {
     if (open) {
-      setName("");
-      setPhone("");
-      setAddress("");
+      // Coba muat data pembeli sebelumnya
+      const saved = loadBuyerData();
+      if (saved) {
+        fillSavedData(saved);
+      } else {
+        setName("");
+        setPhone("");
+        setAddress("");
+        setProvinceId("");
+        setCityId("");
+        setDistrictId("");
+        setDataLoaded(false);
+      }
       setQty("1");
       setNote(variantLabel ?? "");
       setError("");
       setCities([]);
       setDistricts([]);
-      setProvinceId("");
-      setCityId("");
-      setDistrictId("");
       setLocationError("");
       setPayment("");
       setWeightStr(lockedWeight !== null ? String(lockedWeight) : "1000");
@@ -400,6 +480,15 @@ export default function WhatsAppOrderModal({
       setError("Pilih metode pembayaran (COD atau Transfer Bank).");
       return;
     }
+    // Simpan data pembeli untuk auto-fill di pesanan berikutnya
+    saveBuyerData({
+      name: name.trim(),
+      phone: phone.trim(),
+      address: address.trim(),
+      provinceId,
+      cityId,
+      districtId,
+    });
     const paymentLabel =
       PAYMENT_METHODS.find((p) => p.key === payment)?.label ?? payment;
     const productUrl =
@@ -485,6 +574,11 @@ export default function WhatsAppOrderModal({
               <h3 className="text-sm font-bold text-ink">
                 Alamat Pengiriman
               </h3>
+              {dataLoaded && (
+                <span className="ml-auto rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-medium text-green-700">
+                  Data tersimpan
+                </span>
+              )}
             </div>
 
             <div className="space-y-3 rounded-xl border border-gray-100 bg-gray-50/50 p-4">
@@ -522,9 +616,24 @@ export default function WhatsAppOrderModal({
               </div>
 
               <div>
-                <label htmlFor="wa-address" className={labelCls}>
-                  Alamat Lengkap <span className="text-red-500">*</span>
-                </label>
+                <div className="flex items-end justify-between gap-2">
+                  <label htmlFor="wa-address" className={labelCls}>
+                    Alamat Lengkap <span className="text-red-500">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleGeolocation}
+                    disabled={geoLoading}
+                    className="flex shrink-0 items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-medium text-muted-2 transition-colors hover:border-brand hover:text-brand disabled:opacity-50"
+                  >
+                    {geoLoading ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Navigation className="h-3 w-3" />
+                    )}
+                    {geoLoading ? "Mencari..." : "Gunakan Lokasi Saya"}
+                  </button>
+                </div>
                 <textarea
                   id="wa-address"
                   value={address}
