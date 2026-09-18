@@ -171,7 +171,10 @@ export default function WhatsAppOrderModal({
     setDataLoaded(true);
   };
 
-  /** Tombol "Gunakan Lokasi Saya" — isi alamat dari GPS. */
+  /**
+   * Tombol "Gunakan Lokasi Saya" — auto-pilih Provinsi / Kota / Kecamatan
+   * dari GPS via reverse geocoding (OpenStreetMap Nominatim — gratis, tanpa API key).
+   */
   const handleGeolocation = () => {
     if (!navigator.geolocation) {
       setLocationError("Browser tidak mendukung geolokasi.");
@@ -180,17 +183,116 @@ export default function WhatsAppOrderModal({
     setGeoLoading(true);
     setLocationError("");
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      async (pos) => {
         const { latitude, longitude } = pos.coords;
-        setAddress(
-          `(GPS: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}) — lengkapi detail alamat`
-        );
-        setGeoLoading(false);
+        try {
+          // Reverse geocode via Nominatim (OpenStreetMap)
+          const url = `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&accept-language=id`;
+          const res = await fetch(url, {
+            headers: { "User-Agent": "KTD-Store/1.0" },
+          });
+          if (!res.ok) throw new Error("Gagal menghubungi layanan geocoding");
+          const data = await res.json();
+          const addr = data.address ?? {};
+
+          // Ekstrak nama provinsi, kota, kecamatan dari hasil Nominatim
+          const provName =
+            addr.state || addr.region || addr.province || "";
+          const cityName =
+            addr.city || addr.county || addr.municipality || addr.town || "";
+          const districtName =
+            addr.suburb || addr.village || addr.district || addr.neighbourhood || "";
+
+          if (!provName) throw new Error("Tidak dapat menentukan provinsi dari lokasi Anda.");
+
+          // Cocokkan provinsi
+          const provMatch = provinces.find(
+            (p) => p.provinsi_name.toLowerCase().includes(provName.toLowerCase()) ||
+              provName.toLowerCase().includes(p.provinsi_name.toLowerCase())
+          );
+          if (!provMatch) throw new Error(`Provinsi "${provName}" tidak ditemukan dalam daftar.`);
+
+          // Set provinsi dulu — trigger fetch kota
+          setProvinceId(String(provMatch.id));
+          setCityId("");
+          setDistrictId("");
+          setCities([]);
+          setDistricts([]);
+          setGroups([]);
+          setSelectedByGroup({});
+          setRatesError("");
+
+          // Fetch kota untuk provinsi ini
+          setCitiesLoading(true);
+          const citiesRes = await fetch(
+            `/api/shipping/cities?provinsi_id=${encodeURIComponent(String(provMatch.id))}`
+          );
+          const citiesJson = await readJson<{ error?: string; cities?: City[] }>(
+            citiesRes,
+            ONGKIR_UNAVAILABLE
+          );
+          if (citiesJson.error) throw new Error(citiesJson.error);
+          const cityList = citiesJson.cities ?? [];
+          setCities(cityList);
+          setCitiesLoading(false);
+
+          // Cocokkan kota
+          let cityMatch: City | undefined;
+          if (cityName) {
+            cityMatch = cityList.find(
+              (c) =>
+                c.kabupaten_name.toLowerCase().includes(cityName.toLowerCase()) ||
+                cityName.toLowerCase().includes(c.kabupaten_name.toLowerCase())
+            );
+          }
+          if (!cityMatch && cityList.length > 0) cityMatch = cityList[0]; // fallback
+          if (!cityMatch) throw new Error("Tidak dapat menentukan kota dari lokasi Anda.");
+
+          setCityId(String(cityMatch.id));
+          setDistrictId("");
+          setDistricts([]);
+
+          // Fetch kecamatan untuk kota ini
+          setDistrictsLoading(true);
+          const distRes = await fetch(
+            `/api/shipping/districts?kabupaten_id=${encodeURIComponent(String(cityMatch.id))}`
+          );
+          const distJson = await readJson<{ error?: string; districts?: District[] }>(
+            distRes,
+            ONGKIR_UNAVAILABLE
+          );
+          if (distJson.error) throw new Error(distJson.error);
+          const distList = distJson.districts ?? [];
+          setDistricts(distList);
+          setDistrictsLoading(false);
+
+          // Cocokkan kecamatan
+          let distMatch: District | undefined;
+          if (districtName) {
+            distMatch = distList.find(
+              (d) =>
+                d.kecamatan_name.toLowerCase().includes(districtName.toLowerCase()) ||
+                districtName.toLowerCase().includes(d.kecamatan_name.toLowerCase())
+            );
+          }
+          if (!distMatch && distList.length > 0) distMatch = distList[0]; // fallback
+          if (distMatch) {
+            setDistrictId(String(distMatch.id));
+          }
+
+          setLocationError("");
+        } catch (e) {
+          setLocationError(
+            e instanceof Error ? e.message : "Gagal menentukan lokasi. Silakan pilih manual."
+          );
+        } finally {
+          setGeoLoading(false);
+        }
       },
       (err) => {
         setLocationError(
           err.code === 1
-            ? "Izin lokasi ditolak. Silakan isi alamat manual."
+            ? "Izin lokasi ditolak. Silakan pilih manual."
             : "Gagal mendapatkan lokasi. Coba lagi."
         );
         setGeoLoading(false);
@@ -616,24 +718,9 @@ export default function WhatsAppOrderModal({
               </div>
 
               <div>
-                <div className="flex items-end justify-between gap-2">
-                  <label htmlFor="wa-address" className={labelCls}>
-                    Alamat Lengkap <span className="text-red-500">*</span>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={handleGeolocation}
-                    disabled={geoLoading}
-                    className="flex shrink-0 items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-medium text-muted-2 transition-colors hover:border-brand hover:text-brand disabled:opacity-50"
-                  >
-                    {geoLoading ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    ) : (
-                      <Navigation className="h-3 w-3" />
-                    )}
-                    {geoLoading ? "Mencari..." : "Gunakan Lokasi Saya"}
-                  </button>
-                </div>
+                <label htmlFor="wa-address" className={labelCls}>
+                  Alamat Lengkap <span className="text-red-500">*</span>
+                </label>
                 <textarea
                   id="wa-address"
                   value={address}
@@ -645,10 +732,26 @@ export default function WhatsAppOrderModal({
               </div>
 
               <div>
-                <label className={labelCls}>
-                  Provinsi / Kota / Kecamatan{" "}
-                  <span className="text-red-500">*</span>
-                </label>
+                <div className="flex items-end justify-between gap-2">
+                  <label className={labelCls}>
+                    Provinsi / Kota / Kecamatan{" "}
+                    <span className="text-red-500">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleGeolocation}
+                    disabled={geoLoading}
+                    className="flex shrink-0 items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-medium text-muted-2 transition-colors hover:border-brand hover:text-brand disabled:opacity-50"
+                    title="Isi otomatis dari GPS"
+                  >
+                    {geoLoading ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Navigation className="h-3 w-3" />
+                    )}
+                    {geoLoading ? "Mendeteksi..." : "Lokasi Saya"}
+                  </button>
+                </div>
                 <div className="space-y-2">
                   <select
                     value={provinceId}
