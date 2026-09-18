@@ -7,8 +7,10 @@
  * - Threshold & persentase bisa diubah di sini.
  *
  * Flash Sale:
- * - Diskon lebih besar (FLASH_SALE_MARKUP_PERCENT) untuk produk stok rendah.
- * - Countdown timer reset setiap hari pukul 00:00 WIB.
+ * - Diskon lebih besar untuk produk stok rendah.
+ * - Hanya muncul di jam-jam tertentu (FLASH_SALE_SCHEDULE).
+ * - Ada safety check profit minimum agar tidak rugi.
+ * - Countdown timer menghitung mundur ke akhir sesi.
  */
 
 /** Minimum harga (dalam rupiah) agar produk mendapat badge promo + harga coret. */
@@ -26,10 +28,27 @@ export const FLASH_SALE_MIN_PRICE = 30000;
 export const FLASH_SALE_MAX_STOCK = 50;
 
 /** Persentase diskon Flash Sale (lebih besar dari promo biasa). */
-export const FLASH_SALE_DISCOUNT_PERCENT = 20;
+export const FLASH_SALE_DISCOUNT_PERCENT = 15;
 
 /** Jumlah maksimum produk yang ditampilkan di section Flash Sale. */
 export const FLASH_SALE_MAX_ITEMS = 12;
+
+/**
+ * Profit minimum (dalam rupiah) setelah diskon Flash Sale.
+ * Produk yang setelah diskon 15% untungnya di bawah ini TIDAK akan masuk Flash Sale.
+ * Contoh: modal=28.000, jual=30.000 → flash=25.500 → profit=-2.500 → DITOLAK.
+ */
+export const FLASH_SALE_MIN_PROFIT = 5000;
+
+/**
+ * Jam operasional Flash Sale (WIB, UTC+7).
+ * Format: [jam_mulai, jam_selesai] dalam 0-23.
+ * Flash Sale hanya muncul di rentang jam ini.
+ */
+export const FLASH_SALE_SCHEDULE: [number, number][] = [
+    [9, 12],   // Pagi: 09:00 - 12:00 WIB
+    [19, 23],  // Malam: 19:00 - 23:00 WIB
+];
 
 /**
  * Parse string "terjual" dari anekadropship ke number.
@@ -114,21 +133,105 @@ export function hitungHargaCoret(
 // ─── Flash Sale helpers ───────────────────────────────────────────────────
 
 /**
- * Cek apakah produk layak masuk Flash Sale.
- * Syarat: harga >= FLASH_SALE_MIN_PRICE DAN stok <= FLASH_SALE_MAX_STOCK DAN stok > 0.
+ * Dapatkan waktu sekarang dalam WIB (UTC+7) sebagai Date object.
  */
-export function isFlashSaleProduct(rekomendasiJual: string, stok: string): boolean {
+export function nowWIB(): Date {
+    const now = new Date();
+    return new Date(now.getTime() + 7 * 3600_000);
+}
+
+/**
+ * Cek apakah Flash Sale sedang aktif berdasarkan jadwal.
+ * Return [active, endTime] — active=true jika sekarang dalam rentang jadwal,
+ * endTime adalah Date object kapan sesi ini berakhir (untuk countdown).
+ */
+export function getFlashSaleStatus(): {
+    active: boolean;
+    endTime: Date;
+    nextStart: Date | null;
+} {
+    const wib = nowWIB();
+    const currentHour = wib.getHours();
+    const currentMinute = wib.getMinutes();
+    const currentMinutes = currentHour * 60 + currentMinute;
+
+    // Cari sesi yang sedang berlangsung
+    for (const [startH, endH] of FLASH_SALE_SCHEDULE) {
+        const startMin = startH * 60;
+        const endMin = endH * 60;
+        if (currentMinutes >= startMin && currentMinutes < endMin) {
+            const endTime = new Date(wib);
+            endTime.setHours(endH, 0, 0, 0);
+            return { active: true, endTime, nextStart: null };
+        }
+    }
+
+    // Tidak aktif — cari sesi berikutnya
+    let nextStart: Date | null = null;
+    let earliest = Infinity;
+    for (const [startH] of FLASH_SALE_SCHEDULE) {
+        const startMin = startH * 60;
+        let diff = startMin - currentMinutes;
+        if (diff <= 0) diff += 24 * 60; // besok
+        if (diff < earliest) {
+            earliest = diff;
+            nextStart = new Date(wib);
+            nextStart.setHours(startH, 0, 0, 0);
+            if (startMin <= currentMinutes) {
+                nextStart.setDate(nextStart.getDate() + 1);
+            }
+        }
+    }
+
+    return { active: false, endTime: new Date(wib), nextStart };
+}
+
+/**
+ * Hitung sisa detik hingga Flash Sale berakhir (sesi saat ini).
+ * Return 0 jika tidak sedang dalam sesi.
+ */
+export function secondsUntilFlashSaleEnds(): number {
+    const { active, endTime } = getFlashSaleStatus();
+    if (!active) return 0;
+    const wib = nowWIB();
+    return Math.max(0, Math.floor((endTime.getTime() - wib.getTime()) / 1000));
+}
+
+/**
+ * Cek apakah produk layak masuk Flash Sale.
+ * Syarat:
+ * 1. harga >= FLASH_SALE_MIN_PRICE
+ * 2. stok > 0 DAN stok <= FLASH_SALE_MAX_STOCK
+ * 3. (jika hargaModal diberikan) profit setelah diskon >= FLASH_SALE_MIN_PROFIT
+ */
+export function isFlashSaleProduct(
+    rekomendasiJual: string,
+    stok: string,
+    hargaModal?: string,
+): boolean {
     const harga = parseRupiah(rekomendasiJual);
     const stock = parseStock(stok);
-    return harga >= FLASH_SALE_MIN_PRICE && stock > 0 && stock <= FLASH_SALE_MAX_STOCK;
+    if (harga < FLASH_SALE_MIN_PRICE || stock <= 0 || stock > FLASH_SALE_MAX_STOCK) {
+        return false;
+    }
+    // Safety check: profit setelah diskon harus >= FLASH_SALE_MIN_PROFIT
+    if (hargaModal) {
+        const modal = parseRupiah(hargaModal);
+        if (modal > 0) {
+            const diskon = Math.round(harga * (FLASH_SALE_DISCOUNT_PERCENT / 100));
+            const profitAfterDiscount = (harga - diskon) - modal;
+            if (profitAfterDiscount < FLASH_SALE_MIN_PROFIT) return false;
+        }
+    }
+    return true;
 }
 
 /**
  * Hitung harga flash sale (harga setelah diskon flash sale).
  * Return null jika harga tidak valid.
  *
- * Contoh: rekomendasiJual = "Rp 50.000", FLASH_SALE_DISCOUNT = 20
- * → { flashPrice: "Rp 40.000", coret: "Rp 50.000", persen: 20, hemat: "Rp 10.000" }
+ * Contoh: rekomendasiJual = "Rp 50.000", FLASH_SALE_DISCOUNT = 15
+ * → { flashPrice: "Rp 42.500", coret: "Rp 50.000", persen: 15, hemat: "Rp 7.500" }
  */
 export function hitungFlashSale(
     rekomendasiJual: string,
@@ -143,17 +246,4 @@ export function hitungFlashSale(
         persen: FLASH_SALE_DISCOUNT_PERCENT,
         hemat: formatRupiah(diskon),
     };
-}
-
-/**
- * Hitung sisa detik hingga pukul 00:00 WIB (UTC+7) berikutnya.
- * Dipakai untuk countdown timer Flash Sale.
- */
-export function secondsUntilMidnightWIB(): number {
-    const now = new Date();
-    // WIB = UTC+7
-    const wibNow = new Date(now.getTime() + 7 * 3600_000);
-    const midnight = new Date(wibNow);
-    midnight.setHours(24, 0, 0, 0);
-    return Math.floor((midnight.getTime() - wibNow.getTime()) / 1000);
 }

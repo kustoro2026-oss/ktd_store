@@ -1,17 +1,19 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Bolt, ChevronLeft, ChevronRight, ShoppingCart, Check } from "lucide-react";
+import { Bolt, ChevronLeft, ChevronRight, ShoppingCart, Check, Clock } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { useCart } from "@/lib/cart";
 import {
     isFlashSaleProduct,
     hitungFlashSale,
     parseStock,
-    secondsUntilMidnightWIB,
+    getFlashSaleStatus,
+    secondsUntilFlashSaleEnds,
     FLASH_SALE_MAX_ITEMS,
+    FLASH_SALE_SCHEDULE,
 } from "@/lib/promo";
 import type { AnekaProduct } from "@/lib/anekadropship";
 
@@ -22,6 +24,20 @@ function formatCountdown(seconds: number): string {
     const m = Math.floor((seconds % 3600) / 60);
     const s = seconds % 60;
     return [h, m, s].map((n) => String(n).padStart(2, "0")).join(":");
+}
+
+/** Format jam dari Date WIB, e.g. "09:00". */
+function formatHour(date: Date): string {
+    const h = String(date.getHours()).padStart(2, "0");
+    const m = String(date.getMinutes()).padStart(2, "0");
+    return `${h}:${m}`;
+}
+
+/** Deskripsi jadwal Flash Sale, e.g. "09:00 - 12:00 & 19:00 - 23:00". */
+function formatSchedule(): string {
+    return FLASH_SALE_SCHEDULE.map(
+        ([s, e]) => `${String(s).padStart(2, "0")}:00 - ${String(e).padStart(2, "0")}:00`
+    ).join(" & ");
 }
 
 /** Skeleton untuk card flash sale. */
@@ -131,8 +147,8 @@ function FlashSaleCard({ p }: { p: AnekaProduct }) {
                         }
                         aria-label={inCart ? "Hapus dari Keranjang" : "Masukkan Keranjang"}
                         className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-colors ${inCart
-                                ? "border-brand bg-brand text-white"
-                                : "border-gray-200 text-ink hover:border-brand hover:text-brand"
+                            ? "border-brand bg-brand text-white"
+                            : "border-gray-200 text-ink hover:border-brand hover:text-brand"
                             }`}
                     >
                         {inCart ? (
@@ -163,31 +179,37 @@ export default function FlashSale({ initialProducts }: Props) {
     );
     const products = initialProducts ?? data?.products ?? [];
 
-    // Filter produk yang layak Flash Sale
+    // Filter produk yang layak Flash Sale (dengan safety check profit)
     const flashProducts = useMemo(() => {
         return products
-            .filter((p) => isFlashSaleProduct(p.rekomendasiJual, p.stok))
+            .filter((p) => isFlashSaleProduct(p.rekomendasiJual, p.stok, p.hargaModal))
             .slice(0, FLASH_SALE_MAX_ITEMS);
     }, [products]);
 
-    // Countdown timer — reset setiap hari pukul 00:00 WIB
-    const [remaining, setRemaining] = useState<number>(secondsUntilMidnightWIB());
+    // ─── Schedule-aware state ───────────────────────────────────────────
+    const [schedule, setSchedule] = useState(() => getFlashSaleStatus());
+    const [remaining, setRemaining] = useState(() => secondsUntilFlashSaleEnds());
 
     useEffect(() => {
-        const tick = () => setRemaining(secondsUntilMidnightWIB());
+        const tick = () => {
+            const status = getFlashSaleStatus();
+            setSchedule(status);
+            setRemaining(status.active ? secondsUntilFlashSaleEnds() : 0);
+        };
+        tick();
         const id = setInterval(tick, 1000);
         return () => clearInterval(id);
     }, []);
 
-    // Horizontal scroll
+    // ─── Horizontal scroll ──────────────────────────────────────────────
     const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null);
     const [canScrollLeft, setCanScrollLeft] = useState(false);
     const [canScrollRight, setCanScrollRight] = useState(false);
 
-    const updateScroll = (el: HTMLDivElement) => {
+    const updateScroll = useCallback((el: HTMLDivElement) => {
         setCanScrollLeft(el.scrollLeft > 4);
         setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
-    };
+    }, []);
 
     const scrollBy = (dir: "left" | "right") => {
         if (!scrollEl) return;
@@ -195,8 +217,56 @@ export default function FlashSale({ initialProducts }: Props) {
         scrollEl.scrollBy({ left: amount, behavior: "smooth" });
     };
 
-    // Jangan render section jika tidak ada produk flash sale
+    // ─── Render ─────────────────────────────────────────────────────────
+
+    // Jangan render jika tidak ada produk flash sale
     if (!loading && flashProducts.length === 0) return null;
+
+    // Di luar jam operasional: tampilkan banner "akan dimulai" (opsional — bisa juga return null)
+    if (!schedule.active) {
+        const nextTime = schedule.nextStart ? formatHour(schedule.nextStart) : null;
+        return (
+            <section className="container-site mt-10">
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-gray-700 via-gray-600 to-gray-500 p-5 text-white shadow-lg sm:p-6">
+                    <div
+                        className="pointer-events-none absolute inset-0 opacity-5"
+                        style={{
+                            backgroundImage:
+                                "radial-gradient(circle, #fff 1px, transparent 1px)",
+                            backgroundSize: "20px 20px",
+                        }}
+                    />
+                    <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex items-center gap-3">
+                            <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/10 backdrop-blur">
+                                <Clock className="h-6 w-6 text-gray-300" />
+                            </span>
+                            <div>
+                                <h2 className="text-xl font-extrabold tracking-tight sm:text-2xl">
+                                    ⚡ Flash Sale
+                                </h2>
+                                <p className="mt-0.5 text-sm text-white/70">
+                                    {nextTime
+                                        ? `Dimulai pukul ${nextTime} WIB — jam operasional: ${formatSchedule()} WIB`
+                                        : `Jam operasional: ${formatSchedule()} WIB`}
+                                </p>
+                            </div>
+                        </div>
+                        {nextTime && (
+                            <div className="flex items-center gap-2 self-start rounded-xl bg-black/20 px-4 py-2 backdrop-blur sm:self-auto">
+                                <span className="text-xs font-semibold text-white/70">
+                                    Dimulai pukul
+                                </span>
+                                <span className="text-xl font-bold tabular-nums tracking-wider sm:text-2xl">
+                                    {nextTime}
+                                </span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </section>
+        );
+    }
 
     return (
         <section className="container-site mt-10">
