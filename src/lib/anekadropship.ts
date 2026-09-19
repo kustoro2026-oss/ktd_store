@@ -336,31 +336,40 @@ export class AnekaClient {
 
   /**
    * Scrape the "Semua Produk / Terbaru" page (newest products first).
-   * This page has no category filter select, so it needs its own check.
    */
   async getNewestProducts(query: AnekaQuery) {
     const page = Math.max(1, query.page ?? 1);
-    const url = `${BASE}/produk/semua/terbaru?page=${page}`;
-    let html = await this.doFetch(url);
-
-    if (!this.isValidProductPage(html)) {
-      if (this.isLoginPage(html)) {
-        // Session expired → re-login once and retry.
-        this.loggedIn = false;
-        this.cookie = "";
-        await this.ensureLoggedIn();
-        html = await this.doFetch(url);
-      } else {
-        // Transient upstream error (522 / timeout / maintenance): retry with
-        // backoff WITHOUT destroying the current session.
-        for (let attempt = 0; attempt < 3 && !this.isValidProductPage(html); attempt++) {
-          await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
-          html = await this.doFetch(url);
-        }
-      }
-    }
-    if (!this.isValidProductPage(html)) {
+    const result = await this.fetchProdukSemuaPage("terbaru", page);
+    if (!result) {
       throw new Error("Gagal memuat halaman produk terbaru dari anekadropship.id");
+    }
+    return result;
+  }
+
+  /**
+   * Scrape Malaysia products. Tries the dedicated /produk/semua/malaysia page
+   * first; falls back to the main /user/home listing with location filter if
+   * the dedicated page is unreachable or returns no products.
+   *
+   * Products are merged into regular category listings, not shown as a
+   * separate "Malaysia" section.
+   */
+  async getMalaysiaProducts(query: AnekaQuery) {
+    await this.ensureLoggedIn();
+    const page = Math.max(1, query.page ?? 1);
+
+    // Approach 1: dedicated /produk/semua/malaysia page
+    try {
+      const result = await this.fetchProdukSemuaPage("malaysia", page);
+      if (result && result.products.length > 0) return result;
+    } catch {
+      // Fall through to approach 2.
+    }
+
+    // Approach 2: main /user/home listing with location filter
+    const html = await this.fetchHome({ ...query, location: "malaysia", page });
+    if (this.isInvalidHome(html)) {
+      throw new Error("Gagal memuat produk malaysia dari anekadropship.id");
     }
     return {
       products: this.parseProducts(html),
@@ -368,36 +377,25 @@ export class AnekaClient {
     };
   }
 
-  /**
-   * Scrape the "Produk Malaysia" page — same structure as /terbaru.
-   * Products are merged into regular category listings, not shown as a
-   * separate "Malaysia" section.
-   */
-  async getMalaysiaProducts(query: AnekaQuery) {
-    await this.ensureLoggedIn();
-    const page = Math.max(1, query.page ?? 1);
-    const url = `${BASE}/produk/semua/malaysia?page=${page}`;
+  /** Shared helper for /produk/semua/{slug} pages (terbaru, malaysia, etc.). */
+  private async fetchProdukSemuaPage(slug: string, page: number) {
+    const url = `${BASE}/produk/semua/${slug}?page=${page}`;
     let html = await this.doFetch(url);
 
     if (!this.isValidProductPage(html)) {
       if (this.isLoginPage(html)) {
-        // Session expired → re-login once and retry.
         this.loggedIn = false;
         this.cookie = "";
         await this.ensureLoggedIn();
         html = await this.doFetch(url);
       } else {
-        // Transient upstream error (522 / timeout / maintenance): retry with
-        // backoff WITHOUT destroying the current session.
         for (let attempt = 0; attempt < 3 && !this.isValidProductPage(html); attempt++) {
           await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
           html = await this.doFetch(url);
         }
       }
     }
-    if (!this.isValidProductPage(html)) {
-      throw new Error("Gagal memuat halaman produk malaysia dari anekadropship.id");
-    }
+    if (!this.isValidProductPage(html)) return null;
     return {
       products: this.parseProducts(html),
       totalPages: this.parseTotalPages(html, page),
