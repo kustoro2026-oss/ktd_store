@@ -19,9 +19,9 @@ export default function ProductVideos({ productId }: { productId: string }) {
                 Video Produk
             </p>
 
-            {/* Google Drive player — 9:16 matches phone video ratio, gives controls room */}
-            <div className="mt-3 overflow-hidden rounded-xl bg-black">
-                <div className="relative aspect-[9/16] w-full">
+            {/* Google Drive player — 9:16 portrait, no overflow-hidden so zoom/fullscreen button visible on mobile */}
+            <div className="mt-3 bg-black">
+                <div className="relative aspect-[9/16] w-full rounded-xl">
                     <iframe
                         key={active.fileId}
                         src={driveEmbedUrl(active.fileId)}
