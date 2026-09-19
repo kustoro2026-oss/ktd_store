@@ -33,10 +33,12 @@ async function getProducts(search: string, category: string, page: number) {
   try {
     const data = await anekaClient.getProducts({ search, category, page });
 
-    // Merge Malaysia products when browsing all products (no category/search filter).
+    // Merge Malaysia products when browsing all products (no category filter).
+    // Search queries also include Malaysia products — filterByRelevance will
+    // remove irrelevant ones.
     let mergedProducts = data.products;
     let mergedTotalPages = data.totalPages;
-    if (!category && !search) {
+    if (!category) {
       try {
         const malaysia = await anekaClient.getMalaysiaProducts({ page });
         const seen = new Set(data.products.map((p) => p.id));

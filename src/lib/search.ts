@@ -6,6 +6,15 @@
  * unrelated products — e.g. searching "beras" returning headphones. These
  * helpers re-rank results by matching the query against the product NAME so
  * only genuinely related products are ever shown.
+ *
+ * Strategy (ordered by priority):
+ *  0 = name starts with the full query phrase
+ *  1 = name contains the full query phrase
+ *  2 = ALL query tokens match as whole words (any order)
+ *  3 = ALL query tokens match as prefixes (for terms >= 3 chars)
+ *  4 = at least HALF the query tokens match (partial match)
+ *  5 = at least ONE query token matches (weak match)
+ *  -1 = no match at all
  */
 
 /** Lowercase, then collapse every non-alphanumeric run into a single space. */
@@ -18,49 +27,87 @@ export function normalizeForSearch(s: string): string {
 }
 
 /**
- * Find `term` in a list of normalized words as a WHOLE WORD.
- * For terms of 5+ characters a word-prefix match is also allowed
- * ("sneaker" → "sneakers"), but short terms must match exactly so
- * "tas" never matches inside "mengatasi".
+ * Find `term` in a list of normalized words.
+ * Returns the index of the best match, or -1 if not found.
+ *
+ * Matching strategy (in order):
+ *  1. Exact whole-word match
+ *  2. Prefix match (for terms >= 3 chars, e.g. "clut" → "clutch")
+ *  3. Word contains the term (for terms >= 4 chars, e.g. "lutch" → "clutch")
  */
 function wordIndex(words: string[], term: string): number {
+  // Exact match
   const exact = words.findIndex((w) => w === term);
   if (exact !== -1) return exact;
-  if (term.length >= 5) return words.findIndex((w) => w.startsWith(term));
+  // Prefix match (term length >= 3)
+  if (term.length >= 3) {
+    const prefix = words.findIndex((w) => w.startsWith(term));
+    if (prefix !== -1) return prefix;
+  }
+  // Contains match (term length >= 4, e.g. "lutch" inside "clutch")
+  if (term.length >= 4) {
+    const contains = words.findIndex((w) => w.includes(term));
+    if (contains !== -1) return contains;
+  }
   return -1;
 }
 
 /**
- * Rank a product name against a query:
- *  0 = name starts with the full query
- *  1 = name contains the full query (or the whole word)
- *  2+ = name contains at least one query token (earlier word = better)
+ * Rank a product name against a query.
+ *
+ * Rank values (lower = better):
+ *  0 = name starts with the full query phrase
+ *  1 = name contains the full query phrase
+ *  2 = ALL query tokens match as whole words
+ *  3 = ALL query tokens match (prefix or contains)
+ *  4 = majority of tokens match
+ *  5 = at least one token matches
  *  -1 = no match at all
  */
 export function rankMatch(name: string, query: string): number {
   const n = normalizeForSearch(name);
   const full = normalizeForSearch(query);
   if (!n || !full) return -1;
-  const tokens = full.split(" ");
+  const tokens = full.split(" ").filter((t) => t.length >= 2);
+  if (tokens.length === 0) return -1;
   const words = n.split(" ");
 
-  if (tokens.length > 1) {
-    // Multi-word query: prefer the phrase, otherwise any token.
-    if (n.includes(full)) return n.startsWith(full) ? 0 : 1;
-    let best = Infinity;
-    for (const t of tokens) {
-      if (t.length < 3) continue;
-      const idx = wordIndex(words, t);
-      if (idx !== -1 && idx < best) best = idx;
+  // Rank 0-1: full phrase match
+  if (n.includes(full)) return n.startsWith(full) ? 0 : 1;
+
+  // Count how many tokens match
+  let exactMatches = 0;
+  let looseMatches = 0;
+  let bestIdx = Infinity;
+
+  for (const t of tokens) {
+    const exactIdx = words.findIndex((w) => w === t);
+    if (exactIdx !== -1) {
+      exactMatches++;
+      if (exactIdx < bestIdx) bestIdx = exactIdx;
+      continue;
     }
-    return best === Infinity ? -1 : best + 2;
+    const looseIdx = wordIndex(words, t);
+    if (looseIdx !== -1) {
+      looseMatches++;
+      if (looseIdx < bestIdx) bestIdx = looseIdx;
+    }
   }
 
-  // Single-word query: whole-word match only.
-  const t = full;
-  const idx = wordIndex(words, t);
-  if (idx === -1) return -1;
-  return idx === 0 ? 0 : 1;
+  const totalMatches = exactMatches + looseMatches;
+  if (totalMatches === 0) return -1;
+
+  // Rank 2: ALL tokens match as whole words
+  if (exactMatches === tokens.length) return 2 + bestIdx;
+
+  // Rank 3: ALL tokens match (including prefix/contains)
+  if (totalMatches === tokens.length) return 3 + bestIdx;
+
+  // Rank 4: majority match (> 50%)
+  if (totalMatches >= Math.ceil(tokens.length / 2)) return 4 + bestIdx;
+
+  // Rank 5: at least one match
+  return 5 + bestIdx;
 }
 
 /**

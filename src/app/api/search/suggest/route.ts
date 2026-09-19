@@ -30,13 +30,22 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const { products } = await anekaClient.getProducts({ search: q, page: 1 });
+    const [regular, malaysia] = await Promise.all([
+      anekaClient.getProducts({ search: q, page: 1 }),
+      anekaClient.getMalaysiaProducts({ page: 1 }).catch(() => null),
+    ]);
+
+    // Merge Malaysia products (deduplicate by id).
+    const seen = new Set(regular.products.map((p) => p.id));
+    const merged = malaysia
+      ? [...regular.products, ...malaysia.products.filter((p) => !seen.has(p.id))]
+      : regular.products;
 
     // The upstream search matches loosely (it also scans descriptions and can
     // return completely unrelated items), so only suggest products whose NAME
     // actually matches the query. If nothing matches, return an empty list —
     // never fall back to unrelated upstream results.
-    const suggestions: Suggestion[] = filterByRelevance(products, q)
+    const suggestions: Suggestion[] = filterByRelevance(merged, q)
       .slice(0, LIMIT)
       .map((p) => {
         // Gunakan gambar lokal (hasil sinkronisasi) agar tidak ada hotlink eksternal.

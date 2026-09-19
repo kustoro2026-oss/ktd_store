@@ -50,11 +50,11 @@ export async function GET(req: NextRequest) {
         : await anekaClient.getProducts(query);
 
     // Merge Malaysia products into the main listing (not shown as a separate
-    // section). Only relevant when browsing all products or newest — skip when
-    // filtering by a specific category/search to keep results focused.
+    // section). Skip only when filtering by a specific category — search
+    // queries should also include Malaysia products.
     let mergedProducts = products;
     let mergedTotalPages = totalPages;
-    if (!query.category && !query.search) {
+    if (!query.category) {
       try {
         const malaysia = await anekaClient.getMalaysiaProducts({ page: query.page });
         const seen = new Set(products.map((p) => p.id));
