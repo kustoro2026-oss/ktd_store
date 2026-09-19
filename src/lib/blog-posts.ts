@@ -266,7 +266,7 @@ const blogPosts: BlogPost[] = [
         icon: "flashlight",
         date: "01 Sep 2026",
         query: "sparepart",
-        image: "/images/blog/sparepart.jpg",
+        image: "/images/blog/sparepart-motor.jpg",
         excerpt:
             "Jangan kaget dengan tagihan bengkel! Kenali spare part motor yang paling sering diganti, ciri-ciri harus ganti, dan estimasi harganya.",
         content: [
@@ -319,7 +319,7 @@ const blogPosts: BlogPost[] = [
         icon: "spray",
         date: "29 Agu 2026",
         query: "pembasmi",
-        image: "/images/blog/pestisida.jpg",
+        image: "/images/blog/pestisida-hama.jpg",
         excerpt:
             "Tanaman diserang hama? Jangan panik. Kenali jenis hama tanaman dan temukan pestisida serta pembasmi hama terbaik yang aman untuk tanaman Anda.",
         content: [
