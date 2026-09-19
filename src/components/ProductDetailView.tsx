@@ -13,6 +13,7 @@ import MarketplaceNotice from "@/components/MarketplaceNotice";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
 import WhatsAppOrderModal from "@/components/WhatsAppOrderModal";
 import RelatedProducts from "@/components/RelatedProducts";
+import ProductVideos from "@/components/ProductVideos";
 import type { AnekaProductDetail } from "@/lib/anekadropship";
 
 const SIZE_RE =
@@ -461,6 +462,9 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
           />
         </section>
       )}
+
+      {/* Product videos (Google Drive) */}
+      <ProductVideos productId={detail.id} />
 
       {/* Related products */}
       <RelatedProducts productId={detail.id} productName={detail.name} />
