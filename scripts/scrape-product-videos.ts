@@ -159,6 +159,13 @@ async function main() {
     await collect((p) => anekaClient.getNewestProducts({ page: p }), "New");
     try { await collect((p) => anekaClient.getMalaysiaProducts({ page: p }), "Msia"); } catch { /* ok */ }
 
+    // Also scan by ID range to catch products not in listings
+    const MAX_ID = 2300;
+    console.log(`  Scanning ID range 1-${MAX_ID}...`);
+    for (let id = 1; id <= MAX_ID; id++) {
+        ids.add(String(id));
+    }
+
     console.log(`\n📊 Total unique: ${ids.size}\n`);
 
     // Scrape detail pages
