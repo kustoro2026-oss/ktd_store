@@ -30,43 +30,64 @@ interface FolderResult {
     folders: string[];
 }
 
-/** Fetch embedded folder view and extract file/folder IDs. */
+/** Fetch embedded folder view AND main folder page to extract file/folder IDs. */
 async function listFolder(folderId: string): Promise<FolderResult> {
-    const url = `https://drive.google.com/embeddedfolderview?id=${folderId}`;
     const files: { id: string; name: string }[] = [];
     const folders: string[] = [];
+    const seenIds = new Set<string>();
 
-    try {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 15000);
-        const res = await fetch(url, { signal: controller.signal });
-        clearTimeout(timer);
-        const html = await res.text();
+    // Helper: extract IDs from HTML
+    const extract = (html: string) => {
+        const fIds = html.match(/\/file\/d\/([a-zA-Z0-9_-]+)/g) || [];
+        const dIds = html.match(/\/drive\/folders\/([a-zA-Z0-9_-]+)/g) || [];
+        return {
+            files: [...new Set(fIds.map(m => m.split("/").pop()!))].filter(id => !seenIds.has(id)),
+            folders: [...new Set(dIds.map(m => m.split("/").pop()!))].filter(id => !seenIds.has(id)),
+        };
+    };
 
-        // Extract file IDs
-        const fileIds = [...new Set((html.match(/\/file\/d\/([a-zA-Z0-9_-]+)/g) || []).map(m => m.split("/").pop()!))];
-        // Extract subfolder IDs
-        const folderIds = [...new Set((html.match(/\/drive\/folders\/([a-zA-Z0-9_-]+)/g) || []).map(m => m.split("/").pop()!))];
+    // Try multiple URL patterns
+    const urls = [
+        `https://drive.google.com/embeddedfolderview?id=${folderId}`,
+        `https://drive.google.com/drive/folders/${folderId}`,
+    ];
 
-        // Get file names
-        for (const id of fileIds) {
-            try {
-                const fr = await fetch(`https://drive.google.com/file/d/${id}/view`);
-                const fhtml = await fr.text();
-                const titleMatch = fhtml.match(/<title>(.*?)<\/title>/);
-                const name = titleMatch ? titleMatch[1].replace(" - Google Drive", "").trim() : "";
-                files.push({ id, name });
-            } catch {
-                files.push({ id, name: "" });
-            }
+    for (const url of urls) {
+        try {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 15000);
+            const res = await fetch(url, { signal: controller.signal });
+            clearTimeout(timer);
+            const html = await res.text();
+
+            const { files: newFiles, folders: newFolders } = extract(html);
+            for (const id of newFiles) seenIds.add(id);
+            for (const id of newFolders) seenIds.add(id);
+            folders.push(...newFolders);
+            files.push(...newFiles.map(id => ({ id, name: "" })));
+        } catch {
+            // continue to next URL
         }
-
-        folders.push(...folderIds);
-    } catch (e) {
-        console.warn(`  ⚠ Folder ${folderId}: ${(e as Error).message}`);
     }
 
-    return { files, folders };
+    // Deduplicate
+    const uniqueFiles = files.filter((f, i, arr) => arr.findIndex(x => x.id === f.id) === i);
+    const uniqueFolders = [...new Set(folders)];
+
+    // Get file names (only for new files we haven't named yet)
+    for (const f of uniqueFiles) {
+        if (f.name) continue;
+        try {
+            const fr = await fetch(`https://drive.google.com/file/d/${f.id}/view`);
+            const fhtml = await fr.text();
+            const titleMatch = fhtml.match(/<title>(.*?)<\/title>/);
+            f.name = titleMatch ? titleMatch[1].replace(" - Google Drive", "").trim() : "";
+        } catch {
+            // leave name empty
+        }
+    }
+
+    return { files: uniqueFiles, folders: uniqueFolders };
 }
 
 /** Recursively find MP4 files in a folder and its subfolders. */
