@@ -15,6 +15,10 @@ const VIDEOS: Record<string, ProductVideo[]> = {
     { fileId: "1-ZcH7dQ34Y6tyd2gkY8Dvf91obzMpD2w", label: "2025-06-26-152027486" },
     { fileId: "1-gt8kClm8R9bw3MC6qvR5nZPp78AC4V3", label: "2025-06-27-091418345" },
   ],
+  "18": [
+    { fileId: "1CpbQnAVpkOz55YZOLLDoOgT7LEXECBlC", label: "Video 1" },
+    { fileId: "1uGakV7vow4RbNz59FPrLhhwIN3iCE51R", label: "Video 2" },
+  ],
   "1039": [
     { fileId: "1p5eiMlI8egkoCklKyfk28sTeXp6STRpL", label: "amigoss03 - 7571780978201480466" },
     { fileId: "16XfMtsGCEt3KmWq6Kd8Uqv6E02MiOU5d", label: "bersih bersinar" },
