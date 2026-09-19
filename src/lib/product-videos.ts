@@ -34,7 +34,11 @@ export function driveEmbedUrl(fileId: string): string {
     return `https://drive.google.com/file/d/${fileId}/preview`;
 }
 
-/** Direct stream URL for native <video> (works when the file is publicly shared). */
+/**
+ * Direct stream URL for native <video>.
+ * Uses drive.usercontent.google.com (actual file host) — more reliable than
+ * /uc?export=download which often returns a virus-scan HTML page.
+ */
 export function driveStreamUrl(fileId: string): string {
-    return `https://drive.google.com/uc?export=download&id=${fileId}`;
+    return `https://drive.usercontent.google.com/download?id=${fileId}&export=download`;
 }

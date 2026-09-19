@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { Play, Film, ExternalLink } from "lucide-react";
-import { getProductVideos, driveEmbedUrl } from "@/lib/product-videos";
+import { getProductVideos, driveStreamUrl } from "@/lib/product-videos";
 
 export default function ProductVideos({ productId }: { productId: string }) {
     const videos = getProductVideos(productId);
     const [activeIdx, setActiveIdx] = useState(0);
+    const [videoError, setVideoError] = useState(false);
 
     if (!videos.length) return null;
 
@@ -19,18 +20,33 @@ export default function ProductVideos({ productId }: { productId: string }) {
                 Video Produk
             </p>
 
-            {/* Google Drive player — 4:3 agar UI player (top bar + controls) tidak terpotong */}
-            <div className="mt-3 overflow-hidden rounded-xl bg-black">
-                <div className="relative aspect-[4/3] w-full">
-                    <iframe
+            {/* Native video player — auto adapts orientation (portrait/landscape) */}
+            <div className="mt-3 flex items-center justify-center overflow-hidden rounded-xl bg-black">
+                {videoError ? (
+                    <div className="flex w-full flex-col items-center justify-center gap-2 py-10 text-center">
+                        <p className="text-xs text-white/80">Video tidak dapat diputar langsung.</p>
+                        <a
+                            href={`https://drive.google.com/file/d/${active.fileId}/view`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-brand"
+                        >
+                            <ExternalLink className="h-3 w-3" />
+                            Buka di Google Drive
+                        </a>
+                    </div>
+                ) : (
+                    /* eslint-disable-next-line jsx-a11y/media-has-caption */
+                    <video
                         key={active.fileId}
-                        src={driveEmbedUrl(active.fileId)}
-                        title={active.label || "Video Produk"}
-                        className="absolute inset-0 h-full w-full"
-                        allow="autoplay; fullscreen"
-                        allowFullScreen
+                        src={driveStreamUrl(active.fileId)}
+                        controls
+                        playsInline
+                        preload="metadata"
+                        onError={() => setVideoError(true)}
+                        className="max-h-[60vh] w-full object-contain"
                     />
-                </div>
+                )}
             </div>
 
             <a
@@ -52,7 +68,10 @@ export default function ProductVideos({ productId }: { productId: string }) {
                             <button
                                 key={v.fileId}
                                 type="button"
-                                onClick={() => setActiveIdx(i)}
+                                onClick={() => {
+                                    setActiveIdx(i);
+                                    setVideoError(false);
+                                }}
                                 aria-label={v.label || `Video ${i + 1}`}
                                 className={`flex flex-col items-center justify-center gap-1 rounded-lg border px-1 py-2 transition-all ${isActive
                                         ? "border-brand bg-brand/5 text-brand"
