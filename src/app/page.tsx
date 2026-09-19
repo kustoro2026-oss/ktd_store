@@ -51,12 +51,20 @@ const TTL = 5 * 60_000; // 5 minutes
 
 async function getHomeData() {
   if (cache && Date.now() - cache.ts < TTL) return cache;
-  const [categories, { products: raw }] = await Promise.all([
+  const [categories, { products: raw }, malaysia] = await Promise.all([
     anekaClient.getCategories(),
     anekaClient.getNewestProducts({ page: 1 }),
+    anekaClient.getMalaysiaProducts({ page: 1 }).catch(() => null),
   ]);
+  // Merge Malaysia products into the main listing (deduplicate by id).
+  let merged = raw;
+  if (malaysia) {
+    const seen = new Set(raw.map((p) => p.id));
+    const newProducts = malaysia.products.filter((p) => !seen.has(p.id));
+    merged = [...raw, ...newProducts];
+  }
   // Gunakan gambar lokal (hasil sinkronisasi) agar tidak ada hotlink eksternal.
-  const products = raw.map((p) => {
+  const products = merged.map((p) => {
     const local = getLocalImages(p.id);
     return local.length ? { ...p, image: local[0] } : p;
   });

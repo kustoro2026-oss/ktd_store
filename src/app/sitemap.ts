@@ -13,8 +13,15 @@ async function getProductUrls(): Promise<string[]> {
     return productCache.urls;
   }
   try {
-    const { products } = await anekaClient.getNewestProducts({ page: 1 });
-    const urls = products.map((p) => String(p.id));
+    const [newest, malaysia] = await Promise.all([
+      anekaClient.getNewestProducts({ page: 1 }),
+      anekaClient.getMalaysiaProducts({ page: 1 }).catch(() => null),
+    ]);
+    const ids = new Set(newest.products.map((p) => String(p.id)));
+    if (malaysia) {
+      for (const p of malaysia.products) ids.add(String(p.id));
+    }
+    const urls = [...ids];
     productCache = { urls, ts: Date.now() };
     return urls;
   } catch {

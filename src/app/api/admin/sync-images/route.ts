@@ -89,6 +89,17 @@ async function collectProducts(): Promise<{ id: string; image: string }[]> {
     // Abaikan — produk dari listing utama sudah cukup.
   }
 
+  // Listing "malaysia" — produk dari supplier Malaysia, digabung seperti biasa.
+  try {
+    anekaClient.resetSession();
+    await walk(async (page) => {
+      const { products } = await anekaClient.getMalaysiaProducts({ page });
+      return products.map((p) => ({ id: p.id, image: p.image }));
+    });
+  } catch {
+    // Abaikan — produk dari listing lain sudah cukup.
+  }
+
   return Array.from(map.entries()).map(([id, image]) => ({ id, image }));
 }
 

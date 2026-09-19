@@ -368,6 +368,38 @@ export class AnekaClient {
     };
   }
 
+  /**
+   * Scrape the "Produk Malaysia" page — same structure as /terbaru.
+   * Products are merged into regular category listings, not shown as a
+   * separate "Malaysia" section.
+   */
+  async getMalaysiaProducts(query: AnekaQuery) {
+    const page = Math.max(1, query.page ?? 1);
+    const url = `${BASE}/produk/semua/malaysia?page=${page}`;
+    let html = await this.doFetch(url);
+
+    if (!this.isValidProductPage(html)) {
+      if (this.isLoginPage(html)) {
+        this.loggedIn = false;
+        this.cookie = "";
+        await this.ensureLoggedIn();
+        html = await this.doFetch(url);
+      } else {
+        for (let attempt = 0; attempt < 3 && !this.isValidProductPage(html); attempt++) {
+          await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+          html = await this.doFetch(url);
+        }
+      }
+    }
+    if (!this.isValidProductPage(html)) {
+      throw new Error("Gagal memuat halaman produk malaysia dari anekadropship.id");
+    }
+    return {
+      products: this.parseProducts(html),
+      totalPages: this.parseTotalPages(html, page),
+    };
+  }
+
   /** Scrape the full category list from the home page filter dropdown. */
   async getCategories(): Promise<AnekaCategory[]> {
     const html = await this.fetchHome({});

@@ -32,11 +32,27 @@ async function getProducts(search: string, category: string, page: number) {
   if (hit && Date.now() - hit.ts < LIST_TTL) return hit.data;
   try {
     const data = await anekaClient.getProducts({ search, category, page });
+
+    // Merge Malaysia products when browsing all products (no category/search filter).
+    let mergedProducts = data.products;
+    let mergedTotalPages = data.totalPages;
+    if (!category && !search) {
+      try {
+        const malaysia = await anekaClient.getMalaysiaProducts({ page });
+        const seen = new Set(data.products.map((p) => p.id));
+        const newProducts = malaysia.products.filter((p) => !seen.has(p.id));
+        mergedProducts = [...data.products, ...newProducts];
+        mergedTotalPages = Math.max(data.totalPages, malaysia.totalPages);
+      } catch {
+        // Malaysia page unreachable — proceed with regular products only.
+      }
+    }
+
     // The supplier's search is loose; keep only products whose name actually
     // matches the query so unrelated items never appear in search results.
     const filtered = search
-      ? { products: filterByRelevance(data.products, search), totalPages: data.totalPages }
-      : data;
+      ? { products: filterByRelevance(mergedProducts, search), totalPages: mergedTotalPages }
+      : { products: mergedProducts, totalPages: mergedTotalPages };
     // Gunakan gambar lokal (hasil sinkronisasi) agar tidak ada hotlink eksternal.
     const result = {
       ...filtered,
