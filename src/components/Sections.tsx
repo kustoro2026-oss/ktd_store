@@ -60,7 +60,7 @@ export function BlogSection() {
         </Link>
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {blogPosts.map((b) => (
+        {blogPosts.slice(0, 3).map((b) => (
           <Link
             key={b.slug}
             href={`/tips/${b.slug}`}
