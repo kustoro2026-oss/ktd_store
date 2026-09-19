@@ -20,6 +20,16 @@ const CATEGORY_DISPLAY: Record<string, string> = {
 const SMALL_WORDS = new Set(["dan", "atau", "yang", "di", "ke", "&"]);
 
 /**
+ * Strip the Malaysian Ringgit (RM) suffix from price strings.
+ * Malaysia products show dual currency: "Rp 73.810 / RM 66.95" → "Rp 73.810".
+ */
+function cleanPrice(raw: string): string {
+  if (!raw) return raw;
+  // Remove " / RM XX.XX" or " / RM XX" suffix (case-insensitive)
+  return raw.replace(/\s*\/\s*RM\s*[\d.,]+$/i, "").trim();
+}
+
+/**
  * Strip dropshipper store tags (e.g. [PG STORE], [META ADS ONLY], META ADS)
  * from a product title so only the real product name remains.
  */
@@ -493,8 +503,8 @@ export class AnekaClient {
       name,
       images,
       descriptionHtml,
-      rekomendasiJual: extractAfter("Harga Jual:"),
-      hargaModal: extractAfter("Harga Modal:"),
+      rekomendasiJual: cleanPrice(extractAfter("Harga Jual:")),
+      hargaModal: cleanPrice(extractAfter("Harga Modal:")),
       stok: extractAfter("Stok:", ["•", "Terjual"]),
       terjual: extractAfter("Terjual:", ["•", "Stok"]),
       profit: "",
@@ -676,15 +686,15 @@ export class AnekaClient {
         name: cleanProductName(a.text()),
         image,
         location: card.find("div.absolute span.truncate").first().text().trim(),
-        rekomendasiJual: card
+        rekomendasiJual: cleanPrice(card
           .find('span:contains("Rekomendasi Jual")')
           .parent()
           .find("span.text-green-600")
           .first()
           .text()
-          .trim(),
-        hargaModalCut: card.find("span.line-through").first().text().trim(),
-        hargaModal: card.find("span.text-red-500").first().text().trim(),
+          .trim()),
+        hargaModalCut: cleanPrice(card.find("span.line-through").first().text().trim()),
+        hargaModal: cleanPrice(card.find("span.text-red-500").first().text().trim()),
         terjual: card
           .find('span:contains("Terjual")')
           .parent()

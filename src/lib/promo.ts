@@ -79,10 +79,13 @@ export function parseTerjual(terjual: string): number {
 
 /**
  * Parse string harga (mis. "Rp 50.000" / "50.000" / "50000") ke number.
+ * Dual-currency strings like "Rp 73.810 / RM 66.95" only take the Rp part.
  */
 export function parseRupiah(price: string): number {
     if (!price) return 0;
-    const cleaned = price.replace(/[^\d]/g, "");
+    // Strip Malaysian Ringgit suffix if present: "Rp 73.810 / RM 66.95" → "Rp 73.810"
+    const rpOnly = price.replace(/\s*\/\s*RM\s*[\d.,]+$/i, "").trim();
+    const cleaned = rpOnly.replace(/[^\d]/g, "");
     const n = parseInt(cleaned, 10);
     return Number.isNaN(n) ? 0 : n;
 }
