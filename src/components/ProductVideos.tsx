@@ -19,9 +19,9 @@ export default function ProductVideos({ productId }: { productId: string }) {
                 Video Produk
             </p>
 
-            {/* Google Drive player — portrait-friendly (3:4) so phone videos aren't cropped */}
+            {/* Google Drive player — 9:16 matches phone video ratio, gives controls room */}
             <div className="mt-3 overflow-hidden rounded-xl bg-black">
-                <div className="relative aspect-[3/4] w-full">
+                <div className="relative aspect-[9/16] w-full">
                     <iframe
                         key={active.fileId}
                         src={driveEmbedUrl(active.fileId)}
@@ -55,8 +55,8 @@ export default function ProductVideos({ productId }: { productId: string }) {
                                 onClick={() => setActiveIdx(i)}
                                 aria-label={v.label || `Video ${i + 1}`}
                                 className={`flex flex-col items-center justify-center gap-1 rounded-lg border px-1 py-2 transition-all ${isActive
-                                        ? "border-brand bg-brand/5 text-brand"
-                                        : "border-gray-100 bg-white text-muted-2 hover:border-gray-200 hover:text-brand"
+                                    ? "border-brand bg-brand/5 text-brand"
+                                    : "border-gray-100 bg-white text-muted-2 hover:border-gray-200 hover:text-brand"
                                     }`}
                             >
                                 <span
