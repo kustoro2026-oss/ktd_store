@@ -269,6 +269,9 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
             )}
           </div>
 
+          {/* Video produk (Google Drive) — tampil setelah harga, sebelum info pengiriman */}
+          <ProductVideos productId={detail.id} />
+
           {/* Pemilih varian */}
           {varOpts.length > 0 && (
             <div className="mt-4 space-y-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
@@ -462,9 +465,6 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
           />
         </section>
       )}
-
-      {/* Product videos (Google Drive) */}
-      <ProductVideos productId={detail.id} />
 
       {/* Related products */}
       <RelatedProducts productId={detail.id} productName={detail.name} />
