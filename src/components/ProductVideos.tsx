@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Play, Film } from "lucide-react";
-import { getProductVideos, driveStreamUrl } from "@/lib/product-videos";
+import { Play, Film, ExternalLink } from "lucide-react";
+import { getProductVideos, driveEmbedUrl } from "@/lib/product-videos";
 
 export default function ProductVideos({ productId }: { productId: string }) {
     const videos = getProductVideos(productId);
@@ -19,18 +19,29 @@ export default function ProductVideos({ productId }: { productId: string }) {
                 Video Produk
             </p>
 
-            {/* Native video player — auto adapts orientation, no cropping */}
+            {/* Google Drive player — 4:3 agar UI player (top bar + controls) tidak terpotong */}
             <div className="mt-3 overflow-hidden rounded-xl bg-black">
-                {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-                <video
-                    key={active.fileId}
-                    src={driveStreamUrl(active.fileId)}
-                    controls
-                    playsInline
-                    preload="metadata"
-                    className="mx-auto block max-h-[70vh] w-full object-contain"
-                />
+                <div className="relative aspect-[4/3] w-full">
+                    <iframe
+                        key={active.fileId}
+                        src={driveEmbedUrl(active.fileId)}
+                        title={active.label || "Video Produk"}
+                        className="absolute inset-0 h-full w-full"
+                        allow="autoplay; fullscreen"
+                        allowFullScreen
+                    />
+                </div>
             </div>
+
+            <a
+                href={`https://drive.google.com/file/d/${active.fileId}/view`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-brand hover:underline"
+            >
+                <ExternalLink className="h-3 w-3" />
+                Buka di Google Drive
+            </a>
 
             {/* Video selector — always a 3-col grid, compact on all screens */}
             {videos.length > 1 && (
