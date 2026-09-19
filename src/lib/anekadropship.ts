@@ -374,17 +374,21 @@ export class AnekaClient {
    * separate "Malaysia" section.
    */
   async getMalaysiaProducts(query: AnekaQuery) {
+    await this.ensureLoggedIn();
     const page = Math.max(1, query.page ?? 1);
     const url = `${BASE}/produk/semua/malaysia?page=${page}`;
     let html = await this.doFetch(url);
 
     if (!this.isValidProductPage(html)) {
       if (this.isLoginPage(html)) {
+        // Session expired → re-login once and retry.
         this.loggedIn = false;
         this.cookie = "";
         await this.ensureLoggedIn();
         html = await this.doFetch(url);
       } else {
+        // Transient upstream error (522 / timeout / maintenance): retry with
+        // backoff WITHOUT destroying the current session.
         for (let attempt = 0; attempt < 3 && !this.isValidProductPage(html); attempt++) {
           await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
           html = await this.doFetch(url);
