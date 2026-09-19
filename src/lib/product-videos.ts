@@ -68,6 +68,10 @@ const VIDEOS: Record<string, ProductVideo[]> = {
     { fileId: "1Z1iSqU3eBkJFEeSqATGdO8lzTGjb7ooo", label: "Long clutch 2" },
     { fileId: "15qLencV0RSo_8uCtsFmXZySNLOKBOdrX", label: "Long clutch 3" },
   ],
+  "1593": [
+    { fileId: "14MliLLweJj88l8o3qN53-eLw4aIpzO2l", label: "Video 1" },
+    { fileId: "1XtbjSTGzeFMmslk3hywLsjWHRcd_ySeK", label: "Video 2" },
+  ],
   "1754": [
     { fileId: "1sN0OsvYTAuwZ_GhBztHNOFV57mCRuhed", label: "mentahanpengemuk1" },
     { fileId: "1EC-E-oDHiuCp9NhroNvixZDnoEiJ5Kf_", label: "mentahanpengemuk10" },
