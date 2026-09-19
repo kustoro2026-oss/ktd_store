@@ -29,7 +29,12 @@ export function getProductVideos(productId: string): ProductVideo[] {
     return VIDEOS[productId] ?? [];
 }
 
-/** Convert Google Drive file ID to embed URL. */
+/** Convert Google Drive file ID to iframe embed URL. */
 export function driveEmbedUrl(fileId: string): string {
     return `https://drive.google.com/file/d/${fileId}/preview`;
+}
+
+/** Direct stream URL for native <video> (works when the file is publicly shared). */
+export function driveStreamUrl(fileId: string): string {
+    return `https://drive.google.com/uc?export=download&id=${fileId}`;
 }

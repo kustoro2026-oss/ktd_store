@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Play, Film } from "lucide-react";
-import { getProductVideos, driveEmbedUrl } from "@/lib/product-videos";
+import { getProductVideos, driveStreamUrl } from "@/lib/product-videos";
 
 export default function ProductVideos({ productId }: { productId: string }) {
     const videos = getProductVideos(productId);
@@ -19,18 +19,17 @@ export default function ProductVideos({ productId }: { productId: string }) {
                 Video Produk
             </p>
 
-            {/* Video player — responsive 16:9 */}
+            {/* Native video player — auto adapts orientation, no cropping */}
             <div className="mt-3 overflow-hidden rounded-xl bg-black">
-                <div className="relative aspect-video w-full">
-                    <iframe
-                        src={driveEmbedUrl(active.fileId)}
-                        title={active.label || "Video Produk"}
-                        loading="lazy"
-                        className="absolute inset-0 h-full w-full"
-                        allow="autoplay; fullscreen; picture-in-picture"
-                        allowFullScreen
-                    />
-                </div>
+                {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                <video
+                    key={active.fileId}
+                    src={driveStreamUrl(active.fileId)}
+                    controls
+                    playsInline
+                    preload="metadata"
+                    className="mx-auto block max-h-[70vh] w-full object-contain"
+                />
             </div>
 
             {/* Video selector — always a 3-col grid, compact on all screens */}
