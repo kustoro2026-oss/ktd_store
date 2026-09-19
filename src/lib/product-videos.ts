@@ -44,6 +44,11 @@ const VIDEOS: Record<string, ProductVideo[]> = {
     { fileId: "1sBUqjb6Z4lf5-kXVSZsktXBtjCUCFPPH", label: "gammadzaki - 7573406627194359048" },
     { fileId: "1J-cVVlMVzckq7MRbYuP2nWPhWSoO-hoi", label: "Glow home pembersih toilet dan desinfektan" },
   ],
+  "1049": [
+    { fileId: "1nUpbp5xtdA9Rds1eNI23hOm1bF76LWwl", label: "Video 1" },
+    { fileId: "1om1oRX8E4fK6mtLCPQOm_nUwMMbhzOP3", label: "Video 2" },
+    { fileId: "1xkJJZR1J9EXHFwm_KPTAPyFhLcNGena-", label: "Video 3" },
+  ],
   "1255": [
     { fileId: "1xV_RKAJ5WTYZDjXEem0O09VRe6E__IAb", label: "snaptik_7366098695361842437_v2" },
     { fileId: "1JSY1omGbI-P79nB1m02TsnOK5lUyfnY9", label: "snaptik_7499407267729509687_v2" },
