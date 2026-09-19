@@ -30,64 +30,65 @@ interface FolderResult {
     folders: string[];
 }
 
-/** Fetch embedded folder view AND main folder page to extract file/folder IDs. */
+/** Fetch embedded folder view to extract file/folder IDs. */
 async function listFolder(folderId: string): Promise<FolderResult> {
     const files: { id: string; name: string }[] = [];
     const folders: string[] = [];
-    const seenIds = new Set<string>();
 
-    // Helper: extract IDs from HTML
-    const extract = (html: string) => {
-        const fIds = html.match(/\/file\/d\/([a-zA-Z0-9_-]+)/g) || [];
-        const dIds = html.match(/\/drive\/folders\/([a-zA-Z0-9_-]+)/g) || [];
-        return {
-            files: [...new Set(fIds.map(m => m.split("/").pop()!))].filter(id => !seenIds.has(id)),
-            folders: [...new Set(dIds.map(m => m.split("/").pop()!))].filter(id => !seenIds.has(id)),
-        };
-    };
+    const url = `https://drive.google.com/embeddedfolderview?id=${folderId}`;
+    let html = "";
 
-    // Try multiple URL patterns
-    const urls = [
-        `https://drive.google.com/embeddedfolderview?id=${folderId}`,
-        `https://drive.google.com/drive/folders/${folderId}`,
-    ];
-
-    for (const url of urls) {
+    // Retry up to 2 times
+    for (let attempt = 0; attempt < 2; attempt++) {
         try {
             const controller = new AbortController();
             const timer = setTimeout(() => controller.abort(), 15000);
             const res = await fetch(url, { signal: controller.signal });
             clearTimeout(timer);
-            const html = await res.text();
-
-            const { files: newFiles, folders: newFolders } = extract(html);
-            for (const id of newFiles) seenIds.add(id);
-            for (const id of newFolders) seenIds.add(id);
-            folders.push(...newFolders);
-            files.push(...newFiles.map(id => ({ id, name: "" })));
+            html = await res.text();
+            break;
         } catch {
-            // continue to next URL
+            if (attempt === 1) {
+                console.warn(`  ⚠ Folder ${folderId}: failed after 2 attempts`);
+                return { files, folders };
+            }
+            await new Promise(r => setTimeout(r, 2000));
         }
     }
 
-    // Deduplicate
-    const uniqueFiles = files.filter((f, i, arr) => arr.findIndex(x => x.id === f.id) === i);
-    const uniqueFolders = [...new Set(folders)];
+    // Extract file & folder IDs
+    const fileIds = [...new Set((html.match(/\/file\/d\/([a-zA-Z0-9_-]+)/g) || []).map(m => m.split("/").pop()!))];
+    const folderIds = [...new Set((html.match(/\/drive\/folders\/([a-zA-Z0-9_-]+)/g) || []).map(m => m.split("/").pop()!))];
 
-    // Get file names (only for new files we haven't named yet)
-    for (const f of uniqueFiles) {
-        if (f.name) continue;
-        try {
-            const fr = await fetch(`https://drive.google.com/file/d/${f.id}/view`);
-            const fhtml = await fr.text();
-            const titleMatch = fhtml.match(/<title>(.*?)<\/title>/);
-            f.name = titleMatch ? titleMatch[1].replace(" - Google Drive", "").trim() : "";
-        } catch {
-            // leave name empty
+    // Get file names (batch with concurrency 3)
+    const batchSize = 3;
+    for (let i = 0; i < fileIds.length; i += batchSize) {
+        const batch = fileIds.slice(i, i + batchSize);
+        const results = await Promise.allSettled(
+            batch.map(async (id) => {
+                const controller = new AbortController();
+                const timer = setTimeout(() => controller.abort(), 10000);
+                try {
+                    const fr = await fetch(`https://drive.google.com/file/d/${id}/view`, { signal: controller.signal });
+                    const fhtml = await fr.text();
+                    const titleMatch = fhtml.match(/<title>(.*?)<\/title>/);
+                    return { id, name: titleMatch ? titleMatch[1].replace(" - Google Drive", "").trim() : "" };
+                } finally {
+                    clearTimeout(timer);
+                }
+            })
+        );
+        for (const r of results) {
+            if (r.status === "fulfilled") {
+                files.push(r.value);
+            } else {
+                files.push({ id: batch[results.indexOf(r)], name: "" });
+            }
         }
     }
 
-    return { files: uniqueFiles, folders: uniqueFolders };
+    folders.push(...folderIds);
+    return { files, folders };
 }
 
 /** Recursively find MP4 files in a folder and its subfolders. */
