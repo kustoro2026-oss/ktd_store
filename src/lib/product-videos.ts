@@ -72,6 +72,11 @@ const VIDEOS: Record<string, ProductVideo[]> = {
     { fileId: "14MliLLweJj88l8o3qN53-eLw4aIpzO2l", label: "Video 1" },
     { fileId: "1XtbjSTGzeFMmslk3hywLsjWHRcd_ySeK", label: "Video 2" },
   ],
+  "1648": [
+    { fileId: "1YaAS4CkRN9YLdaySiVlZlEpOmhNvhfkR", label: "Video 1" },
+    { fileId: "1xZj2-T9tHwg17CbvBkmdUyX-3j4sqnXK", label: "Video 2" },
+    { fileId: "1gkaxqhh3alfBerNho9r9CdJg5goOj1Tw", label: "Video 3" },
+  ],
   "1754": [
     { fileId: "1sN0OsvYTAuwZ_GhBztHNOFV57mCRuhed", label: "mentahanpengemuk1" },
     { fileId: "1EC-E-oDHiuCp9NhroNvixZDnoEiJ5Kf_", label: "mentahanpengemuk10" },
