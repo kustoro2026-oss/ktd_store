@@ -25,7 +25,7 @@ const BASE = "https://anekadropship.id";
 const EMAIL = process.env.ANEKA_EMAIL || "kustoroterbatas@gmail.com";
 const PASSWORD = process.env.ANEKA_PASSWORD || "@$Kustores2k24";
 const OUTPUT = path.join(__dirname, "..", "src", "lib", "products-cache.json");
-const DELAY_MS = 500;
+const DELAY_MS = 1500; // longer delay to avoid rate limiting
 
 // Cloudflare clearance dari argumen CLI atau env var
 const CF_CLEARANCE = process.argv[2] || process.env.CF_CLEARANCE || "";
@@ -46,6 +46,16 @@ function buildCookie(sessionCookie) {
 const UA =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
+// Full browser headers needed to bypass Cloudflare blocking.
+// Without Accept-Language: id-ID, the site may serve a challenge page.
+const BROWSER_HEADERS = {
+    "User-Agent": UA,
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+    "Accept-Language": "id-ID,id;q=0.9,en;q=0.8",
+    "Cache-Control": "no-cache",
+    "Pragma": "no-cache",
+};
+
 async function login() {
     let cookie = "";
 
@@ -61,7 +71,7 @@ async function login() {
     console.log("[1/4] Login ke anekadropship...");
     const page = await fetch(`${BASE}/login`, {
         redirect: "manual",
-        headers: { Cookie: buildCookie(""), "User-Agent": UA },
+        headers: { ...BROWSER_HEADERS, Cookie: buildCookie("") },
     });
     grab(page);
     const pageText = await page.text();
@@ -77,9 +87,9 @@ async function login() {
     const res = await fetch(`${BASE}/login`, {
         method: "POST",
         headers: {
+            ...BROWSER_HEADERS,
             "Content-Type": "application/x-www-form-urlencoded",
             Cookie: buildCookie(cookie),
-            "User-Agent": UA,
         },
         body: new URLSearchParams({ _token: token, email: EMAIL, password: PASSWORD }),
         redirect: "manual",
@@ -98,7 +108,7 @@ async function login() {
 
 async function fetchPage(url, cookie) {
     const res = await fetch(url, {
-        headers: { Cookie: buildCookie(cookie), "User-Agent": UA },
+        headers: { ...BROWSER_HEADERS, Cookie: buildCookie(cookie) },
     });
     return res.text();
 }
@@ -197,11 +207,24 @@ async function main() {
     console.log(`  ${categories.length} kategori ditemukan.`);
 
     // ─── Scrape products (paginated) ─────────────────────────────────
-    console.log("[3/4] Scrape produk (halaman 1-10)...");
-    const allProducts = [];
-    const seenIds = new Set();
+    console.log("[3/4] Scrape produk (halaman 1-50)...");
 
-    for (let page = 1; page <= 10; page++) {
+    // Resume from checkpoint if exists
+    let allProducts = [];
+    let seenIds = new Set();
+    let startPage = 1;
+    const checkpointFile = OUTPUT + ".tmp";
+    if (fs.existsSync(checkpointFile)) {
+        try {
+            const ck = JSON.parse(fs.readFileSync(checkpointFile, "utf8"));
+            allProducts = ck.products || [];
+            seenIds = new Set(allProducts.map((p) => p.id));
+            startPage = Math.floor(allProducts.length / 10) + 1;
+            console.log(`  Resuming from checkpoint: ${allProducts.length} produk, halaman ${startPage}`);
+        } catch { /* ignore corrupt checkpoint */ }
+    }
+
+    for (let page = startPage; page <= 50; page++) {
         const url = `${BASE}/user/home?page=${page}&sort=newest`;
         console.log(`  Halaman ${page}...`);
         await sleep(DELAY_MS);
@@ -224,7 +247,18 @@ async function main() {
         }
         console.log(`    ${newCount} produk baru (total: ${allProducts.length})`);
 
-        if (products.length < 20) break; // less than a full page = last page
+        // Save checkpoint every 5 pages (survives crashes / rate limiting)
+        if (page % 5 === 0) {
+            const checkpoint = {
+                generatedAt: new Date().toISOString(),
+                categories,
+                products: allProducts,
+            };
+            fs.writeFileSync(OUTPUT + ".tmp", JSON.stringify(checkpoint, null, 2), "utf-8");
+            console.log(`    💾 Checkpoint tersimpan (${allProducts.length} produk)`);
+        }
+
+        if (products.length < 5) break; // less than 5 = likely last page
     }
 
     // ─── Save ────────────────────────────────────────────────────────
@@ -237,6 +271,8 @@ async function main() {
 
     fs.mkdirSync(path.dirname(OUTPUT), { recursive: true });
     fs.writeFileSync(OUTPUT, JSON.stringify(cache, null, 2), "utf-8");
+    // Clean up checkpoint
+    try { fs.unlinkSync(OUTPUT + ".tmp"); } catch { }
     console.log(`  Tersimpan ke ${OUTPUT}`);
     console.log("\n✅ Selesai! Commit & push products-cache.json untuk deploy.");
 }
