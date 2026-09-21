@@ -119,7 +119,7 @@ function parseCategories(html) {
     return cats;
 }
 
-function parseProducts(html) {
+function parseProducts(html, categorySlug) {
     // Skip "recommended products" section after meta_ads.png
     const adsIdx = html.indexOf("meta_ads.png");
     const resultsHtml = adsIdx >= 0 ? html.slice(0, adsIdx) : html;
@@ -139,28 +139,42 @@ function parseProducts(html) {
         const name = a.text().trim();
         const image = card.find("img").first().attr("src") ?? "";
 
-        // Price: cari elemen yang mengandung "Rp"
-        let price = "";
+        // Price (Rekomendasi Jual): cari elemen yang mengandung "Rp"
+        let rekomendasiJual = "";
+        let hargaModal = "";
+        const priceEls = [];
         card.find("*").each((_, e) => {
             const t = $(e).text().trim();
-            if (/^Rp\s*[\d.,]+/.test(t) && !price) price = t;
+            if (/^Rp\s*[\d.,]+/.test(t)) priceEls.push(t);
         });
+        // Biasanya harga pertama = rekomendasi jual, kedua = harga modal
+        rekomendasiJual = priceEls[0] || "Rp -";
+        hargaModal = priceEls[1] || "";
 
         // Stock
-        let stock = "";
+        let stok = "";
         card.find("*").each((_, e) => {
             const t = $(e).text().trim();
-            if (/stok\s*:?\s*\d/i.test(t)) stock = t.replace(/stok\s*:?\s*/i, "").trim();
+            if (/stok\s*:?\s*\d/i.test(t)) stok = t.replace(/stok\s*:?\s*/i, "").trim();
         });
 
         // Sold
-        let sold = "";
+        let terjual = "";
         card.find("*").each((_, e) => {
             const t = $(e).text().trim();
-            if (/terjual/i.test(t)) sold = t.replace(/terjual\s*:?\s*/i, "").trim();
+            if (/terjual/i.test(t)) terjual = t.replace(/terjual\s*:?\s*/i, "").trim();
         });
 
-        items.push({ id, name, image, price: price || "Rp -", stock: stock || "0", sold: sold || "0" });
+        items.push({
+            id,
+            name,
+            image,
+            rekomendasiJual: rekomendasiJual || "Rp -",
+            hargaModal: hargaModal || "",
+            stok: stok || "0",
+            terjual: terjual || "0",
+            category: categorySlug || "",
+        });
     });
 
     return items;
