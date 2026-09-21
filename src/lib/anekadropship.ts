@@ -244,6 +244,34 @@ export class AnekaClient {
   /** Antrian login bersama: request paralel hanya memicu SATU proses login. */
   private loginPromise: Promise<void> | null = null;
 
+  /**
+   * Cloudflare clearance cookies from environment variables.
+   * Set CF_CLEARANCE (required) and optionally CF_BM in Vercel env vars.
+   * Get these by opening anekadropship.id in a browser, then copying
+   * the cookie values from DevTools → Application → Cookies.
+   */
+  private static cfCookies(): string {
+    const cfClearance = process.env.CF_CLEARANCE;
+    if (!cfClearance) return "";
+    const parts = [`cf_clearance=${cfClearance}`];
+    if (process.env.CF_BM) parts.push(`__cf_bm=${process.env.CF_BM}`);
+    return parts.join("; ") + "; ";
+  }
+
+  /**
+   * User-Agent that matches the browser used to obtain the cf_clearance cookie.
+   * Set CF_USER_AGENT in Vercel env vars, or leave empty for the default Chrome UA.
+   */
+  private static ua(): string {
+    return process.env.CF_USER_AGENT ??
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+  }
+
+  /** Build the full Cookie header: Cloudflare clearance + session cookies. */
+  private fullCookie(): string {
+    return AnekaClient.cfCookies() + this.cookie;
+  }
+
   /** Merge Set-Cookie headers into a single Cookie header. */
   private grab(res: Response) {
     const setCookies = res.headers.getSetCookie?.() ?? [];
@@ -260,15 +288,13 @@ export class AnekaClient {
     let lastErr: unknown = null;
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        // Mulai dengan cookie jar BERSIH: cookie lama (termasuk cookie
-        // Cloudflare yang kedaluwarsa/konflik) bisa membuat POST /login
-        // kena challenge → redirect balik ke /login.
+        // Reset session cookies but KEEP Cloudflare clearance cookies.
         this.cookie = "";
         const page = await fetch(`${BASE}/login`, {
           redirect: "manual",
           headers: {
-            "User-Agent":
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            Cookie: this.fullCookie(),
+            "User-Agent": AnekaClient.ua(),
           },
         });
         this.grab(page);
@@ -285,9 +311,8 @@ export class AnekaClient {
           method: "POST",
           headers: {
             "Content-Type": "application/x-www-form-urlencoded",
-            Cookie: this.cookie,
-            "User-Agent":
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            Cookie: this.fullCookie(),
+            "User-Agent": AnekaClient.ua(),
           },
           body: new URLSearchParams({ _token: token, email, password }),
           redirect: "manual",
@@ -644,14 +669,14 @@ export class AnekaClient {
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
         // Abort requests that hang — upstream has been known to stall.
+        // 8s timeout keeps us safely under Vercel Hobby's 10s function limit.
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 20_000);
+        const timer = setTimeout(() => controller.abort(), 8_000);
         try {
           const res = await fetch(url, {
             headers: {
-              Cookie: this.cookie,
-              "User-Agent":
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+              Cookie: this.fullCookie(),
+              "User-Agent": AnekaClient.ua(),
             },
             signal: controller.signal,
           });
