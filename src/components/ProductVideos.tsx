@@ -21,7 +21,7 @@ export default function ProductVideos({ productId }: { productId: string }) {
 
             {/* Google Drive player — 9:16 portrait, constrained width */}
             <div className="mt-3 flex justify-center">
-                <div className="relative aspect-[9/16] w-full max-w-[260px] rounded-xl bg-black">
+                <div className="relative aspect-[3/4] w-full max-w-[260px] rounded-xl bg-black">
                     <iframe
                         key={active.fileId}
                         src={driveEmbedUrl(active.fileId)}
