@@ -41,9 +41,11 @@ export const metadata: Metadata = {
 export default async function Home() {
   // 100% static — no external network calls.
   const staticCats = getStaticCategories();
-  const staticProds = getStaticProducts();
 
-  const products = staticProds.map((p) => {
+  // Only pass first 20 products to the page for fast initial render.
+  // Remaining products load client-side via /api/products.
+  const allProducts = getStaticProducts();
+  const initialProducts = allProducts.slice(0, 20).map((p) => {
     const local = getLocalImages(p.id);
     return local.length ? { ...p, image: local[0] } : p;
   });
@@ -54,9 +56,9 @@ export default async function Home() {
         <HeroCarousel />
       </div>
       <Features />
-      <FlashSale initialProducts={products} />
+      <FlashSale initialProducts={initialProducts} />
       <PopularCategories initialCategories={staticCats} />
-      <NewProducts initialProducts={products} />
+      <NewProducts initialProducts={initialProducts} />
       <LatestCollections />
       <BlogSection />
       <SeoText />
