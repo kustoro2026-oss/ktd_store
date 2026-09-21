@@ -1,14 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { anekaClient } from "@/lib/anekadropship";
 import { toLocalImages } from "@/lib/localImages";
+import { getStaticProducts } from "@/lib/products-cache";
 
 export const dynamic = "force-dynamic";
 
-// Simple in-memory cache for product details (clear on restart).
-const cache = new Map<string, { data: unknown; ts: number }>();
-const TTL = 5 * 60_000; // 5 minutes
-
-// Product details are public — let the edge cache absorb repeat views.
 const CACHE_HEADERS = {
   "Cache-Control": "public, s-maxage=120, stale-while-revalidate=300",
 };
@@ -19,21 +14,37 @@ export async function GET(
 ) {
   const { id } = await params;
 
-  const hit = cache.get(id);
-  if (hit && Date.now() - hit.ts < TTL) {
-    return NextResponse.json(hit.data, { headers: CACHE_HEADERS });
+  const products = getStaticProducts();
+  const p = products.find((p) => p.id === id);
+
+  if (!p) {
+    return NextResponse.json({ error: "Product not found" }, { status: 404 });
   }
 
-  try {
-    const detail = await anekaClient.getProductDetail(id);
-    // Gunakan gambar lokal (hasil sinkronisasi) agar tidak ada hotlink eksternal.
-    detail.images = toLocalImages(detail.id, detail.images);
-    cache.set(id, { data: detail, ts: Date.now() });
-    return NextResponse.json(detail, { headers: CACHE_HEADERS });
-  } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to fetch product" },
-      { status: 502 },
-    );
-  }
+  // Basic detail from static cache.
+  // Full description & variants come from manual scrape script.
+  const detail = {
+    id: p.id,
+    name: p.name,
+    images: toLocalImages(p.id, (p as { images?: string[] }).images ?? [p.image].filter(Boolean)),
+    descriptionHtml: (p as { descriptionHtml?: string }).descriptionHtml ?? "",
+    rekomendasiJual: p.rekomendasiJual ?? "Rp -",
+    hargaModal: (p as { hargaModal?: string }).hargaModal ?? "",
+    stok: p.stok ?? "0",
+    terjual: (p as { terjual?: string }).terjual ?? "0",
+    profit: "",
+    sku: "",
+    berat: (p as { berat?: string }).berat ?? "",
+    beratGram: (p as { beratGram?: number | null }).beratGram ?? null,
+    volume: (p as { volume?: string }).volume ?? "",
+    ekspedisi: (p as { ekspedisi?: string }).ekspedisi ?? "",
+    ekspedisiList: (p as { ekspedisiList?: string[] }).ekspedisiList ?? [],
+    sistem: "",
+    alamatSeller: (p as { alamatSeller?: string }).alamatSeller ?? "",
+    hasVariants: false,
+    variants: [],
+    marketingKitUrl: null,
+  };
+
+  return NextResponse.json(detail, { headers: CACHE_HEADERS });
 }

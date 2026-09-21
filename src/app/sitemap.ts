@@ -1,34 +1,7 @@
 import type { MetadataRoute } from "next";
 import { SITE_URL } from "@/lib/config";
-import { anekaClient } from "@/lib/anekadropship";
 import { blogPosts } from "@/lib/data";
-
-// Cache the scraped product URLs so sitemap requests don't hit the upstream
-// site on every crawl. 30 minutes is plenty — the catalog changes slowly.
-let productCache: { urls: string[]; ts: number } | null = null;
-const TTL = 30 * 60_000;
-
-async function getProductUrls(): Promise<string[]> {
-  if (productCache && Date.now() - productCache.ts < TTL) {
-    return productCache.urls;
-  }
-  try {
-    const [newest, malaysia] = await Promise.all([
-      anekaClient.getNewestProducts({ page: 1 }),
-      anekaClient.getMalaysiaProducts({ page: 1 }).catch(() => null),
-    ]);
-    const ids = new Set(newest.products.map((p) => String(p.id)));
-    if (malaysia) {
-      for (const p of malaysia.products) ids.add(String(p.id));
-    }
-    const urls = [...ids];
-    productCache = { urls, ts: Date.now() };
-    return urls;
-  } catch {
-    // Upstream unreachable — fall back to whatever we cached before (if any).
-    return productCache?.urls ?? [];
-  }
-}
+import { getStaticProducts } from "@/lib/products-cache";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticRoutes: MetadataRoute.Sitemap = [
@@ -49,9 +22,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     })),
   ];
 
-  const productIds = await getProductUrls();
-  const productRoutes: MetadataRoute.Sitemap = productIds.map((id) => ({
-    url: `${SITE_URL}/produk/${id}`,
+  const products = getStaticProducts();
+  const productRoutes: MetadataRoute.Sitemap = products.map((p) => ({
+    url: `${SITE_URL}/produk/${p.id}`,
     lastModified: new Date(),
     changeFrequency: "weekly",
     priority: 0.8,
