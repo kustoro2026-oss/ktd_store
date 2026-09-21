@@ -461,6 +461,7 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
           <h2 className="mb-4 text-xl font-bold text-ink sm:text-2xl">Deskripsi Produk</h2>
           <div
             className="deskripsi-produk rounded-2xl border border-gray-100 bg-white p-5 text-sm leading-6 shadow-sm sm:p-7"
+            suppressHydrationWarning
             dangerouslySetInnerHTML={{ __html: sanitizeHtml(detail.descriptionHtml) }}
           />
         </section>
