@@ -26,6 +26,18 @@ function sleep(ms) {
     return new Promise((r) => setTimeout(r, ms));
 }
 
+const CF_CLEARANCE = process.env.CF_CLEARANCE || "";
+const CF_BM = process.env.CF_BM || "";
+const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
+function buildCookie(sessionCookie) {
+    const parts = [];
+    if (CF_CLEARANCE) parts.push(`cf_clearance=${CF_CLEARANCE}`);
+    if (CF_BM) parts.push(`__cf_bm=${CF_BM}`);
+    if (sessionCookie) parts.push(sessionCookie);
+    return parts.join("; ");
+}
+
 async function login() {
     let cookie = "";
     const grab = (res) => {
@@ -37,8 +49,15 @@ async function login() {
         }
     };
 
+    if (!CF_CLEARANCE) {
+        console.warn("⚠️  CF_CLEARANCE tidak diset. Cloudflare mungkin memblokir request.");
+    }
+
     console.log("Login ke anekadropship...");
-    const page = await fetch(BASE + "/login", { redirect: "manual" });
+    const page = await fetch(BASE + "/login", {
+        redirect: "manual",
+        headers: { Cookie: buildCookie(""), "User-Agent": UA },
+    });
     grab(page);
     const pageText = await page.text();
     const $ = cheerio.load(pageText);
@@ -48,7 +67,11 @@ async function login() {
 
     const res = await fetch(BASE + "/login", {
         method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded", Cookie: cookie },
+        headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            Cookie: buildCookie(cookie),
+            "User-Agent": UA,
+        },
         body: new URLSearchParams({ _token: token, email: EMAIL, password: PASSWORD }),
         redirect: "manual",
     });
@@ -113,7 +136,7 @@ async function main() {
         try {
             // Fetch halaman detail
             const res = await fetch(BASE + "/products/" + p.id, {
-                headers: { Cookie: cookie },
+                headers: { Cookie: buildCookie(cookie), "User-Agent": UA },
                 signal: AbortSignal.timeout(20000),
             });
 
