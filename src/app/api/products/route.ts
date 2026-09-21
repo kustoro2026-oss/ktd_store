@@ -2,11 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { anekaClient } from "@/lib/anekadropship";
 import { filterByRelevance } from "@/lib/search";
 import { getLocalImages } from "@/lib/localImages";
-
-// Simple in-memory cache (per server instance). Clear on restart.
-const cache = new Map<string, { data: unknown; ts: number }>();
-const TTL = 5 * 60_000; // 5 minutes
-const MAX_ENTRIES = 300;
+import { getStaticProducts } from "@/lib/products-cache";
 
 // Allow the Vercel/CDN edge cache to serve repeat requests without invoking
 // this function at all. Bursts of identical requests (popular listings)
@@ -17,14 +13,6 @@ const CACHE_HEADERS = {
 
 // Never statically optimize this route (it fetches external data at runtime).
 export const dynamic = "force-dynamic";
-
-function cacheSet(key: string, data: unknown) {
-  if (cache.size >= MAX_ENTRIES) {
-    const oldest = cache.keys().next().value;
-    if (oldest !== undefined) cache.delete(oldest);
-  }
-  cache.set(key, { data, ts: Date.now() });
-}
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
@@ -37,21 +25,32 @@ export async function GET(req: NextRequest) {
   };
   const sort = searchParams.get("sort") ?? "";
 
-  const key = `${query.search}|${query.category}|${query.location}|${query.seller}|${query.page}|${sort}`;
-  const hit = cache.get(key);
-  if (hit && Date.now() - hit.ts < TTL) {
-    return NextResponse.json(hit.data, { headers: CACHE_HEADERS });
+  // 1. Static cache — serve instantly for default listing (page 1, newest, no filters)
+  const isDefaultListing = !query.search && !query.category && query.page === 1 && sort === "newest";
+  if (isDefaultListing) {
+    const staticProds = getStaticProducts();
+    if (staticProds.length > 0) {
+      // Apply local images to static products
+      const localized = staticProds.map((p) => {
+        const local = getLocalImages(p.id);
+        return local.length ? { ...p, image: local[0] } : p;
+      });
+      return NextResponse.json(
+        { products: localized, page: 1, totalPages: Math.ceil(staticProds.length / 20) },
+        { headers: CACHE_HEADERS },
+      );
+    }
   }
 
+  // 2. For filtered/search queries or when static cache is empty: try live scrape
+  //    (requires CF_CLEARANCE env var to bypass Cloudflare)
   try {
     const { products, totalPages } =
       sort === "newest"
         ? await anekaClient.getNewestProducts(query)
         : await anekaClient.getProducts(query);
 
-    // Merge Malaysia products into the main listing (not shown as a separate
-    // section). Skip only when filtering by a specific category — search
-    // queries should also include Malaysia products.
+    // Merge Malaysia products into the main listing
     let mergedProducts = products;
     let mergedTotalPages = totalPages;
     if (!query.category) {
@@ -66,18 +65,36 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // The supplier's search is loose; keep only products whose name actually
-    // matches the query so unrelated items never appear in search results.
     const relevant = query.search ? filterByRelevance(mergedProducts, query.search) : mergedProducts;
-    // Gunakan gambar lokal (hasil sinkronisasi) agar tidak ada hotlink eksternal.
     const localized = relevant.map((p) => {
       const local = getLocalImages(p.id);
       return local.length ? { ...p, image: local[0] } : p;
     });
-    const data = { products: localized, page: query.page, totalPages: mergedTotalPages };
-    cacheSet(key, data);
-    return NextResponse.json(data, { headers: CACHE_HEADERS });
+    return NextResponse.json(
+      { products: localized, page: query.page, totalPages: mergedTotalPages },
+      { headers: CACHE_HEADERS },
+    );
   } catch (err) {
+    // 3. Ultimate fallback: return static cache even for filtered queries
+    const staticProds = getStaticProducts();
+    if (staticProds.length > 0) {
+      let filtered = staticProds;
+      if (query.search) filtered = filterByRelevance(filtered, query.search);
+      if (query.category) {
+        filtered = filtered.filter((p) =>
+          (p as { category?: string }).category === query.category,
+        );
+      }
+      const localized = filtered.map((p) => {
+        const local = getLocalImages(p.id);
+        return local.length ? { ...p, image: local[0] } : p;
+      });
+      return NextResponse.json(
+        { products: localized, page: query.page, totalPages: Math.ceil(filtered.length / 20) },
+        { headers: CACHE_HEADERS },
+      );
+    }
+
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to fetch products" },
       { status: 502 },

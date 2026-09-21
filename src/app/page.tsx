@@ -5,6 +5,7 @@ import Features from "@/components/Features";
 import { NewProducts, PopularCategories } from "@/components/HomeSections";
 import { anekaClient, type AnekaCategory, type AnekaProduct } from "@/lib/anekadropship";
 import { getLocalImages } from "@/lib/localImages";
+import { getStaticCategories, getStaticProducts } from "@/lib/products-cache";
 
 // Lazy-load below-fold sections — they don't need to block first paint
 const FlashSale = dynamic(() => import("@/components/FlashSale"));
@@ -40,41 +41,32 @@ export const metadata: Metadata = {
   },
 };
 
-// Module-level cache so ISR regenerations reuse the previous scrape result
-// when the upstream site is slow or unreachable.
-let cache: {
-  categories: AnekaCategory[];
-  products: AnekaProduct[];
-  ts: number;
-} | null = null;
-const TTL = 5 * 60_000; // 5 minutes
-
 async function getHomeData() {
-  if (cache && Date.now() - cache.ts < TTL) return cache;
-  try {
-    const [categories, { products: raw }, malaysia] = await Promise.all([
-      anekaClient.getCategories(),
-      anekaClient.getNewestProducts({ page: 1 }),
-      anekaClient.getMalaysiaProducts({ page: 1 }).catch(() => null),
-    ]);
-    // Merge Malaysia products into the main listing (deduplicate by id).
-    let merged = raw;
-    if (malaysia) {
-      const seen = new Set(raw.map((p) => p.id));
-      const newProducts = malaysia.products.filter((p) => !seen.has(p.id));
-      merged = [...raw, ...newProducts];
-    }
-    // Gunakan gambar lokal (hasil sinkronisasi) agar tidak ada hotlink eksternal.
-    const products = merged.map((p) => {
+  // 1. Static cache — always available, no network needed
+  const staticCats = getStaticCategories();
+  const staticProds = getStaticProducts();
+
+  if (staticProds.length > 0) {
+    const products = staticProds.map((p) => {
       const local = getLocalImages(p.id);
       return local.length ? { ...p, image: local[0] } : p;
     });
-    cache = { categories, products, ts: Date.now() };
-    return cache;
+    return { categories: staticCats, products, ts: Date.now() };
+  }
+
+  // 2. Fallback: live scrape (requires CF_CLEARANCE or direct access)
+  try {
+    const [categories, newestResult] = await Promise.all([
+      anekaClient.getCategories(),
+      anekaClient.getNewestProducts({ page: 1 }),
+    ]);
+    const products = newestResult.products.map((p) => {
+      const local = getLocalImages(p.id);
+      return local.length ? { ...p, image: local[0] } : p;
+    });
+    return { categories, products, ts: Date.now() };
   } catch {
-    // Upstream unreachable — serve stale cache if available, otherwise re-throw.
-    if (cache) return cache;
-    throw new Error("anekadropship.id unreachable and no cached data available");
+    throw new Error("anekadropship.id unreachable and no static cache available");
   }
 }
 
