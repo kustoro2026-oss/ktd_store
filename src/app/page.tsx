@@ -8,6 +8,7 @@ import { getStaticCategories, getStaticProducts } from "@/lib/products-cache";
 
 // Lazy-load below-fold sections
 const FlashSale = dynamic(() => import("@/components/FlashSale"));
+const BestSellers = dynamic(() => import("@/components/BestSellers"));
 const BlogSection = dynamic(() => import("@/components/Sections").then((m) => ({ default: m.BlogSection })));
 const LatestCollections = dynamic(() => import("@/components/Sections").then((m) => ({ default: m.LatestCollections })));
 const SeoText = dynamic(() => import("@/components/Sections").then((m) => ({ default: m.SeoText })));
@@ -59,6 +60,7 @@ export default async function Home() {
       <FlashSale initialProducts={initialProducts} />
       <PopularCategories initialCategories={staticCats} />
       <NewProducts initialProducts={initialProducts} />
+      <BestSellers />
       <LatestCollections />
       <BlogSection />
       <SeoText />

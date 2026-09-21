@@ -4,6 +4,7 @@ import Link from "next/link";
 import ProductCard from "./ProductCard";
 import { useApi } from "@/lib/useApi";
 import CategoryIcon from "@/components/CategoryIcon";
+import { saveLastCategory } from "@/components/BestSellers";
 import type { AnekaCategory, AnekaProduct } from "@/lib/anekadropship";
 
 /* Kategori (real categories from anekadropship.id) */
@@ -41,6 +42,7 @@ export function PopularCategories({
             <Link
               key={c.slug}
               href={`/produk?category=${encodeURIComponent(c.slug)}`}
+              onClick={() => saveLastCategory(c.slug)}
               className="group flex flex-col items-center justify-center gap-2 rounded-xl border border-gray-100 bg-white p-3 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-md"
             >
               <span className="flex h-12 w-12 items-center justify-center rounded-full bg-brand/5 text-brand transition-transform group-hover:scale-110">
