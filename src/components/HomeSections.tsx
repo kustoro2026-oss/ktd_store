@@ -13,7 +13,7 @@ export function PopularCategories({
   initialCategories?: AnekaCategory[] | null;
 }) {
   // Server-rendered data (homepage ISR) — skip the client fetch when present.
-  const { data, loading } = useApi<{ categories: AnekaCategory[] }>(
+  const { data, loading, error } = useApi<{ categories: AnekaCategory[] }>(
     initialCategories ? null : "/api/categories",
   );
   const categories = initialCategories ?? data?.categories ?? [];
@@ -35,7 +35,7 @@ export function PopularCategories({
             <div key={i} className="flex h-24 animate-pulse flex-col items-center justify-center gap-2 rounded-xl bg-gray-100" />
           ))}
         </div>
-      ) : (
+      ) : categories.length > 0 ? (
         <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
           {categories.slice(0, 16).map((c) => (
             <Link
@@ -50,6 +50,12 @@ export function PopularCategories({
             </Link>
           ))}
         </div>
+      ) : (
+        <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/50 py-12 text-center">
+          <p className="text-sm text-muted-2">
+            {error ? "Kategori sedang tidak tersedia. Silakan coba beberapa saat lagi." : "Belum ada kategori."}
+          </p>
+        </div>
       )}
     </section>
   );
@@ -62,7 +68,7 @@ export function NewProducts({
   initialProducts?: AnekaProduct[] | null;
 }) {
   // Server-rendered data (homepage ISR) — skip the client fetch when present.
-  const { data, loading } = useApi<{ products: AnekaProduct[] }>(
+  const { data, loading, error } = useApi<{ products: AnekaProduct[] }>(
     initialProducts ? null : "/api/products?sort=newest&page=1",
   );
   const products = initialProducts ?? data?.products ?? [];
@@ -91,11 +97,17 @@ export function NewProducts({
             </div>
           ))}
         </div>
-      ) : (
+      ) : products.length > 0 ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
           {products.slice(0, 10).map((p) => (
             <ProductCard key={p.id} p={p} />
           ))}
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/50 py-12 text-center">
+          <p className="text-sm text-muted-2">
+            {error ? "Produk sedang tidak tersedia. Silakan coba beberapa saat lagi." : "Belum ada produk."}
+          </p>
         </div>
       )}
     </section>
