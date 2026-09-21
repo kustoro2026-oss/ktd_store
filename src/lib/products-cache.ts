@@ -1,14 +1,12 @@
 /**
  * Static products cache — reads pre-scraped data from products-cache.json.
  *
- * Two-trigger architecture:
- * 1. STATIC (always available): products-cache.json committed to repo.
- *    Run `node scripts/scrape-products-cache.cjs` to refresh.
- * 2. LIVE (optional): when CF_CLEARANCE env var is set, API routes
- *    fall back to live scraping for fresher data.
+ * Two ways to populate:
+ * 1. node scripts/build-cache-from-existing.cjs — from local data (NO network)
+ * 2. node scripts/scrape-products-cache.cjs — live scrape (needs cf_clearance)
+ *
+ * The JSON is imported at build time → instant at runtime.
  */
-import { readFileSync } from "fs";
-import { join } from "path";
 import type { AnekaCategory, AnekaProduct } from "./anekadropship";
 
 interface CacheData {
@@ -17,39 +15,34 @@ interface CacheData {
     products: AnekaProduct[];
 }
 
-let _cache: CacheData | null | undefined = undefined;
-
-function loadCache(): CacheData | null {
-    if (_cache !== undefined) return _cache;
-    try {
-        const path = join(process.cwd(), "src", "lib", "products-cache.json");
-        _cache = JSON.parse(readFileSync(path, "utf-8")) as CacheData;
-        return _cache;
-    } catch {
-        _cache = null;
-        return null;
-    }
+// Static import — bundled at build time, no filesystem read at runtime.
+// Falls back to empty cache if the file hasn't been generated yet.
+let cacheData: CacheData;
+try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    cacheData = require("./products-cache.json") as CacheData;
+} catch {
+    cacheData = { generatedAt: "", categories: [], products: [] };
 }
 
-/** Get categories from static cache. Returns empty array if cache unavailable. */
+/** Get categories from static cache. */
 export function getStaticCategories(): AnekaCategory[] {
-    return loadCache()?.categories ?? [];
+    return cacheData.categories;
 }
 
-/** Get all products from static cache. Returns empty array if cache unavailable. */
+/** Get all products from static cache. */
 export function getStaticProducts(): AnekaProduct[] {
-    return loadCache()?.products ?? [];
+    return cacheData.products;
 }
 
 /** Check if static cache is available and not too stale (> 7 days). */
 export function isStaticCacheFresh(): boolean {
-    const c = loadCache();
-    if (!c) return false;
-    const age = Date.now() - new Date(c.generatedAt).getTime();
+    if (!cacheData.generatedAt) return false;
+    const age = Date.now() - new Date(cacheData.generatedAt).getTime();
     return age < 7 * 24 * 3600_000;
 }
 
 /** Get cache generation timestamp for display. */
 export function getStaticCacheDate(): string | null {
-    return loadCache()?.generatedAt ?? null;
+    return cacheData.generatedAt || null;
 }
