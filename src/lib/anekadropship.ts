@@ -264,7 +264,13 @@ export class AnekaClient {
         // Cloudflare yang kedaluwarsa/konflik) bisa membuat POST /login
         // kena challenge → redirect balik ke /login.
         this.cookie = "";
-        const page = await fetch(`${BASE}/login`, { redirect: "manual" });
+        const page = await fetch(`${BASE}/login`, {
+          redirect: "manual",
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          },
+        });
         this.grab(page);
         const pageText = await page.text();
         const $ = cheerio.load(pageText);
@@ -280,6 +286,8 @@ export class AnekaClient {
           headers: {
             "Content-Type": "application/x-www-form-urlencoded",
             Cookie: this.cookie,
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
           },
           body: new URLSearchParams({ _token: token, email, password }),
           redirect: "manual",
@@ -640,7 +648,11 @@ export class AnekaClient {
         const timer = setTimeout(() => controller.abort(), 20_000);
         try {
           const res = await fetch(url, {
-            headers: { Cookie: this.cookie },
+            headers: {
+              Cookie: this.cookie,
+              "User-Agent":
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            },
             signal: controller.signal,
           });
           return await res.text();
