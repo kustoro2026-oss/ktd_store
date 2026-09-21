@@ -187,8 +187,14 @@ export default function FlashSale({ initialProducts }: Props) {
     }, [products]);
 
     // ─── Schedule-aware state ───────────────────────────────────────────
-    const [schedule, setSchedule] = useState(() => getFlashSaleStatus());
-    const [remaining, setRemaining] = useState(() => secondsUntilFlashSaleEnds());
+    // Initialised with a neutral value so server & client render identically.
+    // The real schedule is computed inside useEffect (client-only).
+    const [schedule, setSchedule] = useState<ReturnType<typeof getFlashSaleStatus>>(() => ({
+        active: false,
+        endTime: new Date(),
+        nextStart: null,
+    }));
+    const [remaining, setRemaining] = useState(0);
 
     useEffect(() => {
         const tick = () => {
