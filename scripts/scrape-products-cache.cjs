@@ -295,6 +295,38 @@ async function main() {
         if (products.length < 5) break; // less than 5 = likely last page
     }
 
+    // ─── Scrape Malaysia products ────────────────────────────────────
+    console.log("[3.5/4] Scrape produk Malaysia...");
+    let malaysiaCount = 0;
+    for (let page = 1; page <= 10; page++) {
+        const url = `${BASE}/produk/semua/malaysia?page=${page}`;
+        console.log(`  Malaysia halaman ${page}...`);
+        await sleep(DELAY_MS);
+        try {
+            const html = await fetchPage(url, cookie);
+            if (html.includes("tidak ada produk")) {
+                console.log(`  Halaman ${page} kosong, berhenti.`);
+                break;
+            }
+            const products = parseProducts(html, "malaysia");
+            let newCount = 0;
+            for (const p of products) {
+                if (!seenIds.has(p.id)) {
+                    seenIds.add(p.id);
+                    allProducts.push(p);
+                    newCount++;
+                }
+            }
+            malaysiaCount += newCount;
+            console.log(`    ${newCount} produk baru (total: ${allProducts.length})`);
+            if (products.length < 5) break;
+        } catch (e) {
+            console.log(`    Gagal: ${e.message}`);
+            break;
+        }
+    }
+    console.log(`  Total produk Malaysia: ${malaysiaCount}`);
+
     // ─── Save ────────────────────────────────────────────────────────
     console.log(`[4/4] Menyimpan ${allProducts.length} produk + ${categories.length} kategori...`);
     const cache = {
