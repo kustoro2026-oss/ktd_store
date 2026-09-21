@@ -19,18 +19,16 @@ export default function ProductVideos({ productId }: { productId: string }) {
                 Video Produk
             </p>
 
-            {/* Google Drive player — 9:16 portrait, constrained width */}
-            <div className="mt-3 flex justify-center">
-                <div className="relative aspect-[3/4] w-full max-w-[260px] rounded-xl bg-black">
-                    <iframe
-                        key={active.fileId}
-                        src={driveEmbedUrl(active.fileId)}
-                        title={active.label || "Video Produk"}
-                        className="absolute inset-0 h-full w-full"
-                        allow="autoplay; fullscreen"
-                        allowFullScreen
-                    />
-                </div>
+            {/* Google Drive player — constrained width, centered */}
+            <div className="relative mx-auto aspect-[3/4] w-full max-w-[260px] rounded-xl bg-black">
+                <iframe
+                    key={active.fileId}
+                    src={driveEmbedUrl(active.fileId)}
+                    title={active.label || "Video Produk"}
+                    className="absolute inset-0 h-full w-full"
+                    allow="autoplay; fullscreen"
+                    allowFullScreen
+                />
             </div>
 
             <a
@@ -44,35 +42,37 @@ export default function ProductVideos({ productId }: { productId: string }) {
             </a>
 
             {/* Video selector — always a 3-col grid, compact on all screens */}
-            {videos.length > 1 && (
-                <div className="mt-3 grid grid-cols-3 gap-2">
-                    {videos.map((v, i) => {
-                        const isActive = i === activeIdx;
-                        return (
-                            <button
-                                key={v.fileId}
-                                type="button"
-                                onClick={() => setActiveIdx(i)}
-                                aria-label={v.label || `Video ${i + 1}`}
-                                className={`flex flex-col items-center justify-center gap-1 rounded-lg border px-1 py-2 transition-all ${isActive
-                                    ? "border-brand bg-brand/5 text-brand"
-                                    : "border-gray-100 bg-white text-muted-2 hover:border-gray-200 hover:text-brand"
-                                    }`}
-                            >
-                                <span
-                                    className={`flex h-7 w-7 items-center justify-center rounded-full ${isActive ? "bg-brand text-white" : "bg-gray-100"
+            {
+                videos.length > 1 && (
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                        {videos.map((v, i) => {
+                            const isActive = i === activeIdx;
+                            return (
+                                <button
+                                    key={v.fileId}
+                                    type="button"
+                                    onClick={() => setActiveIdx(i)}
+                                    aria-label={v.label || `Video ${i + 1}`}
+                                    className={`flex flex-col items-center justify-center gap-1 rounded-lg border px-1 py-2 transition-all ${isActive
+                                        ? "border-brand bg-brand/5 text-brand"
+                                        : "border-gray-100 bg-white text-muted-2 hover:border-gray-200 hover:text-brand"
                                         }`}
                                 >
-                                    <Play className="h-3.5 w-3.5" />
-                                </span>
-                                <span className="w-full truncate text-center text-[11px] font-medium">
-                                    {v.label || `Video ${i + 1}`}
-                                </span>
-                            </button>
-                        );
-                    })}
-                </div>
-            )}
-        </div>
+                                    <span
+                                        className={`flex h-7 w-7 items-center justify-center rounded-full ${isActive ? "bg-brand text-white" : "bg-gray-100"
+                                            }`}
+                                    >
+                                        <Play className="h-3.5 w-3.5" />
+                                    </span>
+                                    <span className="w-full truncate text-center text-[11px] font-medium">
+                                        {v.label || `Video ${i + 1}`}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                )
+            }
+        </div >
     );
 }
