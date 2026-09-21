@@ -138,51 +138,85 @@ function parseProducts(html, categorySlug) {
     const items = [];
     const seen = new Set();
 
+    // Same selectors as anekadropship.ts parseProducts()
     $('a.line-clamp-2[href*="/products/"]').each((_, el) => {
         const a = $(el);
         const card = a.closest("div.group");
         const href = a.attr("href") ?? "";
         const id = href.match(/\/products\/(\d+)/)?.[1] ?? "";
-        if (!id || seen.has(id)) return;
-        seen.add(id);
-
-        const name = a.text().trim();
         const image = card.find("img").first().attr("src") ?? "";
 
-        // Price (Rekomendasi Jual): cari elemen yang mengandung "Rp"
-        let rekomendasiJual = "";
-        let hargaModal = "";
-        const priceEls = [];
-        card.find("*").each((_, e) => {
-            const t = $(e).text().trim();
-            if (/^Rp\s*[\d.,]+/.test(t)) priceEls.push(t);
-        });
-        // Biasanya harga pertama = rekomendasi jual, kedua = harga modal
-        rekomendasiJual = priceEls[0] || "Rp -";
-        hargaModal = priceEls[1] || "";
+        if (!id || seen.has(id) || !image) return;
+        seen.add(id);
 
-        // Stock
-        let stok = "";
-        card.find("*").each((_, e) => {
-            const t = $(e).text().trim();
-            if (/stok\s*:?\s*\d/i.test(t)) stok = t.replace(/stok\s*:?\s*/i, "").trim();
-        });
+        // Clean price: strip " / RM XX.XX" suffix
+        const cleanPrice = (raw) => {
+            if (!raw) return "";
+            return raw.replace(/\s*\/\s*RM\s*[\d.,]+$/i, "").trim();
+        };
 
-        // Sold
-        let terjual = "";
-        card.find("*").each((_, e) => {
-            const t = $(e).text().trim();
-            if (/terjual/i.test(t)) terjual = t.replace(/terjual\s*:?\s*/i, "").trim();
-        });
+        // Clean product name: strip [STORE] tags
+        const cleanName = (raw) => {
+            let s = raw.replace(/\s+/g, " ").trim();
+            s = s.replace(/^\s*(?:\[[^\]]*\]\s*)+/, "");
+            s = s.replace(/\b(?:META\s*ADS(?:\s*ONLY)?|ADS\s*ONLY)\b/gi, " ");
+            s = s.replace(/\s*\[[^\]]*\]\s*/g, " ");
+            s = s.replace(/\s{2,}/g, " ").trim();
+            return s || raw.trim();
+        };
+
+        // Use the SAME selectors as the original anekadropship.ts
+        const rekomendasiJual = cleanPrice(
+            card.find('span:contains("Rekomendasi Jual")')
+                .parent()
+                .find("span.text-green-600")
+                .first()
+                .text()
+                .trim()
+        );
+
+        const hargaModal = cleanPrice(
+            card.find("span.text-red-500").first().text().trim()
+        );
+
+        const hargaModalCut = cleanPrice(
+            card.find("span.line-through").first().text().trim()
+        );
+
+        const terjual = card.find('span:contains("Terjual")')
+            .parent()
+            .find("span.font-bold")
+            .last()
+            .text()
+            .trim();
+
+        const stok = card.find('span:contains("Stok:")')
+            .find("span")
+            .last()
+            .text()
+            .trim();
+
+        const profit = card.find("span.bg-orange-100")
+            .first()
+            .text()
+            .trim();
+
+        const location = card.find("div.absolute span.truncate")
+            .first()
+            .text()
+            .trim();
 
         items.push({
             id,
-            name,
+            name: cleanName(a.text()),
             image,
+            location: location || "all",
             rekomendasiJual: rekomendasiJual || "Rp -",
             hargaModal: hargaModal || "",
-            stok: stok || "0",
+            hargaModalCut: hargaModalCut || "",
             terjual: terjual || "0",
+            stok: stok || "0",
+            profit: profit || "",
             category: categorySlug || "",
         });
     });
