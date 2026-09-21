@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import dynamic from "next/dynamic";
+import { writeFileSync, mkdirSync } from "fs";
+import { join } from "path";
 import HeroCarousel from "@/components/HeroCarousel";
 import Features from "@/components/Features";
 import { NewProducts, PopularCategories } from "@/components/HomeSections";
@@ -64,6 +66,25 @@ async function getHomeData() {
       const local = getLocalImages(p.id);
       return local.length ? { ...p, image: local[0] } : p;
     });
+
+    // Self-populate static cache so future requests are instant.
+    // Akan ditimpa oleh script scrape penuh saat dijalankan manual.
+    try {
+      const cachePath = join(process.cwd(), "src", "lib", "products-cache.json");
+      mkdirSync(join(process.cwd(), "src", "lib"), { recursive: true });
+      writeFileSync(
+        cachePath,
+        JSON.stringify(
+          { generatedAt: new Date().toISOString(), categories, products },
+          null,
+          2,
+        ),
+        "utf-8",
+      );
+    } catch {
+      // Read-only filesystem on some deployments — ignore.
+    }
+
     return { categories, products, ts: Date.now() };
   } catch {
     throw new Error("anekadropship.id unreachable and no static cache available");
