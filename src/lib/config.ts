@@ -93,8 +93,11 @@ export type WhatsAppShipping = {
   courier: string;
   cost: string;
   total: string;
-  /** Multi-paket (keranjang beda seller): satu entri per paket. */
-  groups?: { label: string; courier: string; cost: string }[];
+  /**
+   * Multi-paket (keranjang beda seller): satu entri per paket, lengkap dengan
+   * daftar produk yang ada di paket tersebut (peta produk -> paket).
+   */
+  groups?: { label: string; courier: string; cost: string; items?: string[] }[];
 };
 
 // ─── Metode pembayaran ───────────────────────────────────────────────────────
@@ -112,7 +115,7 @@ export const PAYMENT_METHODS: PaymentMethod[] = [
   {
     key: "cod",
     label: "COD (Bayar di Tempat)",
-    note: "Bayar tunai saat paket diterima.",
+    note: "Bayar tunai saat paket diterima (biaya COD per paket).",
   },
   {
     key: "transfer",
@@ -175,10 +178,14 @@ export function buildWhatsAppOrderMessage(i: WhatsAppOrderInput): string {
   if (i.codFee && i.codFee > 0) lines.push(`Biaya COD: Rp ${i.codFee.toLocaleString("id-ID")}`);
   if (i.shipping) {
     if (i.shipping.groups && i.shipping.groups.length > 1) {
-      lines.push("", "Pengiriman:");
-      i.shipping.groups.forEach((g, idx) =>
-        lines.push(`Paket ${idx + 1} (${g.label}): ${g.courier} — ${g.cost}`)
-      );
+      lines.push("", `Pengiriman (${i.shipping.groups.length} paket terpisah):`);
+      i.shipping.groups.forEach((g, idx) => {
+        lines.push(`Paket ${idx + 1} — ${g.label}`);
+        if (g.items && g.items.length > 0) {
+          for (const n of g.items) lines.push(`  • ${n}`);
+        }
+        lines.push(`  Kurir: ${g.courier} — ${g.cost}`);
+      });
       lines.push(`Ongkir Total: ${i.shipping.cost}`, `Total: ${i.shipping.total}`);
     } else {
       lines.push("", "Pengiriman:", `Kurir: ${i.shipping.courier}`, `Ongkir: ${i.shipping.cost}`, `Total: ${i.shipping.total}`);

@@ -3,32 +3,49 @@
 import type { AnekaProductDetail } from "./anekadropship";
 import { getStaticProducts } from "./products-cache";
 
-/** Ambil detail produk dari static cache (info dasar saja). */
+/** Field pengiriman hasil enrich (scripts/enrich-products-cache.cjs). */
+type ShippingFields = {
+  images?: string[];
+  hargaModal?: string;
+  terjual?: string;
+  berat?: string;
+  beratGram?: number | null;
+  volume?: string;
+  ekspedisi?: string;
+  ekspedisiList?: string[];
+  alamatSeller?: string;
+};
+
+/** Ambil detail produk dari static cache (info dasar + data pengiriman). */
 export async function getDetailCached(id: string): Promise<AnekaProductDetail | null> {
   const products = getStaticProducts();
   const p = products.find((p) => p.id === id);
   if (!p) return null;
 
-  // Return basic info as AnekaProductDetail shape.
-  // Full details (description, variants, images) will be empty.
+  // Info dasar + data pengiriman hasil enrich; deskripsi & varian tetap kosong.
+  const s = p as ShippingFields;
+  const beratGram =
+    typeof s.beratGram === "number" && s.beratGram > 0 ? s.beratGram : null;
+
   return {
     id: p.id,
     name: p.name,
-    images: (p as { images?: string[] }).images ?? [p.image].filter(Boolean),
+    images: s.images ?? [p.image].filter(Boolean),
     descriptionHtml: "",
     rekomendasiJual: p.rekomendasiJual ?? "Rp -",
-    hargaModal: (p as { hargaModal?: string }).hargaModal ?? "",
+    hargaModal: s.hargaModal ?? "",
     stok: p.stok ?? "0",
-    terjual: (p as { terjual?: string }).terjual ?? "0",
+    terjual: s.terjual ?? "0",
     profit: "",
     sku: "",
-    berat: "",
-    beratGram: null,
-    volume: "",
-    ekspedisi: "",
-    ekspedisiList: [],
+    berat: s.berat ?? "",
+    beratGram,
+    volume: s.volume ?? "",
+    ekspedisi: s.ekspedisi ?? "",
+    ekspedisiList: s.ekspedisiList ?? [],
     sistem: "",
-    alamatSeller: "",
+    alamatSeller: s.alamatSeller ?? "",
+    location: p.location ?? "",
     hasVariants: false,
     variants: [],
     marketingKitUrl: null,

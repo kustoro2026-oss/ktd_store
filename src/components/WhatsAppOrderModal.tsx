@@ -84,9 +84,13 @@ type Rate = {
 };
 type RateGroup = {
   origin: number;
+  /** Kunci grup dari server: kecamatan + identitas seller. */
+  sellerKey?: string;
   label: string;
   weight: number;
   estimated?: boolean;
+  /** ID produk yang masuk paket ini (peta produk -> paket). */
+  itemIds?: string[];
   results: Rate[];
 };
 
@@ -101,6 +105,9 @@ const parseRupiah = (s: string) => {
   const d = s.replace(/\D/g, "");
   return d ? Number(d) : 0;
 };
+
+/** Kunci stabil pemilihan kurir — indeks daftar bisa berubah saat difilter COD. */
+const rateKey = (r: Rate) => `${r.service}::${r.service_type}`;
 
 const ONGKIR_UNAVAILABLE =
   "Cek ongkir sementara tidak tersedia. Silakan coba beberapa saat lagi.";
@@ -151,7 +158,7 @@ export default function WhatsAppOrderModal({
   const [weightStr, setWeightStr] = useState("1000");
   const [groups, setGroups] = useState<RateGroup[]>([]);
   const [selectedByGroup, setSelectedByGroup] = useState<
-    Record<number, number>
+    Record<number, string>
   >({});
   const [ratesLoading, setRatesLoading] = useState(false);
   const [ratesError, setRatesError] = useState("");
@@ -384,8 +391,10 @@ export default function WhatsAppOrderModal({
     if (isCart) {
       payload.productIds = (items ?? []).map((it) => it.id);
     } else {
+      // Berat dikirim per unit; server mengalikannya dengan qty.
       if (productId) payload.productId = productId;
       payload.weight = Math.round(w);
+      payload.qty = Math.max(1, Number(qty.replace(/\D/g, "") || "1"));
     }
     fetch("/api/shipping/rates", {
       method: "POST",
@@ -486,6 +495,13 @@ export default function WhatsAppOrderModal({
   const subtotal = isCart
     ? (items ?? []).reduce((s, it) => s + parseRupiah(it.price), 0)
     : unitPrice * qtyNum;
+  /** Berat 1 unit: dari data produk (locked) atau input manual pembeli. */
+  const perItemWeight = lockedWeight ?? Number(weightStr);
+  /** Total berat single-product = berat per unit × qty. */
+  const totalWeight =
+    Number.isFinite(perItemWeight) && perItemWeight > 0
+      ? Math.round(perItemWeight * qtyNum)
+      : 0;
 
   const checkRates = () => {
     if (!districtId) {
@@ -510,8 +526,10 @@ export default function WhatsAppOrderModal({
     if (isCart) {
       payload.productIds = (items ?? []).map((it) => it.id);
     } else {
+      // Berat dikirim per unit; server mengalikannya dengan qty.
       if (productId) payload.productId = productId;
       payload.weight = Math.round(w);
+      payload.qty = Math.max(1, Number(qty.replace(/\D/g, "") || "1"));
     }
     fetch("/api/shipping/rates", {
       method: "POST",
@@ -541,16 +559,39 @@ export default function WhatsAppOrderModal({
       .finally(() => setRatesLoading(false));
   };
 
+  /**
+   * Nama item per paket (peta produk -> paket) untuk pesan WhatsApp dan UI.
+   * Item keranjang yang sama muncul lebih dari sekali ditandai (×N).
+   */
+  const cartLineById = new Map<string, { name: string; count: number }>();
+  for (const it of items ?? []) {
+    const k = String(it.id);
+    const cur = cartLineById.get(k);
+    if (cur) cur.count += 1;
+    else cartLineById.set(k, { name: it.name, count: 1 });
+  }
+  const groupItemNames = (g: RateGroup): string[] =>
+    (g.itemIds ?? []).map((id) => {
+      const e = cartLineById.get(id);
+      if (!e) return isCart ? id : productName;
+      return e.count > 1 ? `${e.name} (×${e.count})` : e.name;
+    });
+
   const ratesFor = (g: RateGroup): Rate[] => {
-    if (isCart || !ekspedisi?.length) return g.results ?? [];
-    const filtered = (g.results ?? []).filter((r) => matchEkspedisi(r, ekspedisi));
-    return filtered.length ? filtered : g.results ?? [];
+    let list = g.results ?? [];
+    if (!isCart && ekspedisi?.length) {
+      const filtered = list.filter((r) => matchEkspedisi(r, ekspedisi));
+      if (filtered.length) list = filtered;
+    }
+    // Kurir tanpa dukungan COD (rate.cod=false) tidak boleh dipilih saat
+    // pembeli memilih COD.
+    return payment === "cod" ? list.filter((r) => r.cod) : list;
   };
 
   const selectedFor = (idx: number): Rate | null => {
     const list = groups[idx] ? ratesFor(groups[idx]) : [];
     const sel = selectedByGroup[idx];
-    return typeof sel === "number" ? (list[sel] ?? null) : null;
+    return sel ? list.find((r) => rateKey(r) === sel) ?? null : null;
   };
 
   const totalOngkir = groups.reduce((s, g, idx) => {
@@ -561,7 +602,13 @@ export default function WhatsAppOrderModal({
   const allSelected =
     groups.length > 0 && groups.every((_, idx) => selectedFor(idx) !== null);
 
-  const codFeeAmount = payment === "cod" ? COD_FEE : 0;
+  /** Paket yang tidak punya satu pun kurir tersedia (submit mustahil tanpa jalan keluar). */
+  const emptyGroupCount = groups.filter((g) => !ratesFor(g).length).length;
+  const hasEmptyGroups = emptyGroupCount > 0;
+
+  /** COD fee dikenakan per paket — tiap paket adalah kiriman COD terpisah. */
+  const codFeeAmount =
+    payment === "cod" ? COD_FEE * Math.max(1, groups.length) : 0;
   const grandTotal = subtotal + totalOngkir + codFeeAmount;
 
   const submit = (e: React.FormEvent) => {
@@ -575,7 +622,13 @@ export default function WhatsAppOrderModal({
       return;
     }
     if (!allSelected) {
-      setError('Klik "Cek Ongkir" lalu pilih kurir pengiriman.');
+      setError(
+        hasEmptyGroups
+          ? payment === "cod"
+            ? `Ada ${emptyGroupCount} paket tanpa kurir yang mendukung COD. Pilih Transfer Bank atau gunakan tombol "Tanya Admin via WA".`
+            : `Ada ${emptyGroupCount} paket yang belum punya kurir. Gunakan tombol "Tanya Admin via WA" agar admin bantu hitung ongkirnya.`
+          : 'Klik "Cek Ongkir" lalu pilih kurir pengiriman.'
+      );
       return;
     }
     if (!payment) {
@@ -623,12 +676,74 @@ export default function WhatsAppOrderModal({
                 r.service_name +
                 (r.etd ? ` (estimasi ${r.etd} hari)` : ""),
               cost: formatRupiah(Number(r.cost) || 0),
+              items: groupItemNames(g),
             }))
             : undefined,
       },
     });
     window.open(whatsappLink(message), "_blank", "noopener,noreferrer");
     onClose();
+  };
+
+  /**
+   * Paket tanpa kurir bukan jalan buntu: pesanan tetap bisa dikirim ke admin
+   * via WhatsApp. Paket yang sudah punya kurir ikut disertakan; paket yang
+   * belum ditandai agar admin menghitung ongkirnya manual.
+   */
+  const askAdminViaWa = () => {
+    if (!districtId) {
+      setError("Pilih provinsi, kota, dan kecamatan tujuan.");
+      return;
+    }
+    saveBuyerData({
+      name: name.trim(),
+      phone: phone.trim(),
+      address: address.trim(),
+      provinceId,
+      cityId,
+      districtId,
+    });
+    const paymentLabel =
+      PAYMENT_METHODS.find((p) => p.key === payment)?.label ?? payment;
+    const productUrl =
+      typeof window !== "undefined" ? window.location.href : "";
+    const helperNote = [
+      note.trim(),
+      `Mohon bantu cek ongkir ${emptyGroupCount} paket yang belum tersedia kurirnya.`,
+    ]
+      .filter(Boolean)
+      .join(" ");
+    const message = buildWhatsAppOrderMessage({
+      productName: isCart ? "Checkout Keranjang" : productName,
+      price: isCart ? formatRupiah(subtotal) : price,
+      items: isCart ? items : undefined,
+      productUrl,
+      name: name.trim(),
+      phone: phone.trim(),
+      address: address.trim(),
+      qty: isCart ? "" : qty.trim(),
+      note: helperNote,
+      payment: paymentLabel || undefined,
+      codFee: codFeeAmount || undefined,
+      shipping: {
+        courier: "Belum tersedia — ongkir menyusul",
+        cost: totalOngkir > 0 ? formatRupiah(totalOngkir) : "-",
+        total: `${formatRupiah(subtotal + totalOngkir + codFeeAmount)} (+ ongkir paket menyusul)`,
+        groups: groups.map((g, idx) => {
+          const r = selectedFor(idx);
+          return {
+            label: g.label,
+            courier: r
+              ? r.service_name +
+                (r.etd ? ` (estimasi ${r.etd} hari)` : "")
+              : "Belum ada kurir",
+            cost: r ? formatRupiah(Number(r.cost) || 0) : "ongkir menyusul",
+            items: groupItemNames(g),
+          };
+        }),
+      },
+    });
+    window.open(whatsappLink(message), "_blank", "noopener,noreferrer");
   };
 
   // ─── Render ────────────────────────────────────────────────────────────
@@ -940,6 +1055,11 @@ export default function WhatsAppOrderModal({
                       Volume {volume}
                     </span>
                   )}
+                  {qtyNum > 1 && totalWeight > 0 && (
+                    <span className="text-xs font-semibold text-brand">
+                      Total {totalWeight} gr ({perItemWeight} gr × {qtyNum})
+                    </span>
+                  )}
                   {ratesLoading && (
                     <span className="inline-flex items-center gap-1 text-xs text-brand">
                       <Loader2 className="h-3 w-3 animate-spin" />
@@ -971,6 +1091,19 @@ export default function WhatsAppOrderModal({
                 </p>
               )}
 
+              {payment === "cod" && groups.length > 0 && (
+                <p className="mb-2 text-[11px] text-muted-2">
+                  Hanya kurir yang mendukung COD yang ditampilkan.{" "}
+                  <button
+                    type="button"
+                    onClick={() => setPayment("transfer")}
+                    className="font-semibold text-brand underline underline-offset-2"
+                  >
+                    Ganti ke Transfer Bank
+                  </button>
+                </p>
+              )}
+
               {!districtId && (
                 <p className="text-[11px] text-muted-2">
                   Pilih kecamatan tujuan untuk melihat ongkir
@@ -985,25 +1118,71 @@ export default function WhatsAppOrderModal({
 
               {groups.map((g, gi) => {
                 const list = ratesFor(g);
-                if (!list.length) return null;
+                const gKey = `${g.origin}-${g.sellerKey ?? "g"}-${gi}`;
+                if (!list.length) {
+                  return (
+                    <div
+                      key={gKey}
+                      className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2"
+                    >
+                      <p className="text-[11px] font-semibold text-amber-700">
+                        Paket {gi + 1} —{" "}
+                        {payment === "cod"
+                          ? "tidak ada kurir COD tersedia"
+                          : "tidak ada kurir tersedia"}
+                      </p>
+                      <p className="line-clamp-2 text-[11px] text-amber-700/80">
+                        {g.label} · Berat {g.weight} gram
+                        {g.estimated ? " (estimasi)" : ""}
+                      </p>
+                      {groupItemNames(g).length > 0 && (
+                        <ul className="mt-0.5 space-y-0.5 text-[11px] text-amber-700/80">
+                          {groupItemNames(g).map((n, ni) => (
+                            <li key={`${ni}-${gKey}`} className="flex gap-1">
+                              <span>•</span>
+                              <span className="line-clamp-1">{n}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      <p className="mt-1 text-[11px] text-amber-700/80">
+                        {payment === "cod"
+                          ? "Tidak ada kurir yang mendukung COD untuk paket ini — pilih Transfer Bank, atau gunakan tombol “Tanya Admin via WA” di bawah."
+                          : "Pesanan tetap bisa diproses — admin akan bantu hitung ongkir paket ini lewat tombol “Tanya Admin via WA” di bawah."}
+                      </p>
+                    </div>
+                  );
+                }
                 return (
-                  <div key={g.origin} className="mt-3 space-y-1.5">
+                  <div key={gKey} className="mt-3 space-y-1.5">
                     <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-2">
                       {groups.length > 1
                         ? `Paket ${gi + 1} — pilih kurir`
                         : "Pilih Kurir"}
                     </p>
                     {groups.length > 1 && (
-                      <p className="line-clamp-2 text-[11px] text-muted-2">
-                        {g.label} · Berat {g.weight} gram
-                        {g.estimated ? " (estimasi)" : ""}
-                      </p>
+                      <div className="text-[11px] text-muted-2">
+                        <p className="line-clamp-2">
+                          {g.label} · Berat {g.weight} gram
+                          {g.estimated ? " (estimasi)" : ""}
+                        </p>
+                        {groupItemNames(g).length > 0 && (
+                          <ul className="mt-0.5 space-y-0.5">
+                            {groupItemNames(g).map((n, ni) => (
+                              <li key={`${ni}-${gKey}`} className="flex gap-1">
+                                <span>•</span>
+                                <span className="line-clamp-1">{n}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
                     )}
                     <div className="space-y-1.5">
                       {list.map((r, i) => (
                         <label
                           key={`${r.service}-${r.service_type}-${i}`}
-                          className={`flex cursor-pointer items-center gap-3 rounded-lg border bg-white px-3 py-2.5 transition-all ${selectedByGroup[gi] === i
+                          className={`flex cursor-pointer items-center gap-3 rounded-lg border bg-white px-3 py-2.5 transition-all ${selectedByGroup[gi] === rateKey(r)
                             ? "border-brand ring-2 ring-brand/20 shadow-sm"
                             : "border-gray-200 hover:border-gray-300"
                             }`}
@@ -1011,11 +1190,11 @@ export default function WhatsAppOrderModal({
                           <input
                             type="radio"
                             name={`shipping-rate-${gi}`}
-                            checked={selectedByGroup[gi] === i}
+                            checked={selectedByGroup[gi] === rateKey(r)}
                             onChange={() =>
                               setSelectedByGroup((prev) => ({
                                 ...prev,
-                                [gi]: i,
+                                [gi]: rateKey(r),
                               }))
                             }
                             className="h-4 w-4 accent-brand"
@@ -1189,7 +1368,9 @@ export default function WhatsAppOrderModal({
             )}
             {codFeeAmount > 0 && (
               <div className="flex justify-between">
-                <span className="text-muted-2">Biaya COD</span>
+                <span className="text-muted-2">
+                  Biaya COD{groups.length > 1 ? ` (${groups.length} paket)` : ""}
+                </span>
                 <span className="font-semibold text-ink">
                   {formatRupiah(codFeeAmount)}
                 </span>
@@ -1212,6 +1393,17 @@ export default function WhatsAppOrderModal({
             <WhatsAppIcon className="h-5 w-5" />
             Buat Pesanan via WhatsApp
           </button>
+          {hasEmptyGroups && !ratesLoading && (
+            <button
+              type="button"
+              onClick={askAdminViaWa}
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-[#25D366] bg-white px-4 py-3 text-sm font-bold text-[#128C4A] transition-all hover:bg-[#25D366]/10 active:scale-[0.98]"
+            >
+              <WhatsAppIcon className="h-4.5 w-4.5" />
+              Tanya Admin via WA — {emptyGroupCount}{" "}
+              {payment === "cod" ? "paket tanpa kurir COD" : "paket tanpa kurir"}
+            </button>
+          )}
           <p className="mt-2 text-center text-[11px] text-muted-2">
             Pesanan akan dikirim ke WhatsApp admin untuk diproses
           </p>

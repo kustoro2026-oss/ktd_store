@@ -230,6 +230,8 @@ export type AnekaProductDetail = {
   sistem: string;
   /** Alamat penjual/gudang tempat barang dikirim. */
   alamatSeller: string;
+  /** Kota lokasi seller (badge, mis. "Jakarta Barat") — hint resolusi origin. */
+  location?: string;
   /** Apakah produk punya varian (warna/ukuran). */
   hasVariants: boolean;
   /** Daftar varian produk (kosong jika tanpa varian). */
