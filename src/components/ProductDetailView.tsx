@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Boxes, MessageCircle, Package, Percent, Share2, ShieldCheck, ShoppingBag, Tag } from "lucide-react";
+import { Boxes, MessageCircle, Package, Percent, Share2, ShoppingBag, Tag } from "lucide-react";
 import { marketplaces } from "@/lib/config";
 import { getTikTokProductLink } from "@/lib/tiktok-product-links";
 import { getLazadaProductLink } from "@/lib/lazada-product-links";
@@ -353,7 +353,7 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
           )}
 
           {/* Info pengiriman dari anekadropship (berat/volume/ekspedisi terkunci) */}
-          {(detail.berat || detail.volume || detail.ekspedisi || detail.alamatSeller) && (
+          {(detail.berat || detail.volume || detail.ekspedisi) && (
             <div className="mt-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
               <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-2">
                 <Package className="h-3.5 w-3.5 text-brand" />
@@ -382,12 +382,6 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
                   <div className="flex justify-between gap-3">
                     <dt className="text-muted-2">Sistem</dt>
                     <dd className="font-medium text-ink">{detail.sistem}</dd>
-                  </div>
-                )}
-                {detail.alamatSeller && (
-                  <div className="flex justify-between gap-3">
-                    <dt className="shrink-0 text-muted-2">Dikirim dari</dt>
-                    <dd className="text-right text-xs text-muted">{detail.alamatSeller}</dd>
                   </div>
                 )}
               </dl>
@@ -525,7 +519,6 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
         weightLabel={detail.berat}
         volume={detail.volume}
         ekspedisi={detail.ekspedisiList}
-        sellerAddress={detail.alamatSeller}
       />
     </div>
   );

@@ -96,8 +96,10 @@ export type WhatsAppShipping = {
   /**
    * Multi-paket (keranjang beda seller): satu entri per paket, lengkap dengan
    * daftar produk yang ada di paket tersebut (peta produk -> paket).
+   * `label` opsional; sengaja tidak diisi dengan alamat seller agar asal
+   * gudang tidak terlihat pembeli — paket cukup tampil sebagai "Paket N".
    */
-  groups?: { label: string; courier: string; cost: string; items?: string[] }[];
+  groups?: { label?: string; courier: string; cost: string; items?: string[] }[];
 };
 
 // ─── Metode pembayaran ───────────────────────────────────────────────────────
@@ -180,7 +182,7 @@ export function buildWhatsAppOrderMessage(i: WhatsAppOrderInput): string {
     if (i.shipping.groups && i.shipping.groups.length > 1) {
       lines.push("", `Pengiriman (${i.shipping.groups.length} paket terpisah):`);
       i.shipping.groups.forEach((g, idx) => {
-        lines.push(`Paket ${idx + 1} — ${g.label}`);
+        lines.push(g.label ? `Paket ${idx + 1} — ${g.label}` : `Paket ${idx + 1}`);
         if (g.items && g.items.length > 0) {
           for (const n of g.items) lines.push(`  • ${n}`);
         }

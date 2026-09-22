@@ -68,7 +68,6 @@ type Props = {
   weightLabel?: string;
   volume?: string;
   ekspedisi?: string[];
-  sellerAddress?: string;
 };
 
 type Province = { id: number | string; provinsi_name: string };
@@ -133,7 +132,6 @@ export default function WhatsAppOrderModal({
   weightLabel,
   volume,
   ekspedisi,
-  sellerAddress,
 }: Props) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -671,7 +669,6 @@ export default function WhatsAppOrderModal({
         groups:
           selectedRates.length > 1
             ? selectedRates.map(({ g, r }) => ({
-              label: g.label,
               courier:
                 r.service_name +
                 (r.etd ? ` (estimasi ${r.etd} hari)` : ""),
@@ -732,7 +729,6 @@ export default function WhatsAppOrderModal({
         groups: groups.map((g, idx) => {
           const r = selectedFor(idx);
           return {
-            label: g.label,
             courier: r
               ? r.service_name +
                 (r.etd ? ` (estimasi ${r.etd} hari)` : "")
@@ -977,11 +973,6 @@ export default function WhatsAppOrderModal({
                       <p className="line-clamp-2 text-sm font-semibold text-ink">
                         {productName}
                       </p>
-                      {sellerAddress && (
-                        <p className="mt-0.5 text-[11px] text-muted-2">
-                          Dikirim dari: {sellerAddress}
-                        </p>
-                      )}
                       {variantLabel && (
                         <p className="mt-0.5 text-xs text-muted-2">
                           Varian: {variantLabel}
@@ -1132,7 +1123,7 @@ export default function WhatsAppOrderModal({
                           : "tidak ada kurir tersedia"}
                       </p>
                       <p className="line-clamp-2 text-[11px] text-amber-700/80">
-                        {g.label} · Berat {g.weight} gram
+                        Berat {g.weight} gram
                         {g.estimated ? " (estimasi)" : ""}
                       </p>
                       {groupItemNames(g).length > 0 && (
@@ -1163,7 +1154,7 @@ export default function WhatsAppOrderModal({
                     {groups.length > 1 && (
                       <div className="text-[11px] text-muted-2">
                         <p className="line-clamp-2">
-                          {g.label} · Berat {g.weight} gram
+                          Berat {g.weight} gram
                           {g.estimated ? " (estimasi)" : ""}
                         </p>
                         {groupItemNames(g).length > 0 && (
