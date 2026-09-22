@@ -57,12 +57,18 @@ export default function BestSellers() {
 
         // If user has a preferred category, bias toward it (70% from preferred, 30% random)
         if (preferredCat) {
-            const fromCat = sorted.filter((p) =>
-                (p as { category?: string }).category === preferredCat
-            );
-            const others = sorted.filter((p) =>
-                (p as { category?: string }).category !== preferredCat
-            );
+            const catLower = preferredCat.toLowerCase();
+            const fromCat = sorted.filter((p) => {
+                const cat = (p as { category?: string }).category;
+                // Exact match on category field, or fallback to name-based match
+                if (cat && cat.toLowerCase() === catLower) return true;
+                return p.name.toLowerCase().includes(catLower);
+            });
+            const others = sorted.filter((p) => {
+                const cat = (p as { category?: string }).category;
+                if (cat && cat.toLowerCase() === catLower) return false;
+                return !p.name.toLowerCase().includes(catLower);
+            });
             // Take 7 from preferred category, 3 from others, then shuffle
             const selected = [...fromCat.slice(0, 7), ...shuffle(others).slice(0, 3)];
             return shuffle(selected).slice(0, 10);

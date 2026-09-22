@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { filterByRelevance } from "@/lib/search";
 import { getLocalImages } from "@/lib/localImages";
-import { getStaticProducts } from "@/lib/products-cache";
+import { getStaticCategories, getStaticProducts } from "@/lib/products-cache";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +22,22 @@ export async function GET(req: NextRequest) {
     products = filterByRelevance(products, search);
   }
   if (category) {
-    products = products.filter((p) => (p as { category?: string }).category === category);
+    // Match category by product's `category` field first (exact match),
+    // then fall back to name-based relevance matching for products that
+    // don't have a category assigned yet.
+    const exactMatch = products.filter(
+      (p) => (p as { category?: string }).category?.toLowerCase() === category.toLowerCase(),
+    );
+    if (exactMatch.length > 0) {
+      products = exactMatch;
+    } else {
+      // Fallback: match the category slug against product names.
+      const catName =
+        getStaticCategories()
+          .find((c) => c.slug.toLowerCase() === category.toLowerCase())
+          ?.name ?? category;
+      products = filterByRelevance(products, catName);
+    }
   }
 
   // Apply local images

@@ -97,17 +97,19 @@ export function rankMatch(name: string, query: string): number {
   const totalMatches = exactMatches + looseMatches;
   if (totalMatches === 0) return -1;
 
+  // Use a composite key (tier * 10000 + bestIdx) so the match-quality tier
+  // always takes precedence over the position of the first match.
   // Rank 2: ALL tokens match as whole words
-  if (exactMatches === tokens.length) return 2 + bestIdx;
+  if (exactMatches === tokens.length) return 2 * 10000 + bestIdx;
 
   // Rank 3: ALL tokens match (including prefix/contains)
-  if (totalMatches === tokens.length) return 3 + bestIdx;
+  if (totalMatches === tokens.length) return 3 * 10000 + bestIdx;
 
   // Rank 4: majority match (> 50%)
-  if (totalMatches >= Math.ceil(tokens.length / 2)) return 4 + bestIdx;
+  if (totalMatches >= Math.ceil(tokens.length / 2)) return 4 * 10000 + bestIdx;
 
   // Rank 5: at least one match
-  return 5 + bestIdx;
+  return 5 * 10000 + bestIdx;
 }
 
 /**
