@@ -71,6 +71,7 @@ export default async function ProdukPage({
 
   return (
     <PlpContent
+      key={`${search}|${category}|${page}`}
       categories={categories}
       products={products}
       totalPages={totalPages}

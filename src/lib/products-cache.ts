@@ -8,6 +8,7 @@
  * The JSON is imported at build time → instant at runtime.
  */
 import type { AnekaCategory, AnekaProduct } from "./anekadropship";
+import _cacheData from "./products-cache.json";
 
 interface CacheData {
     generatedAt: string;
@@ -16,14 +17,7 @@ interface CacheData {
 }
 
 // Static import — bundled at build time, no filesystem read at runtime.
-// Falls back to empty cache if the file hasn't been generated yet.
-let cacheData: CacheData;
-try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    cacheData = require("./products-cache.json") as CacheData;
-} catch {
-    cacheData = { generatedAt: "", categories: [], products: [] };
-}
+const cacheData: CacheData = (_cacheData as CacheData) ?? { generatedAt: "", categories: [], products: [] };
 
 /** Get categories from static cache. */
 export function getStaticCategories(): AnekaCategory[] {
