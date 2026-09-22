@@ -5,6 +5,7 @@ import Features from "@/components/Features";
 import { NewProducts, PopularCategories } from "@/components/HomeSections";
 import { getLocalImages } from "@/lib/localImages";
 import { getStaticCategories, getStaticProducts } from "@/lib/products-cache";
+import { isFlashSaleProduct } from "@/lib/promo";
 
 // Lazy-load below-fold sections
 const FlashSale = dynamic(() => import("@/components/FlashSale"));
@@ -51,13 +52,23 @@ export default async function Home() {
     return local.length ? { ...p, image: local[0] } : p;
   });
 
+  // Flash Sale: pool awal dari produk eligible di SELURUH katalog (bukan 20
+  // pertama) supaya render awal sudah bisa menampilkan >= 10 kartu.
+  const flashInitial = allProducts
+    .filter((p) => isFlashSaleProduct(p.rekomendasiJual, p.stok, p.hargaModal))
+    .slice(0, 20)
+    .map((p) => {
+      const local = getLocalImages(p.id);
+      return local.length ? { ...p, image: local[0] } : p;
+    });
+
   return (
     <>
       <div className="container-site mt-3">
         <HeroCarousel />
       </div>
       <Features />
-      <FlashSale initialProducts={initialProducts} />
+      <FlashSale initialProducts={flashInitial} />
       <PopularCategories initialCategories={staticCats} />
       <NewProducts initialProducts={initialProducts} />
       <BestSellers />

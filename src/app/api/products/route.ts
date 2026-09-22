@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { filterByRelevance } from "@/lib/search";
 import { getLocalImages } from "@/lib/localImages";
 import { getStaticCategories, getStaticProducts } from "@/lib/products-cache";
+import { isFlashSaleProduct, shuffleArray } from "@/lib/promo";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,8 @@ export async function GET(req: NextRequest) {
   const search = searchParams.get("search") ?? "";
   const category = searchParams.get("category") ?? "";
   const page = Number(searchParams.get("page") ?? "1");
+  const flashsale = searchParams.get("flashsale") === "1";
+  const sort = searchParams.get("sort") ?? "";
 
   let products = getStaticProducts();
 
@@ -38,6 +41,18 @@ export async function GET(req: NextRequest) {
           ?.name ?? category;
       products = filterByRelevance(products, catName);
     }
+  }
+
+  // Flash Sale: hanya produk eligible (harga, stok, profit) dari seluruh katalog
+  if (flashsale) {
+    products = products.filter((p) =>
+      isFlashSaleProduct(p.rekomendasiJual, p.stok, p.hargaModal),
+    );
+  }
+
+  // Urutan acak (rotasi Flash Sale) — sebelum paginasi
+  if (sort === "random") {
+    products = shuffleArray(products);
   }
 
   // Apply local images

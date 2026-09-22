@@ -135,69 +135,86 @@ export function hitungHargaCoret(
 
 // ─── Flash Sale helpers ───────────────────────────────────────────────────
 
+/** Offset WIB dari UTC (UTC+7) dalam milidetik. */
+export const WIB_OFFSET_MS = 7 * 3600_000;
+
 /**
- * Dapatkan waktu sekarang dalam WIB (UTC+7) sebagai Date object.
+ * Detik ke berapa dalam hari menurut WIB (0-86399).
+ * Timezone-safe: geser timestamp +7 jam lalu baca dengan getter UTC,
+ * jadi hasilnya sama dari device mana pun (bukan jam lokal device).
  */
-export function nowWIB(): Date {
-    const now = new Date();
-    return new Date(now.getTime() + 7 * 3600_000);
+function wibSecondsOfDay(ts: number): number {
+    const d = new Date(ts + WIB_OFFSET_MS);
+    return d.getUTCHours() * 3600 + d.getUTCMinutes() * 60 + d.getUTCSeconds();
+}
+
+/** Format "HH:MM" jam WIB dari Date/timestamp — timezone-safe. */
+export function formatWIB(time: Date | number): string {
+    const ts = typeof time === "number" ? time : time.getTime();
+    const d = new Date(ts + WIB_OFFSET_MS);
+    const h = String(d.getUTCHours()).padStart(2, "0");
+    const m = String(d.getUTCMinutes()).padStart(2, "0");
+    return `${h}:${m}`;
+}
+
+/** Fisher-Yates shuffle — hasil salinan baru, array asli tidak diubah. */
+export function shuffleArray<T>(arr: T[]): T[] {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
 }
 
 /**
- * Cek apakah Flash Sale sedang aktif berdasarkan jadwal.
- * Return [active, endTime] — active=true jika sekarang dalam rentang jadwal,
- * endTime adalah Date object kapan sesi ini berakhir (untuk countdown).
+ * Cek apakah Flash Sale sedang aktif berdasarkan jadwal WIB.
+ * `now` opsional (timestamp ms) supaya bisa diuji deterministik.
+ * endTime & nextStart adalah tanggal absolut — tampilkan dengan formatWIB().
  */
-export function getFlashSaleStatus(): {
+export function getFlashSaleStatus(now: number = Date.now()): {
     active: boolean;
     endTime: Date;
     nextStart: Date | null;
 } {
-    const wib = nowWIB();
-    const currentHour = wib.getHours();
-    const currentMinute = wib.getMinutes();
-    const currentMinutes = currentHour * 60 + currentMinute;
+    const cur = wibSecondsOfDay(now);
 
-    // Cari sesi yang sedang berlangsung
+    // Sesi yang sedang berlangsung
     for (const [startH, endH] of FLASH_SALE_SCHEDULE) {
-        const startMin = startH * 60;
-        const endMin = endH * 60;
-        if (currentMinutes >= startMin && currentMinutes < endMin) {
-            const endTime = new Date(wib);
-            endTime.setHours(endH, 0, 0, 0);
-            return { active: true, endTime, nextStart: null };
+        const startSec = startH * 3600;
+        const endSec = endH * 3600;
+        if (cur >= startSec && cur < endSec) {
+            return {
+                active: true,
+                endTime: new Date(now + (endSec - cur) * 1000),
+                nextStart: null,
+            };
         }
     }
 
-    // Tidak aktif — cari sesi berikutnya
-    let nextStart: Date | null = null;
+    // Tidak aktif — cari sesi terdekat berikutnya (bisa besok)
     let earliest = Infinity;
+    let nextStart: Date | null = null;
     for (const [startH] of FLASH_SALE_SCHEDULE) {
-        const startMin = startH * 60;
-        let diff = startMin - currentMinutes;
-        if (diff <= 0) diff += 24 * 60; // besok
+        const startSec = startH * 3600;
+        const diff = startSec > cur ? startSec - cur : startSec - cur + 86400;
         if (diff < earliest) {
             earliest = diff;
-            nextStart = new Date(wib);
-            nextStart.setHours(startH, 0, 0, 0);
-            if (startMin <= currentMinutes) {
-                nextStart.setDate(nextStart.getDate() + 1);
-            }
+            nextStart = new Date(now + diff * 1000);
         }
     }
 
-    return { active: false, endTime: new Date(wib), nextStart };
+    return { active: false, endTime: new Date(now), nextStart };
 }
 
 /**
  * Hitung sisa detik hingga Flash Sale berakhir (sesi saat ini).
  * Return 0 jika tidak sedang dalam sesi.
  */
-export function secondsUntilFlashSaleEnds(): number {
-    const { active, endTime } = getFlashSaleStatus();
+export function secondsUntilFlashSaleEnds(now: number = Date.now()): number {
+    const { active, endTime } = getFlashSaleStatus(now);
     if (!active) return 0;
-    const wib = nowWIB();
-    return Math.max(0, Math.floor((endTime.getTime() - wib.getTime()) / 1000));
+    return Math.max(0, Math.floor((endTime.getTime() - now) / 1000));
 }
 
 /**

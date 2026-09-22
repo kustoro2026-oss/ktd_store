@@ -12,6 +12,8 @@ import {
     parseStock,
     getFlashSaleStatus,
     secondsUntilFlashSaleEnds,
+    formatWIB,
+    shuffleArray,
     FLASH_SALE_MAX_ITEMS,
     FLASH_SALE_SCHEDULE,
 } from "@/lib/promo";
@@ -26,28 +28,11 @@ function formatCountdown(seconds: number): string {
     return [h, m, s].map((n) => String(n).padStart(2, "0")).join(":");
 }
 
-/** Format jam dari Date WIB, e.g. "09:00". */
-function formatHour(date: Date): string {
-    const h = String(date.getHours()).padStart(2, "0");
-    const m = String(date.getMinutes()).padStart(2, "0");
-    return `${h}:${m}`;
-}
-
 /** Deskripsi jadwal Flash Sale. */
 function formatSchedule(): string {
     return FLASH_SALE_SCHEDULE.map(
         ([s, e]) => `${String(s).padStart(2, "0")}:00 - ${String(e).padStart(2, "0")}:00`
     ).join(" & ");
-}
-
-/** Fisher-Yates shuffle. */
-function shuffle<T>(arr: T[]): T[] {
-    const a = [...arr];
-    for (let i = a.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [a[i], a[j]] = [a[j], a[i]];
-    }
-    return a;
 }
 
 /** Skeleton untuk card flash sale. */
@@ -184,20 +169,19 @@ type Props = {
 };
 
 export default function FlashSale({ initialProducts }: Props) {
-    // Fetch more products from API for a bigger pool to randomize from
+    // Pool = produk eligible dari SELURUH katalog (difilter di server),
+    // diacak server-side → cukup untuk target minimal 10 kartu.
     const { data, loading } = useApi<{ products: AnekaProduct[] }>(
-        "/api/products?sort=newest&page=1",
+        "/api/products?flashsale=1&sort=random&page=1",
     );
     const products = data?.products ?? initialProducts ?? [];
 
-    // Filter + shuffle + pick min 10
+    // Acak ulang di client + batasi FLASH_SALE_MAX_ITEMS (target >= 10 kartu)
     const flashProducts = useMemo(() => {
         const eligible = products.filter((p) =>
             isFlashSaleProduct(p.rekomendasiJual, p.stok, p.hargaModal)
         );
-        // Shuffle for variety, then take up to FLASH_SALE_MAX_ITEMS
-        const shuffled = shuffle(eligible);
-        return shuffled.slice(0, Math.max(FLASH_SALE_MAX_ITEMS, 10));
+        return shuffleArray(eligible).slice(0, Math.max(FLASH_SALE_MAX_ITEMS, 10));
     }, [products]);
 
     // ─── Schedule-aware state ───────────────────────────────────────────
@@ -239,7 +223,7 @@ export default function FlashSale({ initialProducts }: Props) {
 
     // Di luar jam operasional: tampilkan banner info jadwal
     if (!schedule.active) {
-        const nextTime = schedule.nextStart ? formatHour(schedule.nextStart) : null;
+        const nextTime = schedule.nextStart ? formatWIB(schedule.nextStart) : null;
         return (
             <section className="container-site mt-10">
                 <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-700 via-slate-600 to-slate-500 p-5 text-white shadow-lg sm:p-6">
