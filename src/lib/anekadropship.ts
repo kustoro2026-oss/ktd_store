@@ -150,9 +150,14 @@ function cleanDescription(html: string): string {
 
   // 8) Page-UI junk detection — the scrape captured a checkout/CSS block
   //    instead of a product description.
-  if (
-    /Add\s*Checkout\s*Form|Pilih\s*Varian|window\.detailFlash|\.wrv-|<\/style>/i.test(out)
-  ) {
+  if (/Add\s*Checkout\s*Form|window\.detailFlash|\.wrv-|<\/style>/i.test(out)) {
+    return "";
+  }
+
+  //    "Pilih Varian" alone is not junk: real descriptions often contain a
+  //    "silakan pilih varian ..." note. Treat it as junk only when the
+  //    content carries interactive variant-picker markup.
+  if (/Pilih\s*Varian/i.test(out) && /@click|<button|x-data|x-init|<select/i.test(out)) {
     return "";
   }
 

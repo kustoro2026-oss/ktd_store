@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { toLocalImages } from "@/lib/localImages";
 import { getStaticProducts } from "@/lib/products-cache";
 import { getCachedVariants } from "@/lib/variant-cache";
+import { getCachedDescription } from "@/lib/description-cache";
 
 export const dynamic = "force-dynamic";
 
@@ -24,13 +25,13 @@ export async function GET(
 
   // Basic detail from static cache.
   // Varian dari variant-cache.json (hasil scripts/enrich-variants-cache.cjs);
-  // deskripsi belum tersedia di cache statis.
+  // deskripsi dari description-cache.json (hasil scripts/enrich-descriptions-cache.ts).
   const variants = getCachedVariants(p.id)?.variants ?? [];
   const detail = {
     id: p.id,
     name: p.name,
     images: toLocalImages(p.id, (p as { images?: string[] }).images ?? [p.image].filter(Boolean)),
-    descriptionHtml: (p as { descriptionHtml?: string }).descriptionHtml ?? "",
+    descriptionHtml: getCachedDescription(p.id) ?? "",
     rekomendasiJual: p.rekomendasiJual ?? "Rp -",
     hargaModal: (p as { hargaModal?: string }).hargaModal ?? "",
     stok: p.stok ?? "0",
