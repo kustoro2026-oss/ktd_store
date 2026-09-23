@@ -190,7 +190,9 @@ async function main() {
                 vids++;
                 results[id] = videos.map((v, idx) => ({
                     fileId: v.id,
-                    label: v.name.replace(/\.mp4$/i, "") || `Video ${idx + 1}`,
+                    // Uniform UI names: "Video 1", "Video 2", ... (Drive file
+                    // names are often TikTok captions and are never shown).
+                    label: `Video ${idx + 1}`,
                 }));
             }
         } catch {
