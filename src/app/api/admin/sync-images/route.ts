@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
 import { promises as fs } from "fs";
 import path from "path";
-import { anekaClient } from "@/lib/anekadropship";
+import type { AnekaClient } from "@/lib/anekadropship";
 
 // Alat sinkronisasi gambar produk: mengunduh semua gambar dari anekadropship.id
 // ke /public/images/products/ dan menulis src/lib/product-images.json (mapping
 // id produk -> path lokal). Hanya berjalan di development (dijalankan manual
 // lewat POST /api/admin/sync-images). Di production route ini menolak request.
-// Jalankan ulang secara berkala agar produk baru ikut tersinkron.
+// Klien anekadropship di-import secara DINAMIS setelah gate production — di
+// production modul scraper tidak pernah dimuat dan env ANEKA_*/CF_* tidak
+// diperlukan. Jalankan ulang secara berkala agar produk baru ikut tersinkron.
 
 export const dynamic = "force-dynamic";
 
@@ -52,10 +54,19 @@ async function loadMapping(): Promise<Record<string, string[]>> {
   }
 }
 
+/** Tulis mapping ke disk (urutkan kunci agar diff rapi). */
+async function saveMapping(mapping: Record<string, string[]>): Promise<void> {
+  const sorted: Record<string, string[]> = {};
+  for (const k of Object.keys(mapping).sort((a, b) => Number(a) - Number(b))) {
+    sorted[k] = mapping[k];
+  }
+  await fs.writeFile(MAPPING_PATH, JSON.stringify(sorted, null, 2) + "\n", "utf8");
+}
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** Kumpulkan semua produk unik dari listing (home + terbaru) sampai halaman kosong. */
-async function collectProducts(): Promise<{ id: string; image: string }[]> {
+async function collectProducts(client: AnekaClient): Promise<{ id: string; image: string }[]> {
   const map = new Map<string, string>();
 
   const walk = async (
@@ -73,16 +84,16 @@ async function collectProducts(): Promise<{ id: string; image: string }[]> {
   };
 
   await walk(async (page) => {
-    const { products } = await anekaClient.getProducts({ page });
+    const { products } = await client.getProducts({ page });
     return products.map((p) => ({ id: p.id, image: p.image }));
   });
 
   // Listing "terbaru" kadang ditolak setelah banyak request — jangan
   // gagalkan seluruh sinkronisasi; lanjut saja dengan produk dari listing utama.
   try {
-    anekaClient.resetSession();
+    client.resetSession();
     await walk(async (page) => {
-      const { products } = await anekaClient.getNewestProducts({ page });
+      const { products } = await client.getNewestProducts({ page });
       return products.map((p) => ({ id: p.id, image: p.image }));
     });
   } catch {
@@ -91,9 +102,9 @@ async function collectProducts(): Promise<{ id: string; image: string }[]> {
 
   // Listing "malaysia" — produk dari supplier Malaysia, digabung seperti biasa.
   try {
-    anekaClient.resetSession();
+    client.resetSession();
     await walk(async (page) => {
-      const { products } = await anekaClient.getMalaysiaProducts({ page });
+      const { products } = await client.getMalaysiaProducts({ page });
       return products.map((p) => ({ id: p.id, image: p.image }));
     });
   } catch {
@@ -120,16 +131,21 @@ export async function POST() {
     return NextResponse.json({ error: "Hanya tersedia di development" }, { status: 403 });
   }
 
+  // Import dinamis: modul scraper anekadropship hanya dimuat di development.
+  const { anekaClient } = await import("@/lib/anekadropship");
+
   await fs.mkdir(OUT_DIR, { recursive: true });
   const mapping = await loadMapping();
 
   // 1) Kumpulkan produk dari semua halaman listing.
-  const products = await collectProducts();
+  const products = await collectProducts(anekaClient);
 
   // 2) Untuk tiap produk: ambil galeri detail lalu unduh gambarnya.
   let newImages = 0;
   let skipped = 0;
   let failedProducts = 0;
+  let processed = 0;
+  let sinceSave = 0;
 
   await runPool(products, 4, async ({ id, image }) => {
     try {
@@ -148,7 +164,15 @@ export async function POST() {
         const detail = await anekaClient.getProductDetail(id);
         urls = detail.images.filter(Boolean);
       } catch {
-        // Detail gagal (produk dihapus/berubah) — pakai gambar utama dari kartu.
+        // Coba sekali lagi dengan sesi baru (supplier kadang 522/timeout).
+        try {
+          await sleep(800);
+          anekaClient.resetSession();
+          const detail = await anekaClient.getProductDetail(id);
+          urls = detail.images.filter(Boolean);
+        } catch {
+          // Detail gagal (produk dihapus/berubah) — pakai gambar utama dari kartu.
+        }
       }
       if (!urls.length && image) urls = [image];
 
@@ -176,22 +200,25 @@ export async function POST() {
       }
 
       mapping[id] = local;
+      processed++;
+      // Checkpoint berkala: progres tersimpan walau request terputus di tengah.
+      if (++sinceSave >= 25) {
+        sinceSave = 0;
+        await saveMapping(mapping);
+      }
     } catch {
       failedProducts++;
     }
   });
 
   // 3) Simpan mapping (urutkan kunci agar diff rapi).
-  const sorted: Record<string, string[]> = {};
-  for (const k of Object.keys(mapping).sort((a, b) => Number(a) - Number(b))) {
-    sorted[k] = mapping[k];
-  }
-  await fs.writeFile(MAPPING_PATH, JSON.stringify(sorted, null, 2) + "\n", "utf8");
+  await saveMapping(mapping);
 
   return NextResponse.json({
     ok: true,
     totalProducts: products.length,
     mappedProducts: Object.keys(mapping).filter((k) => mapping[k].length).length,
+    newOrUpdatedProducts: processed,
     newImages,
     skipped,
     failedProducts,

@@ -140,6 +140,12 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
         : [...new Set(varOpts.map((v) => v.label).filter(Boolean))],
     [varOpts, warnaList, ukuranList]
   );
+  /** Nilai "warna" hanya diberi header "Warna" bila memang warna (mis. Hitam,
+   *  Coklat); varian non-warna (mis. "60 Kapsul", "Paket Hemat") pakai "Varian". */
+  const warnaIsColor = useMemo(
+    () => warnaList.length > 0 && warnaList.every((w) => COLOR_WORDS.test(w)),
+    [warnaList]
+  );
 
   const [selWarna, setSelWarna] = useState<string | null>(null);
   const [selUkuran, setSelUkuran] = useState<string | null>(null);
@@ -282,7 +288,7 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
               </p>
               {warnaList.length > 0 && (
                 <div>
-                  <p className="mb-1.5 text-xs font-semibold text-ink">Warna</p>
+                  <p className="mb-1.5 text-xs font-semibold text-ink">{warnaIsColor ? "Warna" : "Varian"}</p>
                   <div className="flex flex-wrap gap-1.5">
                     {warnaList.map((w) => {
                       const isSel = (selWarna ?? warnaList[0]) === w;

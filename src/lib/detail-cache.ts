@@ -1,7 +1,8 @@
-// Detail produk: ambil info dasar dari static cache.
-// Detail lengkap (deskripsi, varian) hanya tersedia saat script scrape manual dijalankan.
+// Detail produk: info dasar dari static cache + varian dari variant-cache.json
+// (hasil scripts/enrich-variants-cache.cjs). Deskripsi belum ada di cache statis.
 import type { AnekaProductDetail } from "./anekadropship";
 import { getStaticProducts } from "./products-cache";
+import { getCachedVariants } from "./variant-cache";
 
 /** Field pengiriman hasil enrich (scripts/enrich-products-cache.cjs). */
 type ShippingFields = {
@@ -22,10 +23,13 @@ export async function getDetailCached(id: string): Promise<AnekaProductDetail | 
   const p = products.find((p) => p.id === id);
   if (!p) return null;
 
-  // Info dasar + data pengiriman hasil enrich; deskripsi & varian tetap kosong.
+  // Info dasar + data pengiriman hasil enrich; varian dari variant-cache.json
+  // (picker warna/ukuran di halaman detail). Deskripsi tetap kosong.
   const s = p as ShippingFields;
   const beratGram =
     typeof s.beratGram === "number" && s.beratGram > 0 ? s.beratGram : null;
+  // Varian (id, label, warna, ukuran, stok) — hanya ada bila supplier memisahkan.
+  const variants = getCachedVariants(p.id)?.variants ?? [];
 
   return {
     id: p.id,
@@ -46,8 +50,8 @@ export async function getDetailCached(id: string): Promise<AnekaProductDetail | 
     sistem: "",
     alamatSeller: s.alamatSeller ?? "",
     location: p.location ?? "",
-    hasVariants: false,
-    variants: [],
+    hasVariants: variants.length > 0,
+    variants,
     marketingKitUrl: null,
   };
 }

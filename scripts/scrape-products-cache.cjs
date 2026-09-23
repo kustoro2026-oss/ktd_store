@@ -24,11 +24,17 @@ const cheerio = require("cheerio");
 const BASE = "https://anekadropship.id";
 const EMAIL = process.env.ANEKA_EMAIL || "kustoroterbatas@gmail.com";
 const PASSWORD = process.env.ANEKA_PASSWORD || "@$Kustores2k24";
-const OUTPUT = path.join(__dirname, "..", "src", "lib", "products-cache.json");
+
+// Output: default src/lib/products-cache.json, bisa dioverride dengan --out=path
+const argv = process.argv.slice(2);
+const outArg = argv.find((a) => a.startsWith("--out="));
+const OUTPUT = outArg
+    ? path.resolve(outArg.slice("--out=".length))
+    : path.join(__dirname, "..", "src", "lib", "products-cache.json");
 const DELAY_MS = 1500; // longer delay to avoid rate limiting
 
-// Cloudflare clearance dari argumen CLI atau env var
-const CF_CLEARANCE = process.argv[2] || process.env.CF_CLEARANCE || "";
+// Cloudflare clearance dari argumen CLI (non-flag) atau env var
+const CF_CLEARANCE = argv.find((a) => !a.startsWith("--")) || process.env.CF_CLEARANCE || "";
 const CF_BM = process.env.CF_BM || "";
 
 function sleep(ms) {
@@ -241,7 +247,7 @@ async function main() {
     console.log(`  ${categories.length} kategori ditemukan.`);
 
     // ─── Scrape products (paginated) ─────────────────────────────────
-    console.log("[3/4] Scrape produk (halaman 1-50)...");
+    console.log("[3/4] Scrape produk (semua halaman)...");
 
     // Resume from checkpoint if exists
     let allProducts = [];
@@ -258,7 +264,7 @@ async function main() {
         } catch { /* ignore corrupt checkpoint */ }
     }
 
-    for (let page = startPage; page <= 50; page++) {
+    for (let page = startPage; page <= 200; page++) {
         const url = `${BASE}/user/home?page=${page}&sort=newest`;
         console.log(`  Halaman ${page}...`);
         await sleep(DELAY_MS);
@@ -296,9 +302,9 @@ async function main() {
     }
 
     // ─── Scrape Malaysia products ────────────────────────────────────
-    console.log("[3.5/4] Scrape produk Malaysia...");
+    console.log("[3.5/4] Scrape produk Malaysia (semua halaman)...");
     let malaysiaCount = 0;
-    for (let page = 1; page <= 10; page++) {
+    for (let page = 1; page <= 100; page++) {
         const url = `${BASE}/produk/semua/malaysia?page=${page}`;
         console.log(`  Malaysia halaman ${page}...`);
         await sleep(DELAY_MS);

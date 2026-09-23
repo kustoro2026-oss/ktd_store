@@ -194,10 +194,12 @@ export type AnekaVariant = {
   /** Nilai axis ukuran (null jika supplier tidak memisahkan). */
   size: string | null;
   /** Harga MODAL varian (yang dibayar dropshipper, mis. "40000.00").
-   *  BUKAN harga jual — harga jual produk ada di rekomendasiJual. */
-  price: string;
-  /** Field hpp di JSON supplier — saat ini selalu null (tidak terpakai). */
-  hpp: string;
+   *  BUKAN harga jual — harga jual produk ada di rekomendasiJual.
+   *  Opsional: cache varian statis (variant-cache.json) tidak menyimpannya. */
+  price?: string;
+  /** Field hpp di JSON supplier — saat ini selalu null (tidak terpakai).
+   *  Opsional: hanya terisi dari scrape live. */
+  hpp?: string;
   /** Stok varian (number). */
   stock: number;
   /** Apakah varian aktif dijual. */
