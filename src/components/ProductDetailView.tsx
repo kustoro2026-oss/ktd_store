@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Boxes, MessageCircle, Package, Percent, Share2, ShoppingBag, Tag } from "lucide-react";
 import { marketplaces } from "@/lib/config";
+import { getBlibliProductLink } from "@/lib/blibli-product-links";
 import { getTikTokProductLink } from "@/lib/tiktok-product-links";
 import { getLazadaProductLink } from "@/lib/lazada-product-links";
 import { sanitizeHtml } from "@/lib/sanitize";
@@ -105,8 +106,15 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
     }
   };
 
-  /** Buka link marketplace; TikTok Shop & Lazada pakai link produk dari data JSON. */
+  /** Buka link marketplace; Blibli, TikTok Shop & Lazada pakai link produk dari data JSON. */
   const openMarketplace = (label: string, key: string) => {
+    if (key === "blibli") {
+      const link = getBlibliProductLink(detail.name);
+      if (link) {
+        window.open(link, "_blank", "noopener,noreferrer");
+        return;
+      }
+    }
     if (key === "tiktok") {
       const link = getTikTokProductLink(detail.name);
       if (link) {

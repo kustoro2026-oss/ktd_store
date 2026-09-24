@@ -1,17 +1,17 @@
 // Marketplace ordering configuration.
 //
 // Products are sourced from anekadropship.id, but the actual ordering is done
-// through external marketplaces (Shopee / TikTok Shop / Lazada).
+// through external marketplaces (Blibli / TikTok Shop / Lazada).
 // Catatan: Tokopedia sudah merger dengan TikTok Shop (ShopTokopedia),
 // jadi marketplace Tokopedia tidak ditampilkan terpisah.
 //
 // By default the buttons search the product name on each marketplace. To point
 // to your own store instead, replace the base URL below with your store link
 // and keep the product name appended, e.g.:
-//   searchUrl: "https://shopee.co.id/yourstore?keyword="
+//   searchUrl: "https://www.blibli.com/search?searchTerm="
 //   or a fixed storefront: use a function in `marketplaceLink`.
 
-export type MarketplaceKey = "shopee" | "tiktok" | "lazada";
+export type MarketplaceKey = "blibli" | "tiktok" | "lazada";
 
 export type Marketplace = {
   key: MarketplaceKey;
@@ -26,10 +26,11 @@ export type Marketplace = {
 
 export const marketplaces: Marketplace[] = [
   {
-    key: "shopee",
-    label: "Shopee",
-    color: "#ee4d2d",
-    searchUrl: "https://shopee.co.id/search?keyword=",
+    key: "blibli",
+    label: "Blibli",
+    color: "#0071ff",
+    searchUrl: "https://www.blibli.com/search?searchTerm=",
+    storeUrl: "https://blibli.onelink.me/GNtk/fw29u5fy",
   },
   {
     key: "tiktok",

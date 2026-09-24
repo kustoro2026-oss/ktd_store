@@ -4,9 +4,9 @@ import type { MarketplaceKey } from "@/lib/config";
  * "color" = brand-colored logo for light backgrounds.
  * "white" = monochrome white logo for brand-colored buttons. */
 const LOGOS: Record<MarketplaceKey, { color: string; white: string }> = {
-  shopee: {
-    color: "/images/marketplace/shopee.svg",
-    white: "/images/marketplace/white/shopee.svg",
+  blibli: {
+    color: "/images/marketplace/blibli.svg",
+    white: "/images/marketplace/white/blibli.svg",
   },
   tiktok: {
     color: "/images/marketplace/tiktok.svg",

@@ -3,7 +3,7 @@
 import { Info, X } from "lucide-react";
 
 type Props = {
-  /** Marketplace label shown in the message, e.g. "Shopee". */
+  /** Marketplace label shown in the message, e.g. "Blibli". */
   label: string;
   onClose: () => void;
   className?: string;

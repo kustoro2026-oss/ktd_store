@@ -5,7 +5,9 @@ import Link from "next/link";
 import { ShoppingCart, Trash2 } from "lucide-react";
 import { useCart, type CartItem } from "@/lib/cart";
 import { marketplaces } from "@/lib/config";
+import { getBlibliProductLink } from "@/lib/blibli-product-links";
 import { getTikTokProductLink } from "@/lib/tiktok-product-links";
+import { getLazadaProductLink } from "@/lib/lazada-product-links";
 import MarketplaceIcon from "@/components/MarketplaceIcon";
 import MarketplaceNotice from "@/components/MarketplaceNotice";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
@@ -27,10 +29,24 @@ export default function CartPage() {
   const [missingMp, setMissingMp] = useState<string | null>(null);
   const total = items.reduce((s, it) => s + parseRupiah(it.price), 0);
 
-  /** Buka link marketplace; khusus TikTok Shop pakai link produk dari tokopedia-products.json. */
+  /** Buka link marketplace; Blibli, TikTok Shop & Lazada pakai link produk dari data JSON. */
   const openMarketplace = (label: string, key: string, productName: string) => {
+    if (key === "blibli") {
+      const link = getBlibliProductLink(productName);
+      if (link) {
+        window.open(link, "_blank", "noopener,noreferrer");
+        return;
+      }
+    }
     if (key === "tiktok") {
       const link = getTikTokProductLink(productName);
+      if (link) {
+        window.open(link, "_blank", "noopener,noreferrer");
+        return;
+      }
+    }
+    if (key === "lazada") {
+      const link = getLazadaProductLink(productName);
       if (link) {
         window.open(link, "_blank", "noopener,noreferrer");
         return;

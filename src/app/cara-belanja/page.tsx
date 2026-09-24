@@ -12,14 +12,14 @@ import {
 export const metadata: Metadata = {
   title: "Cara Belanja",
   description:
-    "Panduan lengkap cara belanja di KTD Store: cari produk, pesan via WhatsApp atau marketplace resmi (Shopee, TikTok Shop, Lazada), sampai konfirmasi pembayaran.",
+    "Panduan lengkap cara belanja di KTD Store: cari produk, pesan via WhatsApp atau marketplace resmi (Blibli, TikTok Shop, Lazada), sampai konfirmasi pembayaran.",
   alternates: { canonical: "/cara-belanja" },
   openGraph: {
     type: "website",
     url: "/cara-belanja",
     title: "Cara Belanja di KTD Store",
     description:
-      "Panduan lengkap cara belanja di KTD Store: cari produk, pesan via WhatsApp atau marketplace resmi (Shopee, TikTok Shop, Lazada), sampai konfirmasi pembayaran.",
+      "Panduan lengkap cara belanja di KTD Store: cari produk, pesan via WhatsApp atau marketplace resmi (Blibli, TikTok Shop, Lazada), sampai konfirmasi pembayaran.",
     images: [{ url: "/images/logo.png", width: 512, height: 512, alt: "KTD Store" }],
     siteName: "KTD Store",
     locale: "id_ID",
@@ -28,7 +28,7 @@ export const metadata: Metadata = {
     card: "summary",
     title: "Cara Belanja di KTD Store",
     description:
-      "Panduan lengkap cara belanja di KTD Store: cari produk, pesan via WhatsApp atau marketplace resmi (Shopee, TikTok Shop, Lazada), sampai konfirmasi pembayaran.",
+      "Panduan lengkap cara belanja di KTD Store: cari produk, pesan via WhatsApp atau marketplace resmi (Blibli, TikTok Shop, Lazada), sampai konfirmasi pembayaran.",
     images: ["/images/logo.png"],
   },
 };
@@ -47,7 +47,7 @@ const STEPS = [
   {
     icon: Store,
     title: "Pesan via WhatsApp atau Marketplace",
-    desc: "Pesan langsung via WhatsApp dengan mengisi data penerima, atau klik tombol marketplace resmi (Shopee, TikTok Shop, Lazada) di halaman produk untuk belanja di sana.",
+    desc: "Pesan langsung via WhatsApp dengan mengisi data penerima, atau klik tombol marketplace resmi (Blibli, TikTok Shop, Lazada) di halaman produk untuk belanja di sana.",
   },
   {
     icon: CreditCard,
@@ -64,7 +64,7 @@ const STEPS = [
 const FAQS = [
   {
     q: "Apakah saya bisa membeli langsung di website ini?",
-    a: "Bisa. Pembelian dapat dilakukan melalui dua jalur resmi: pemesanan langsung via WhatsApp, atau belanja melalui marketplace kami di Shopee, TikTok Shop, dan Lazada. Kedua jalur sama-sama aman dan resmi.",
+    a: "Bisa. Pembelian dapat dilakukan melalui dua jalur resmi: pemesanan langsung via WhatsApp, atau belanja melalui marketplace kami di Blibli, TikTok Shop, dan Lazada. Kedua jalur sama-sama aman dan resmi.",
   },
   {
     q: "Apakah ada biaya tambahan?",
@@ -96,7 +96,7 @@ export default function CaraBelanjaPage() {
         <p className="mt-2 max-w-2xl text-sm text-white/85 sm:text-base">
           Belanja di KTD Store mudah dan aman — cukup lima langkah. Pilih sesuai
           kenyamanan Anda: pesan langsung melalui WhatsApp, atau belanja lewat
-          marketplace resmi kami di Shopee, TikTok Shop, dan Lazada. Anda
+          marketplace resmi kami di Blibli, TikTok Shop, dan Lazada. Anda
           terlindungi dari awal sampai pesanan tiba.
         </p>
       </section>
