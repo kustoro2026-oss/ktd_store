@@ -8,6 +8,7 @@ import { marketplaces } from "@/lib/config";
 import { getBlibliProductLink } from "@/lib/blibli-product-links";
 import { getTikTokProductLink } from "@/lib/tiktok-product-links";
 import { getLazadaProductLink } from "@/lib/lazada-product-links";
+import { pixelMarketplaceClick } from "@/lib/meta-pixel";
 import MarketplaceIcon from "@/components/MarketplaceIcon";
 import MarketplaceNotice from "@/components/MarketplaceNotice";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
@@ -30,27 +31,16 @@ export default function CartPage() {
   const total = items.reduce((s, it) => s + parseRupiah(it.price), 0);
 
   /** Buka link marketplace; Blibli, TikTok Shop & Lazada pakai link produk dari data JSON. */
-  const openMarketplace = (label: string, key: string, productName: string) => {
-    if (key === "blibli") {
-      const link = getBlibliProductLink(productName);
-      if (link) {
-        window.open(link, "_blank", "noopener,noreferrer");
-        return;
-      }
-    }
-    if (key === "tiktok") {
-      const link = getTikTokProductLink(productName);
-      if (link) {
-        window.open(link, "_blank", "noopener,noreferrer");
-        return;
-      }
-    }
-    if (key === "lazada") {
-      const link = getLazadaProductLink(productName);
-      if (link) {
-        window.open(link, "_blank", "noopener,noreferrer");
-        return;
-      }
+  const openMarketplace = (label: string, key: string, item: CartItem) => {
+    let link: string | null = null;
+    if (key === "blibli") link = getBlibliProductLink(item.name);
+    else if (key === "tiktok") link = getTikTokProductLink(item.name);
+    else if (key === "lazada") link = getLazadaProductLink(item.name);
+    if (link) {
+      // Meta Pixel: pembeli keluar ke marketplace (audiens retargeting).
+      pixelMarketplaceClick({ marketplace: key, id: item.id, name: item.name, price: item.price });
+      window.open(link, "_blank", "noopener,noreferrer");
+      return;
     }
     setMissingMp(label);
   };
@@ -131,7 +121,7 @@ export default function CartPage() {
                       <button
                         key={m.key}
                         type="button"
-                        onClick={() => openMarketplace(m.label, m.key, item.name)}
+                        onClick={() => openMarketplace(m.label, m.key, item)}
                         aria-label={`Beli ${item.name} via ${m.label}`}
                         className="flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-[11px] font-semibold text-ink transition-colors hover:border-brand hover:text-brand"
                       >

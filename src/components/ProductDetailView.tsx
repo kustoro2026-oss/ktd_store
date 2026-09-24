@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Boxes, MessageCircle, Package, Percent, Share2, ShoppingBag, Tag } from "lucide-react";
 import { marketplaces } from "@/lib/config";
@@ -8,6 +8,7 @@ import { getBlibliProductLink } from "@/lib/blibli-product-links";
 import { getTikTokProductLink } from "@/lib/tiktok-product-links";
 import { getLazadaProductLink } from "@/lib/lazada-product-links";
 import { sanitizeHtml } from "@/lib/sanitize";
+import { pixelMarketplaceClick, pixelViewContent } from "@/lib/meta-pixel";
 import { isProdukPromo, hitungHargaCoret, parseRupiah, formatRupiah } from "@/lib/promo";
 import MarketplaceIcon from "@/components/MarketplaceIcon";
 import MarketplaceNotice from "@/components/MarketplaceNotice";
@@ -108,26 +109,20 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
 
   /** Buka link marketplace; Blibli, TikTok Shop & Lazada pakai link produk dari data JSON. */
   const openMarketplace = (label: string, key: string) => {
-    if (key === "blibli") {
-      const link = getBlibliProductLink(detail.name);
-      if (link) {
-        window.open(link, "_blank", "noopener,noreferrer");
-        return;
-      }
-    }
-    if (key === "tiktok") {
-      const link = getTikTokProductLink(detail.name);
-      if (link) {
-        window.open(link, "_blank", "noopener,noreferrer");
-        return;
-      }
-    }
-    if (key === "lazada") {
-      const link = getLazadaProductLink(detail.name);
-      if (link) {
-        window.open(link, "_blank", "noopener,noreferrer");
-        return;
-      }
+    let link: string | null = null;
+    if (key === "blibli") link = getBlibliProductLink(detail.name);
+    else if (key === "tiktok") link = getTikTokProductLink(detail.name);
+    else if (key === "lazada") link = getLazadaProductLink(detail.name);
+    if (link) {
+      // Meta Pixel: pembeli keluar ke marketplace (audiens retargeting).
+      pixelMarketplaceClick({
+        marketplace: key,
+        id: detail.id,
+        name: detail.name,
+        price: detail.rekomendasiJual ?? "",
+      });
+      window.open(link, "_blank", "noopener,noreferrer");
+      return;
     }
     setMissingMp(label);
   };
@@ -181,6 +176,11 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
   // Promo: harga coret +10% hanya untuk produk dengan terjual >= threshold
   const promo = isProdukPromo(detail.rekomendasiJual) ? hitungHargaCoret(detail.rekomendasiJual) : null;
   const hematNominal = promo ? parseRupiah(promo.coret) - parseRupiah(price) : 0;
+
+  // Meta Pixel: halaman produk dibuka (ViewContent) — sekali per produk.
+  useEffect(() => {
+    pixelViewContent({ id: detail.id, name: detail.name, price });
+  }, [detail.id, detail.name, price]);
 
 
   return (

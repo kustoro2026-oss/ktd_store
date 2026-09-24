@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { pixelAddToCart } from "@/lib/meta-pixel";
 
 export type CartItem = {
   id: string;
@@ -61,13 +62,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, [items, ready]);
 
-  const toggleItem = useCallback((item: CartItem) => {
-    setItems((prev) =>
-      prev.some((i) => i.id === item.id)
-        ? prev.filter((i) => i.id !== item.id)
-        : [...prev, item]
-    );
-  }, []);
+  const toggleItem = useCallback(
+    (item: CartItem) => {
+      if (items.some((i) => i.id === item.id)) {
+        setItems((prev) => prev.filter((i) => i.id !== item.id));
+        return;
+      }
+      // Meta Pixel: produk masuk keranjang (AddToCart). Efek dijalankan di
+      // luar state updater agar tidak terduplikasi saat React re-invoke.
+      pixelAddToCart({ id: item.id, name: item.name, price: item.price });
+      setItems((prev) => [...prev, item]);
+    },
+    [items]
+  );
 
   const removeItem = useCallback((id: string) => {
     setItems((prev) => prev.filter((i) => i.id !== id));

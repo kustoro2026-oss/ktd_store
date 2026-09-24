@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import MetaPixel from "@/components/MetaPixel";
 import { CartProvider } from "@/lib/cart";
 import { SITE_URL } from "@/lib/config";
 
@@ -96,6 +97,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="id" className={`${inter.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col" suppressHydrationWarning>
+        <MetaPixel />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}

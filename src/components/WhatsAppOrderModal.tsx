@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Banknote,
   ChevronRight,
@@ -23,6 +23,7 @@ import {
   whatsappLink,
 } from "@/lib/config";
 import { mapEkspedisiToCourierCodes, matchEkspedisi } from "@/lib/kiriminaja";
+import { pixelContact, pixelInitiateCheckout, pixelLead } from "@/lib/meta-pixel";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
 
 // ─── localStorage: simpan data pembeli untuk auto-fill ──────────────────
@@ -423,6 +424,30 @@ export default function WhatsAppOrderModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, districtId, qty, weightStr]);
 
+  /**
+   * Meta Pixel: modal checkout dibuka = sinyal intent beli (InitiateCheckout).
+   * Dikirim sekali per sesi buka modal (ref guard) — data dihitung dari props
+   * yang tersedia di titik ini (nilai subtotal dihitung mandiri).
+   */
+  const checkoutTracked = useRef(false);
+  useEffect(() => {
+    if (!open) {
+      checkoutTracked.current = false;
+      return;
+    }
+    if (checkoutTracked.current) return;
+    checkoutTracked.current = true;
+    const cartItems = items ?? [];
+    const cartMode = cartItems.length > 0;
+    pixelInitiateCheckout({
+      ids: cartMode ? cartItems.map((it) => it.id) : productId ? [productId] : [],
+      value: cartMode
+        ? cartItems.reduce((s, it) => s + parseRupiah(it.price), 0)
+        : parseRupiah(price),
+      numItems: cartMode ? cartItems.length : 1,
+    });
+  }, [open, items, productId, price]);
+
   if (!open) return null;
 
   const onProvinceChange = (v: string) => {
@@ -679,6 +704,11 @@ export default function WhatsAppOrderModal({
       },
     });
     window.open(whatsappLink(message), "_blank", "noopener,noreferrer");
+    // Meta Pixel: pesanan terkirim ke WhatsApp — konversi utama situs (Lead).
+    pixelLead({
+      ids: isCart ? (items ?? []).map((it) => it.id) : productId ? [productId] : [],
+      value: grandTotal,
+    });
     onClose();
   };
 
@@ -740,6 +770,10 @@ export default function WhatsAppOrderModal({
       },
     });
     window.open(whatsappLink(message), "_blank", "noopener,noreferrer");
+    // Meta Pixel: pembeli menghubungi admin via WA tanpa menyelesaikan form.
+    pixelContact({
+      ids: isCart ? (items ?? []).map((it) => it.id) : productId ? [productId] : [],
+    });
   };
 
   // ─── Render ────────────────────────────────────────────────────────────
