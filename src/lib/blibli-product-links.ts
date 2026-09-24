@@ -1,6 +1,9 @@
 // Pemetaan nama produk -> link produk Blibli.
 // Sumber data: blibli-products.json (hasil scrape Blibli Seller Center, API
 // filterProductSkus — 612 produk aktif; dibuat oleh scripts/build-blibli-products.cjs).
+// Semua URL memakai format kanonik https://www.blibli.com/p/<slug>/ps--<SKU> —
+// format lama productDetailPageLink (…-KTS.70007.xxxxx.html) membuat aplikasi
+// Blibli terbuka tanpa menampilkan produk saat link di-tap dari HP.
 // Dipakai untuk tombol marketplace "Blibli" di halaman produk & keranjang.
 
 import blibliProducts from "../../blibli-products.json";
@@ -42,24 +45,24 @@ const KEYS = [...byName.keys()];
 const ALIASES: Record<string, string> = {
   // [1055]: "...Viral TikTok..." -> listing Blibli tanpa kata "TikTok".
   "8 pcs x 30gr detergen bubuk viral tiktok cloth stain remover ampuh hilangkan noda jamur kuning pakaian bersih seketika":
-    "https://www.blibli.com/product-detail-KTS.70007.00188.html",
+    "https://www.blibli.com/p/8-pcs-x-30gr-detergen-bubuk-viral-cloth-stain-remover-ampuh-hilangkan-noda-jamur-kuning-pakaian-bersih-seketika/ps--KTS-70007-00188",
   // [962]: "Pembersih Tas" -> listing memakai nama brand "Miss Clean Pembersih Tas".
-  "pembersih tas": "https://www.blibli.com/product-detail-KTS.70007.00240.html",
+  "pembersih tas": "https://www.blibli.com/p/miss-clean-pembersih-tas/ps--KTS-70007-00240",
   // [958]: "Pembersih Meja" -> "Miss Clean Pembersih Meja".
-  "pembersih meja": "https://www.blibli.com/product-detail-KTS.70007.00248.html",
+  "pembersih meja": "https://www.blibli.com/p/miss-clean-pembersih-meja/ps--KTS-70007-00248",
   // [956]: "Pembersih Wajan" -> "Miss Clean Pembersih Wajan".
-  "pembersih wajan": "https://www.blibli.com/product-detail-KTS.70007.00251.html",
+  "pembersih wajan": "https://www.blibli.com/p/miss-clean-pembersih-wajan/ps--KTS-70007-00251",
   // [757]: "SIDOARJO Detergen Khusus" -> listing "Detergen Khusus".
-  "sidoarjo detergen khusus": "https://www.blibli.com/product-detail-KTS.70007.00297.html",
+  "sidoarjo detergen khusus": "https://www.blibli.com/p/detergen-khusus/ps--KTS-70007-00297",
   // [1370]: prefix "Pocket Slingbag - ... POCKETSling" dihapus di listing Blibli.
   "pocket slingbag tas selempang slingbag wanita pocketsling bag simple desain minimalis bahan motif kombinasi":
-    "https://www.blibli.com/product-detail-KTS.70007.00477.html",
+    "https://www.blibli.com/p/tas-selempang-slingbag-wanita-bag-simple-desain-minimalis-bahan-motif-kombinasi/ps--KTS-70007-00477",
   // [1357]: "250 Gram – Perangsang Bunga..." -> listing disanitasi jadi "Booster Bunga".
   "pupuk pelebat tanaman buah 250 gram perangsang bunga buah lebat":
-    "https://www.blibli.com/product-detail-KTS.70007.00727.html",
+    "https://www.blibli.com/p/pupuk-pelebat-tanaman-buah-250-gram-booster-bunga-buah-lebat/ps--KTS-70007-00727",
   // [2174]: idem untuk varian "Booster Tanaman Buah".
   "pupuk booster tanaman buah 250 gram perangsang bunga buah lebat":
-    "https://www.blibli.com/product-detail-KTS.70007.00729.html",
+    "https://www.blibli.com/p/pupuk-booster-tanaman-buah-250-gram-booster-bunga-buah-lebat/ps--KTS-70007-00729",
 };
 
 /**

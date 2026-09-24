@@ -8,6 +8,11 @@
  *          mengikuti pola tokopedia-products.json; dipakai oleh
  *          src/lib/blibli-product-links.ts untuk tombol marketplace Blibli.
  *
+ * URL produk memakai format kanonik https://www.blibli.com/p/<slug-nama>/ps--<SKU>
+ * (format yang sama dengan link share Blibli dan dikenali aplikasi saat link
+ * di-tap dari HP / App Links). Format lama productDetailPageLink (…-KTS.70007.xxxxx.html)
+ * hanya bekerja di web — saat di-tap dari HP, aplikasi terbuka tanpa menampilkan produk.
+ *
  * Jalankan: node scripts/build-blibli-products.cjs
  */
 const fs = require("fs");
@@ -25,10 +30,21 @@ let skippedNoName = 0;
 let skippedNoUrl = 0;
 let dupSku = 0;
 
+/** Lowercase, non-alfanumerik jadi "-" — sama dengan cara Blibli membentuk slug URL. */
+const slugify = (s) =>
+  String(s)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
 for (const p of active) {
   const id = String(p.productSku || "").trim();
   const name = String(p.productName || "").trim();
-  const url = String(p.productDetailPageLink || "").trim();
+  const slug = slugify(name);
+  const url =
+    id && slug
+      ? `https://www.blibli.com/p/${slug}/ps--${id}`
+      : String(p.productDetailPageLink || "").trim();
   if (!name) {
     skippedNoName++;
     continue;
