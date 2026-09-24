@@ -3,7 +3,7 @@
  * build-blibli-products.cjs
  *
  * Sumber : blibli-upload/blibli-products-raw.json — hasil scrape Seller Center
- *          (API filterProductSkus, 604 produk aktif) via Browser agent.
+ *          (API filterProductSkus, 612 produk aktif) via Browser agent.
  * Output : blibli-products.json (root repo) — array {id,name,url,price,stock}
  *          mengikuti pola tokopedia-products.json; dipakai oleh
  *          src/lib/blibli-product-links.ts untuk tombol marketplace Blibli.

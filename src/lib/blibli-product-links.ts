@@ -1,6 +1,6 @@
 // Pemetaan nama produk -> link produk Blibli.
 // Sumber data: blibli-products.json (hasil scrape Blibli Seller Center, API
-// filterProductSkus — 604 produk aktif; dibuat oleh scripts/build-blibli-products.cjs).
+// filterProductSkus — 612 produk aktif; dibuat oleh scripts/build-blibli-products.cjs).
 // Dipakai untuk tombol marketplace "Blibli" di halaman produk & keranjang.
 
 import blibliProducts from "../../blibli-products.json";
@@ -54,6 +54,12 @@ const ALIASES: Record<string, string> = {
   // [1370]: prefix "Pocket Slingbag - ... POCKETSling" dihapus di listing Blibli.
   "pocket slingbag tas selempang slingbag wanita pocketsling bag simple desain minimalis bahan motif kombinasi":
     "https://www.blibli.com/product-detail-KTS.70007.00477.html",
+  // [1357]: "250 Gram – Perangsang Bunga..." -> listing disanitasi jadi "Booster Bunga".
+  "pupuk pelebat tanaman buah 250 gram perangsang bunga buah lebat":
+    "https://www.blibli.com/product-detail-KTS.70007.00727.html",
+  // [2174]: idem untuk varian "Booster Tanaman Buah".
+  "pupuk booster tanaman buah 250 gram perangsang bunga buah lebat":
+    "https://www.blibli.com/product-detail-KTS.70007.00729.html",
 };
 
 /**
