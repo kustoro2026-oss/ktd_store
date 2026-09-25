@@ -44,6 +44,7 @@ export const marketplaces: Marketplace[] = [
     label: "Lazada",
     color: "#0f146d",
     searchUrl: "https://www.lazada.co.id/catalog/?q=",
+    storeUrl: "https://s.lazada.co.id/s.ZrcN1n?c=x",
   },
 ];
 
