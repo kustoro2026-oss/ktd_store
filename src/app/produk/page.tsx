@@ -11,28 +11,32 @@ function getProducts(search: string, category: string, page: number) {
     products = filterByRelevance(products, search);
   }
   if (category) {
-    // Match category by product's `category` field first (exact match),
-    // then fall back to name-based relevance matching for products that
-    // don't have a category assigned yet.
+    // 1) Products whose `category` field matches exactly (mostly EVM items
+    //    after the site-category mapping).
     const exactMatch = products.filter(
       (p) => (p as { category?: string }).category?.toLowerCase() === category.toLowerCase(),
     );
-    if (exactMatch.length > 0) {
-      products = exactMatch;
-    } else {
-      // Fallback: match the category slug against product names.
-      const catName =
-        getStaticCategories()
-          .find((c) => c.slug.toLowerCase() === category.toLowerCase())
-          ?.name ?? category;
-      products = filterByRelevance(products, catName);
-    }
+    // 2) The remaining products: match the category NAME against product
+    //    names — most aneka items have an empty/unusable `category` field,
+    //    so exact-match alone would drop every aneka product from the page.
+    const catName =
+      getStaticCategories()
+        .find((c) => c.slug.toLowerCase() === category.toLowerCase())
+        ?.name ?? category;
+    const nameMatch = filterByRelevance(
+      products.filter(
+        (p) => (p as { category?: string }).category?.toLowerCase() !== category.toLowerCase(),
+      ),
+      catName,
+    );
+    products = [...exactMatch, ...nameMatch];
   }
 
-  // Shuffle search results so aneka & Evermos products are mixed instead of
-  // grouped per source. Deterministic per keyword + category so pages 1..N
-  // stay consistent (no duplicates / gaps) and match /api/products order.
-  if (search) {
+  // Shuffle search/category results so aneka & Evermos products are mixed
+  // instead of grouped per source. Deterministic per keyword + category so
+  // pages 1..N stay consistent (no duplicates / gaps) and match the
+  // /api/products order.
+  if (search || category) {
     products = shuffleSeeded(
       products,
       `search|${search.trim().toLowerCase()}|${category.trim().toLowerCase()}`,
