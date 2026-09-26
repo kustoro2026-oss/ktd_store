@@ -138,7 +138,7 @@ function FlashSaleCard({ p }: { p: AnekaProduct }) {
                     <button
                         type="button"
                         onClick={() =>
-                            toggleItem({ id: p.id, name: p.name, image: p.image, price })
+                            toggleItem({ id: p.id, name: p.name, image: p.image, price, marketplace: p.marketplace })
                         }
                         aria-label={inCart ? "Hapus dari Keranjang" : "Masukkan Keranjang"}
                         className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-colors ${inCart

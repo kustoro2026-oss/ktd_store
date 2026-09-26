@@ -1,7 +1,11 @@
 // Resolusi origin (kecamatan pengirim) per produk, dari lokasi seller anekadropship.
 // Data statis di seller-origins.json dibuat oleh scripts/build-origin-map.ts.
-// Prioritas: id produk -> alamat seller -> kota. Fallback: env global toko.
+// Prioritas: id produk -> alamat seller -> kota -> default kota (perkiraan) ->
+// fallback env global toko. Default kota dipakai bila produk hanya punya badge
+// kota tanpa alamat (mis. katalog Evermos): memakai kecamatan perwakilan kota
+// dari city-origin-defaults.json agar ongkir tidak jatuh ke gudang KTD.
 import sellerOrigins from "./seller-origins.json";
+import cityOriginDefaults from "./city-origin-defaults.json";
 
 type OriginMap = {
   byProductId?: Record<string, number>;
@@ -10,6 +14,8 @@ type OriginMap = {
 };
 
 const MAP = sellerOrigins as OriginMap;
+/** Kota (ternormalisasi) -> kecamatan perwakilan — perkiraan, lihat file JSON. */
+const CITY_DEFAULTS = cityOriginDefaults as Record<string, number>;
 
 /** Lowercase, buang tanda baca, satukan spasi. */
 export function normalizeOriginKey(s: string): string {
@@ -19,7 +25,7 @@ export function normalizeOriginKey(s: string): string {
 export type OriginResolution = {
   /** ID kecamatan KiriminAja (origin shipping_price). */
   districtId: number;
-  /** Sumber kecocokan: "produk" | "alamat" | "kota". */
+  /** Sumber kecocokan: "produk" | "alamat" | "kota" | "kota-default". */
   source: string;
 };
 
@@ -41,6 +47,8 @@ export function resolveOriginDistrict(opts: {
     const key = normalizeOriginKey(opts.location);
     const v = MAP.byLocation?.[key];
     if (v) return { districtId: v, source: "kota" };
+    const d = CITY_DEFAULTS[key];
+    if (d) return { districtId: d, source: "kota-default" };
   }
   return null;
 }

@@ -163,11 +163,12 @@ Buka Ads Manager → menu **Audiences** → **Create audience → Custom audienc
 
 ---
 
-## BAGIAN C — Campaign Traffic ke Situs: "model pilih channel" (opsional)
+## BAGIAN C — Campaign Traffic ke Situs: "model pilih channel"
 
-> Buka setelah Campaign A & B stabil (biasanya minggu ke-3+). Alur: iklan
-> angle promo → halaman produk di situs → pembeli pilih sendiri: tombol WA
-> (COD) atau tombol marketplace resmi.
+> **Dijalankan sebagai campaign pertama (keputusan 25 Sep 2026).** CTWA
+> (Bagian A) ditunda dan bisa ditambahkan kapan saja. Alur: iklan angle promo
+> → halaman produk di situs → pembeli pilih sendiri: tombol WA (COD) atau
+> tombol marketplace resmi.
 
 | Level | Field | Yang diisi |
 | --- | --- | --- |
@@ -175,13 +176,19 @@ Buka Ads Manager → menu **Audiences** → **Create audience → Custom audienc
 | Campaign | Nama | `KTD \| Traffic \| Promo \| Situs` |
 | Ad Set | Conversion location | **Website** |
 | Ad Set | Performance goal | **Maximize number of landing page views** |
-| Ad Set | Budget | Rp 20.000/hari — dari dana tambahan, jangan potong jatah Campaign A |
+| Ad Set | Budget | **Rp 30.000/hari** (diterapkan 25 Sep 2026; evaluasi 10–14 hari, naik bertahap bila terbukti) |
 | Ad Set | Audience | Indonesia · 18–54 · semua (broad, sama seperti A3) |
 | Ad Set | Placements | Advantage+ (default) |
 | Iklan | Media | kreatif produk promo (video 9:16 / gambar dari `creatives/`) |
 | Iklan | Primary text | dari `ad-copy.md` + sisipkan kalimat "Ambil harga promo" |
-| Iklan | Destination | **Website URL:** `https://toko.kustoro2026.com/produk/<id>?utm_source=facebook&utm_medium=paid&utm_campaign=ktd-promo-situs&utm_content=<nama-iklan>` |
-| Iklan | CTA button | **Beli sekarang / Shop Now** |
+| Iklan | Destination | **Website URL:** `https://toko.kustoro2026.com/produk/<id>?utm_source=facebook&utm_medium=paid&utm_campaign=ktd-traffic-situs&utm_content=<nama-iklan>` |
+| Iklan | CTA button | **Belanja sekarang / Shop Now** |
+
+> **Kreatif terpasang (25 Sep 2026):** video demo 14 dtk via **"Gunakan
+> postingan yang ada"** — postingan KTD Store 24 Sep, social proof (44
+> bagikan) ikut terbawa; mode ini tidak menyediakan field Judul/Deskripsi.
+> Menerbitkan perubahan materi lewat "Tinjau Item Konsep" memicu review ulang
+> singkat (status "Sedang Ditinjau") — normal.
 
 > Hasil campaign ini diukur dari: (1) jumlah kunjungan situs (kolom Meta),
 > (2) chat/order WA yang masuk dari pengunjung situs, (3) kenaikan penjualan
@@ -197,7 +204,7 @@ Buka Ads Manager → menu **Audiences** → **Create audience → Custom audienc
 | Pertanyaan | Jawaban |
 | --- | --- |
 | Cek status di mana? | Kolom **Delivery / Penayangan** — harus tertulis "Active/Aktif" (hijau) |
-| Hasilnya dilihat di kolom apa? | **Results / Hasil** = "New messaging conversations" (untuk CTWA), dan **Amount spent / Jumlah belanja** |
+| Hasilnya dilihat di kolom apa? | Campaign **Traffic aktif**: **Results / Hasil** = "Tayangan Halaman Tujuan" + **Amount spent / Jumlah belanja**. Untuk CTWA nanti: "New messaging conversations" |
 | Boleh ubah budget/targeting? | **TIDAK** selama 3–4 hari pertama (learning phase) |
 | Yang perlu dilakukan? | Balas tiap chat WA < 5 menit · isi log harian di `reports/` |
 | Kapan evaluasi pertama? | Hari 8–10 — aturan kill/scale ada di `strategy.md` Bagian 6 |

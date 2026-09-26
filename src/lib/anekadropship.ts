@@ -175,7 +175,23 @@ export type AnekaProduct = {
   terjual: string;
   stok: string;
   profit: string;
+  /** Kategori situs (ada di products-cache.json; dipakai filter /produk). */
+  category?: string;
+  /** Asal produk: "evermos" untuk katalog tambahan; undefined = anekadropship. */
+  marketplace?: string;
+  /** Link halaman produk di marketplace asal (khusus produk Evermos). */
+  url?: string;
 };
+
+/**
+ * Field minimal satu kartu produk (ProductCard). Dipakai pool rotasi beranda
+ * (src/lib/hourlyProducts.ts) agar payload HTML tetap ringan — AnekaProduct
+ * tetap kompatibel karena tipe ini hanya subset darinya.
+ */
+export type CardProduct = Pick<
+  AnekaProduct,
+  "id" | "name" | "image" | "rekomendasiJual" | "stok" | "terjual" | "marketplace"
+>;
 
 export type AnekaQuery = {
   search?: string;
@@ -239,6 +255,10 @@ export type AnekaProductDetail = {
   alamatSeller: string;
   /** Kota lokasi seller (badge, mis. "Jakarta Barat") — hint resolusi origin. */
   location?: string;
+  /** Asal produk: "evermos" untuk katalog tambahan; undefined = anekadropship. */
+  marketplace?: string;
+  /** Link halaman produk di marketplace asal (khusus produk Evermos). */
+  url?: string;
   /** Apakah produk punya varian (warna/ukuran). */
   hasVariants: boolean;
   /** Daftar varian produk (kosong jika tanpa varian). */

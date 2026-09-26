@@ -107,6 +107,10 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
     }
   };
 
+  /** Produk katalog tambahan Evermos (EVM-): tanpa tautan keluar, pemesanan via
+   *  WhatsApp; badge huruf "E" menandai asal produk. */
+  const isEvermos = detail.marketplace === "evermos";
+
   /** Buka link marketplace; Blibli, TikTok Shop & Lazada pakai link produk dari data JSON. */
   const openMarketplace = (label: string, key: string) => {
     let link: string | null = null;
@@ -239,6 +243,15 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
           )}
 
           <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-muted-2">
+            {isEvermos && (
+              <span
+                title="Produk Evermos — pemesanan via WhatsApp"
+                aria-label="Produk Evermos"
+                className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#00A94F] text-[11px] font-bold text-white"
+              >
+                E
+              </span>
+            )}
             {detail.terjual && (
               <span className="inline-flex items-center gap-1.5">
                 <ShoppingBag className="h-4 w-4 text-brand" />
@@ -417,32 +430,34 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
             </p>
           </div>
 
-          {/* Order via marketplace */}
-          <div className="mt-6">
-            <p className="mb-3 text-sm font-bold text-ink">Beli di marketplace resmi:</p>
-            {missingMp && (
-              <MarketplaceNotice
-                label={missingMp}
-                onClose={() => setMissingMp(null)}
-                className="mb-3"
-              />
-            )}
-            <div className="grid gap-2 sm:grid-cols-3">
-              {marketplaces.map((m) => (
-                <button
-                  key={m.key}
-                  type="button"
-                  onClick={() => openMarketplace(m.label, m.key)}
-                  aria-label={`Beli via ${m.label}`}
-                  className="flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:opacity-90"
-                  style={{ backgroundColor: m.color }}
-                >
-                  <MarketplaceIcon name={m.key} variant="white" className="h-4 w-auto object-contain" />
-                  {m.label}
-                </button>
-              ))}
+          {/* Order via marketplace — produk Evermos tanpa tautan keluar (via WhatsApp) */}
+          {!isEvermos && (
+            <div className="mt-6">
+              <p className="mb-3 text-sm font-bold text-ink">Beli di marketplace resmi:</p>
+              {missingMp && (
+                <MarketplaceNotice
+                  label={missingMp}
+                  onClose={() => setMissingMp(null)}
+                  className="mb-3"
+                />
+              )}
+              <div className="grid gap-2 sm:grid-cols-3">
+                {marketplaces.map((m) => (
+                  <button
+                    key={m.key}
+                    type="button"
+                    onClick={() => openMarketplace(m.label, m.key)}
+                    aria-label={`Beli via ${m.label}`}
+                    className="flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:opacity-90"
+                    style={{ backgroundColor: m.color }}
+                  >
+                    <MarketplaceIcon name={m.key} variant="white" className="h-4 w-auto object-contain" />
+                    {m.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Trust badges */}
           <div className="mt-6 grid grid-cols-1 gap-2 border-t border-gray-100 pt-5 sm:grid-cols-3 sm:text-center">
@@ -505,18 +520,19 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
               <WhatsAppIcon className="h-5 w-5" />
               WA
             </button>
-            {marketplaces.map((m) => (
-              <button
-                key={m.key}
-                type="button"
-                onClick={() => openMarketplace(m.label, m.key)}
-                aria-label={`Pesan via ${m.label}`}
-                className="flex h-11 min-w-0 flex-1 items-center justify-center rounded-xl px-1 text-white shadow-sm transition-opacity hover:opacity-90"
-                style={{ backgroundColor: m.color }}
-              >
-                <MarketplaceIcon name={m.key} variant="white" className="h-3.5 w-auto max-w-full object-contain" />
-              </button>
-            ))}
+            {!isEvermos &&
+              marketplaces.map((m) => (
+                <button
+                  key={m.key}
+                  type="button"
+                  onClick={() => openMarketplace(m.label, m.key)}
+                  aria-label={`Pesan via ${m.label}`}
+                  className="flex h-11 min-w-0 flex-1 items-center justify-center rounded-xl px-1 text-white shadow-sm transition-opacity hover:opacity-90"
+                  style={{ backgroundColor: m.color }}
+                >
+                  <MarketplaceIcon name={m.key} variant="white" className="h-3.5 w-auto max-w-full object-contain" />
+                </button>
+              ))}
           </div>
         </div>
       </div>

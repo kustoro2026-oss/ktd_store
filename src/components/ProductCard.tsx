@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Check, ShoppingCart } from "lucide-react";
-import type { AnekaProduct } from "@/lib/anekadropship";
+import type { CardProduct } from "@/lib/anekadropship";
 import { useCart } from "@/lib/cart";
 import { isProdukPromo, hitungHargaCoret } from "@/lib/promo";
 
@@ -10,7 +10,7 @@ function parseStock(stok: string): number {
   return Number.isNaN(n) ? 0 : n;
 }
 
-export default function ProductCard({ p }: { p: AnekaProduct }) {
+export default function ProductCard({ p }: { p: CardProduct }) {
   const { hasItem, toggleItem } = useCart();
   const inCart = hasItem(p.id);
   const stock = parseStock(p.stok);
@@ -48,6 +48,16 @@ export default function ProductCard({ p }: { p: AnekaProduct }) {
             Hampir Habis
           </span>
         )}
+        {/* Penanda asal katalog: produk Evermos (EVM-) — cukup huruf "E", pesan via WA */}
+        {p.marketplace === "evermos" && (
+          <span
+            title="Produk Evermos — pemesanan via WhatsApp"
+            aria-label="Produk Evermos"
+            className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-[#00A94F] text-[11px] font-bold text-white shadow-sm"
+          >
+            E
+          </span>
+        )}
         <span className="absolute bottom-2 right-2 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-medium text-white opacity-0 backdrop-blur transition-opacity duration-200 group-hover:opacity-100">
           Lihat Detail
         </span>
@@ -82,7 +92,7 @@ export default function ProductCard({ p }: { p: AnekaProduct }) {
         <div className="mt-auto flex flex-wrap gap-2 pt-3">
           <button
             type="button"
-            onClick={() => toggleItem({ id: p.id, name: p.name, image: p.image, price })}
+            onClick={() => toggleItem({ id: p.id, name: p.name, image: p.image, price, marketplace: p.marketplace })}
             aria-label={inCart ? "Hapus dari Keranjang" : "Masukkan Keranjang"}
             className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition-colors ${inCart
               ? "border-brand bg-brand text-white"

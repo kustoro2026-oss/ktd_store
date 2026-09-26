@@ -117,18 +117,19 @@ export default function CartPage() {
                       <WhatsAppIcon className="h-3.5 w-3.5" />
                       WhatsApp
                     </button>
-                    {marketplaces.map((m) => (
-                      <button
-                        key={m.key}
-                        type="button"
-                        onClick={() => openMarketplace(m.label, m.key, item)}
-                        aria-label={`Beli ${item.name} via ${m.label}`}
-                        className="flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-[11px] font-semibold text-ink transition-colors hover:border-brand hover:text-brand"
-                      >
-                        <MarketplaceIcon name={m.key} className="h-3 w-auto object-contain" />
-                        {m.label}
-                      </button>
-                    ))}
+                    {item.marketplace !== "evermos" &&
+                      marketplaces.map((m) => (
+                        <button
+                          key={m.key}
+                          type="button"
+                          onClick={() => openMarketplace(m.label, m.key, item)}
+                          aria-label={`Beli ${item.name} via ${m.label}`}
+                          className="flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-[11px] font-semibold text-ink transition-colors hover:border-brand hover:text-brand"
+                        >
+                          <MarketplaceIcon name={m.key} className="h-3 w-auto object-contain" />
+                          {m.label}
+                        </button>
+                      ))}
                   </div>
                 </div>
                 <button

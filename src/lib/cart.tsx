@@ -16,6 +16,8 @@ export type CartItem = {
   name: string;
   image: string;
   price: string;
+  /** Asal produk ("evermos") — produk EVM hanya dipesan via WhatsApp; undefined = aneka. */
+  marketplace?: string;
 };
 
 type CartContextValue = {

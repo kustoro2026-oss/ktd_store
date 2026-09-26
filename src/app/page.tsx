@@ -4,7 +4,21 @@ import HeroCarousel from "@/components/HeroCarousel";
 import Features from "@/components/Features";
 import { NewProducts, PopularCategories } from "@/components/HomeSections";
 import { getLocalImages } from "@/lib/localImages";
-import { getStaticCategories, getStaticProducts } from "@/lib/products-cache";
+import {
+  getStaticAnekaProducts,
+  getStaticCategories,
+  getStaticEvermosProducts,
+  getStaticProducts,
+} from "@/lib/products-cache";
+import {
+  hourSeed,
+  parseSold,
+  pickHourly,
+  POOL_SIZE,
+  SALT_BARU,
+  SALT_LARIS,
+} from "@/lib/hourlyProducts";
+import type { AnekaProduct, CardProduct } from "@/lib/anekadropship";
 import { isFlashSaleProduct } from "@/lib/promo";
 
 // Lazy-load below-fold sections
@@ -40,17 +54,43 @@ export const metadata: Metadata = {
   },
 };
 
+/** Produk cache → kartu ringan (pakai gambar lokal bila tersedia). */
+function toCard(p: AnekaProduct): CardProduct {
+  const local = getLocalImages(p.id);
+  return {
+    id: p.id,
+    name: p.name,
+    image: local.length ? local[0] : p.image,
+    rekomendasiJual: p.rekomendasiJual,
+    stok: p.stok,
+    terjual: p.terjual,
+    marketplace: p.marketplace,
+  };
+}
+
+/** n produk dengan penjualan terbanyak. */
+function topBySold(list: AnekaProduct[], n: number): AnekaProduct[] {
+  return [...list].sort((a, b) => parseSold(b.terjual) - parseSold(a.terjual)).slice(0, n);
+}
+
 export default async function Home() {
   // 100% static — no external network calls.
   const staticCats = getStaticCategories();
 
-  // Only pass first 20 products to the page for fast initial render.
-  // Remaining products load client-side via /api/products.
+  // Seluruh katalog gabungan (aneka + Evermos) untuk pool Flash Sale.
   const allProducts = getStaticProducts();
-  const initialProducts = allProducts.slice(0, 20).map((p) => {
-    const local = getLocalImages(p.id);
-    return local.length ? { ...p, image: local[0] } : p;
-  });
+
+  // Rotasi per jam untuk "Produk Terbaru" & "Produk Terlaris": masing-masing
+  // 16 aneka + 16 Evermos, acak namun deterministik per jam (lihat
+  // src/lib/hourlyProducts.ts). Seed dihitung saat render/ISR; klien
+  // menghitung ulang saat jam berganti.
+  const aneka = getStaticAnekaProducts();
+  const evm = getStaticEvermosProducts();
+  const seed = hourSeed();
+  const poolBaruAneka = aneka.slice(0, POOL_SIZE).map(toCard);
+  const poolBaruEvm = evm.slice(0, POOL_SIZE).map(toCard);
+  const poolLarisAneka = topBySold(aneka, POOL_SIZE).map(toCard);
+  const poolLarisEvm = topBySold(evm, POOL_SIZE).map(toCard);
 
   // Flash Sale: pool awal dari produk eligible di SELURUH katalog (bukan 20
   // pertama) supaya render awal sudah bisa menampilkan >= 10 kartu.
@@ -70,8 +110,18 @@ export default async function Home() {
       <Features />
       <FlashSale initialProducts={flashInitial} />
       <PopularCategories initialCategories={staticCats} />
-      <NewProducts initialProducts={initialProducts} />
-      <BestSellers />
+      <NewProducts
+        anekaPool={poolBaruAneka}
+        evmPool={poolBaruEvm}
+        initialItems={pickHourly(poolBaruAneka, poolBaruEvm, seed, SALT_BARU)}
+        initialSeed={seed}
+      />
+      <BestSellers
+        anekaPool={poolLarisAneka}
+        evmPool={poolLarisEvm}
+        initialItems={pickHourly(poolLarisAneka, poolLarisEvm, seed, SALT_LARIS)}
+        initialSeed={seed}
+      />
       <LatestCollections />
       <BlogSection />
       <SeoText />

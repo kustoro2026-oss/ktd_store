@@ -5,7 +5,9 @@ import ProductCard from "./ProductCard";
 import { useApi } from "@/lib/useApi";
 import CategoryIcon from "@/components/CategoryIcon";
 import { saveLastCategory } from "@/components/BestSellers";
-import type { AnekaCategory, AnekaProduct } from "@/lib/anekadropship";
+import { SALT_BARU } from "@/lib/hourlyProducts";
+import { useHourlyProducts } from "@/lib/useHourlyProducts";
+import type { AnekaCategory, AnekaProduct, CardProduct } from "@/lib/anekadropship";
 
 /* Kategori (real categories from anekadropship.id) */
 export function PopularCategories({
@@ -63,17 +65,25 @@ export function PopularCategories({
   );
 }
 
-/* Produk Terbaru (real products from anekadropship.id) */
+/* Produk Terbaru — 16 aneka + 16 Evermos, acak & berganti tiap jam */
 export function NewProducts({
-  initialProducts,
+  anekaPool,
+  evmPool,
+  initialItems,
+  initialSeed,
 }: {
-  initialProducts?: AnekaProduct[] | null;
+  anekaPool: CardProduct[];
+  evmPool: CardProduct[];
+  initialItems: CardProduct[];
+  initialSeed: number;
 }) {
-  // Server-rendered data (homepage ISR) — skip the client fetch when present.
+  const hasPool = anekaPool.length > 0 || evmPool.length > 0;
+  // Fallback jarang: pool statis kosong → ambil live dari API aneka.
   const { data, loading, error } = useApi<{ products: AnekaProduct[] }>(
-    initialProducts ? null : "/api/products?sort=newest&page=1",
+    hasPool ? null : "/api/products?sort=newest&page=1",
   );
-  const products = initialProducts ?? data?.products ?? [];
+  const hourly = useHourlyProducts(anekaPool, evmPool, initialItems, initialSeed, SALT_BARU);
+  const products: CardProduct[] = hasPool ? hourly : (data?.products ?? []).slice(0, 32);
 
   return (
     <section className="container-site mt-10">
@@ -101,7 +111,7 @@ export function NewProducts({
         </div>
       ) : products.length > 0 ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-          {products.slice(0, 10).map((p) => (
+          {products.map((p) => (
             <ProductCard key={p.id} p={p} />
           ))}
         </div>

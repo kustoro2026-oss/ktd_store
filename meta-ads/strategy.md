@@ -119,10 +119,19 @@ KTD | Traffic | Retargeting | Pixel
   ("stok ready", "COD bisa", "ongkir real-time"), plus bundling lebih hemat.
 - Frekuensi dijaga < 4×/minggu per orang; ganti kreatif jika lelah.
 
-### Campaign C — Traffic ke Situs: "model pilih channel" (opsional, buka setelah A & B stabil)
+### Campaign C — Traffic ke Situs: "model pilih channel"
 
 Alur: **Iklan (angle "Ambil Promo") → halaman produk di situs → pembeli pilih
 sendiri: tombol WA (COD) atau tombol marketplace resmi → closing.**
+
+> **Keputusan 25 Sep 2026:** campaign ini dijalankan SEBAGAI CAMPAIGN PERTAMA
+> (situs jadi pusat "pilih channel"). CTWA (Campaign A) ditunda — bisa
+> ditambahkan kapan saja. Budget final yang diterapkan: **Rp 30.000/hari**
+> (start hati-hati; evaluasi 10–14 hari). Iklan pertama terbit 25 Sep 2026,
+> kreatifnya memakai **postingan Facebook KTD Store (24 Sep, video demo
+> 14 dtk)** via "Gunakan postingan yang ada" — social proof (44 bagikan) ikut
+> terbawa; field Judul/Deskripsi custom tidak tersedia di mode ini (ditunda ke
+> iterasi kreatif berikutnya).
 
 ```
 KTD | Traffic | Promo | Situs
@@ -134,12 +143,15 @@ KTD | Traffic | Promo | Situs
 - **Fungsinya:** menangkap pembeli yang *hanya percaya marketplace* (mereka
   tidak mau chat dulu). Perantara halaman produk tetap mencatat pixel
   (`ViewContent`) sehingga audiens retargeting ikut tumbuh.
-- **Sadari batasnya:** konversi akhir di marketplace TIDAK terlihat pixel —
-  Meta hanya mengoptimalkan "kunjungan situs", bukan order. Jadi campaign ini
-  mesin kesempatan, bukan pengganti Campaign A. Order marketplace dicek manual
-  dari Seller Center masing-masing.
-- **Budget:** mulai Rp 20.000/hari dari dana tambahan — jangan memotong jatah
-  Campaign A. Buka hanya setelah A & B stabil (biasanya minggu ke-3+).
+- **Sadari batasnya:** Meta hanya mengoptimalkan "kunjungan situs", bukan
+  order. Event di situs tetap terekam (`ViewContent` → `AddToCart` →
+  `InitiateCheckout` → `Lead`/`Contact`, plus `MarketplaceClick` saat klik
+  keluar ke marketplace) sehingga perilaku "pilih channel" bisa diukur; order
+  via WhatsApp tercatat sebagai `Lead`, order marketplace dicek manual dari
+  Seller Center masing-masing.
+- **Budget:** Rp 30.000/hari (diterapkan 25 Sep 2026 — start hati-hati,
+  evaluasi 10–14 hari); bila terbukti jalan, naikkan bertahap +20–30% per
+  3–4 hari, jangan diubah-ubah selama masa pembelajaran.
 - Catatan TikTok Shop: checkout butuh app + login (drop-off tinggi) — di model
   ini Blibli/Lazada yang checkout-nya via web paling mulus.
 - **Landing (diputuskan):** halaman produk yang sudah ada di situs (tanpa kode

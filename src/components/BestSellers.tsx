@@ -1,82 +1,39 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import ProductCard from "./ProductCard";
 import { useApi } from "@/lib/useApi";
-import type { AnekaProduct } from "@/lib/anekadropship";
-import { TrendingUp, Sparkles } from "lucide-react";
-
-/** Fisher-Yates shuffle. */
-function shuffle<T>(arr: T[]): T[] {
-    const a = [...arr];
-    for (let i = a.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [a[i], a[j]] = [a[j], a[i]];
-    }
-    return a;
-}
-
-/** Parse "7,7rb" → 7700, "1,2RB" → 1200, "500" → 500 */
-function parseSold(sold: string): number {
-    if (!sold) return 0;
-    const s = sold.toLowerCase().replace(/\s+/g, "").replace(/\./g, "");
-    const rb = s.match(/^([\d,]+)rb$/);
-    if (rb) return Math.round(parseFloat(rb[1].replace(",", ".")) * 1000);
-    const k = s.match(/^([\d,]+)k$/);
-    if (k) return Math.round(parseFloat(k[1].replace(",", ".")) * 1000);
-    return parseInt(s, 10) || 0;
-}
+import { SALT_LARIS } from "@/lib/hourlyProducts";
+import { useHourlyProducts } from "@/lib/useHourlyProducts";
+import type { AnekaProduct, CardProduct } from "@/lib/anekadropship";
+import { TrendingUp } from "lucide-react";
 
 const STORAGE_KEY = "ktd-last-category";
 
-function getLastCategory(): string | null {
-    try { return localStorage.getItem(STORAGE_KEY); } catch { return null; }
-}
-
+/** Simpan kategori terakhir yang diklik (dipakai PopularCategories). */
 export function saveLastCategory(slug: string) {
     try { localStorage.setItem(STORAGE_KEY, slug); } catch { /* ignore */ }
 }
 
-export default function BestSellers() {
+/* Produk Terlaris — pool 16 aneka + 16 Evermos terlaris, acak & berganti tiap jam */
+export default function BestSellers({
+    anekaPool,
+    evmPool,
+    initialItems,
+    initialSeed,
+}: {
+    anekaPool: CardProduct[];
+    evmPool: CardProduct[];
+    initialItems: CardProduct[];
+    initialSeed: number;
+}) {
+    const hasPool = anekaPool.length > 0 || evmPool.length > 0;
+    // Fallback jarang: pool statis kosong → ambil live dari API aneka.
     const { data, loading } = useApi<{ products: AnekaProduct[] }>(
-        "/api/products?sort=newest&page=1",
+        hasPool ? null : "/api/products?sort=newest&page=1",
     );
-    const [preferredCat, setPreferredCat] = useState<string | null>(null);
-
-    useEffect(() => {
-        setPreferredCat(getLastCategory());
-    }, []);
-
-    const products = useMemo(() => {
-        const all = data?.products ?? [];
-        if (!all.length) return [];
-
-        // Sort by sold count (highest first)
-        const sorted = [...all].sort((a, b) => parseSold(b.terjual) - parseSold(a.terjual));
-
-        // If user has a preferred category, bias toward it (70% from preferred, 30% random)
-        if (preferredCat) {
-            const catLower = preferredCat.toLowerCase();
-            const fromCat = sorted.filter((p) => {
-                const cat = (p as { category?: string }).category;
-                // Exact match on category field, or fallback to name-based match
-                if (cat && cat.toLowerCase() === catLower) return true;
-                return p.name.toLowerCase().includes(catLower);
-            });
-            const others = sorted.filter((p) => {
-                const cat = (p as { category?: string }).category;
-                if (cat && cat.toLowerCase() === catLower) return false;
-                return !p.name.toLowerCase().includes(catLower);
-            });
-            // Take 7 from preferred category, 3 from others, then shuffle
-            const selected = [...fromCat.slice(0, 7), ...shuffle(others).slice(0, 3)];
-            return shuffle(selected).slice(0, 10);
-        }
-
-        // No preference: take top 15 by sold, shuffle, pick 10
-        return shuffle(sorted.slice(0, 15)).slice(0, 10);
-    }, [data, preferredCat]);
+    const hourly = useHourlyProducts(anekaPool, evmPool, initialItems, initialSeed, SALT_LARIS);
+    const products: CardProduct[] = hasPool ? hourly : (data?.products ?? []).slice(0, 32);
 
     if (loading) {
         return (
@@ -113,11 +70,7 @@ export default function BestSellers() {
                         <TrendingUp className="h-6 w-6 text-red-500" />
                         Produk Terlaris
                     </h2>
-                    <p className="mt-1 text-sm text-muted">
-                        {preferredCat
-                            ? "Rekomendasi berdasarkan minat Anda"
-                            : "Produk paling banyak diminati pembeli"}
-                    </p>
+                    <p className="mt-1 text-sm text-muted">Produk paling banyak diminati pembeli</p>
                 </div>
                 <Link
                     href="/produk"
@@ -126,13 +79,6 @@ export default function BestSellers() {
                     Lihat Semua →
                 </Link>
             </div>
-
-            {preferredCat && (
-                <div className="mb-3 flex items-center gap-1.5 rounded-lg bg-brand/5 px-3 py-1.5 text-xs text-brand">
-                    <Sparkles className="h-3.5 w-3.5" />
-                    Menampilkan rekomendasi berdasarkan kategori yang Anda minati
-                </div>
-            )}
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                 {products.map((p) => (

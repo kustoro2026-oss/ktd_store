@@ -3,6 +3,7 @@
 // SENGAJA tidak disimpan karena tidak pernah ditampilkan ke pembeli
 // (harga tampil selalu rekomendasiJual / "Harga Jual").
 import variantCache from "./variant-cache.json";
+import evermosVariantCache from "./evermos-variant-cache.json";
 
 /** Satu varian hasil scrape (bentuk tampilan, tanpa harga modal). */
 export type CachedVariant = {
@@ -33,9 +34,13 @@ type VariantCacheFile = {
 };
 
 const FILE = variantCache as VariantCacheFile;
+// Produk Evermos (EVM-*): evermos-variant-cache.json (scripts/build-evermos-site-data.cjs).
+// Entri punya field tambahan labelVariant/labelSubVariant yang tidak dipakai situs.
+const EVERMOS_FILE = evermosVariantCache as unknown as VariantCacheFile;
 
 /** Varian cache satu produk (null jika produk belum pernah discan). */
 export function getCachedVariants(id: string): CachedVariantEntry | null {
+  if (id.startsWith("EVM-")) return EVERMOS_FILE.products[id] ?? null;
   return FILE.products[id] ?? null;
 }
 

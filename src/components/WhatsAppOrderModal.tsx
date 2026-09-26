@@ -448,6 +448,22 @@ export default function WhatsAppOrderModal({
     });
   }, [open, items, productId, price]);
 
+  /** Produk Evermos (EVM-) hanya mendukung Transfer Bank — COD tidak tersedia. */
+  const hasEvermos = Boolean(
+    productId?.startsWith("EVM-") ||
+      items?.some((it) => it.id.startsWith("EVM-"))
+  );
+  const paymentMethods = hasEvermos
+    ? PAYMENT_METHODS.filter((m) => m.key !== "cod")
+    : PAYMENT_METHODS;
+
+  // Batal-kan pilihan COD bila pesanan memuat produk Evermos (mis. modal yang
+  // sama dipakai ulang untuk keranjang yang isinya berubah). Hook wajib di
+  // atas early return agar jumlah hook antar-render tidak berubah.
+  useEffect(() => {
+    if (hasEvermos && payment === "cod") setPayment("");
+  }, [hasEvermos, payment]);
+
   if (!open) return null;
 
   const onProvinceChange = (v: string) => {
@@ -655,7 +671,11 @@ export default function WhatsAppOrderModal({
       return;
     }
     if (!payment) {
-      setError("Pilih metode pembayaran (COD atau Transfer Bank).");
+      setError(
+        hasEvermos
+          ? "Pilih metode pembayaran (Transfer Bank)."
+          : "Pilih metode pembayaran (COD atau Transfer Bank)."
+      );
       return;
     }
     // Simpan data pembeli untuk auto-fill di pesanan berikutnya
@@ -1260,7 +1280,7 @@ export default function WhatsAppOrderModal({
 
             <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-4">
               <div className="space-y-2">
-                {PAYMENT_METHODS.map((p) => (
+                {paymentMethods.map((p) => (
                   <label
                     key={p.key}
                     className={`flex cursor-pointer items-start gap-3 rounded-lg border bg-white px-4 py-3 transition-all ${payment === p.key
@@ -1287,6 +1307,13 @@ export default function WhatsAppOrderModal({
                   </label>
                 ))}
               </div>
+
+              {hasEvermos && (
+                <p className="mt-3 text-[11px] leading-relaxed text-muted-2">
+                  Pesanan ini memuat produk Evermos — pembayaran hanya tersedia
+                  via Transfer Bank.
+                </p>
+              )}
 
               {payment === "transfer" && (
                 <div className="mt-3 space-y-2">

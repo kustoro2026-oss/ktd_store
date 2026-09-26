@@ -6,7 +6,7 @@ import { getStaticProducts } from "./products-cache";
 import { getCachedVariants } from "./variant-cache";
 import { getCachedDescription } from "./description-cache";
 
-/** Field pengiriman hasil enrich (scripts/enrich-products-cache.cjs). */
+/** Field tambahan di luar tipe dasar: pengiriman (hasil enrich) + asal/url katalog. */
 type ShippingFields = {
   images?: string[];
   hargaModal?: string;
@@ -17,6 +17,9 @@ type ShippingFields = {
   ekspedisi?: string;
   ekspedisiList?: string[];
   alamatSeller?: string;
+  /** Asal produk ("evermos") + link marketplace — hanya untuk katalog Evermos. */
+  marketplace?: string;
+  url?: string;
 };
 
 /** Ambil detail produk dari static cache (info dasar + data pengiriman). */
@@ -52,6 +55,8 @@ export async function getDetailCached(id: string): Promise<AnekaProductDetail | 
     sistem: "",
     alamatSeller: s.alamatSeller ?? "",
     location: p.location ?? "",
+    marketplace: s.marketplace,
+    url: s.url,
     hasVariants: variants.length > 0,
     variants,
     marketingKitUrl: null,

@@ -52,3 +52,23 @@ next-env.d.ts
 /tiktok-template/
 /tiktok-upload/
 /Tiktoksellercenter_*.xlsx
+
+# evermos scrape (data hasil scrape & token sesi milik user)
+/evermos-scrape/
+
+# evermos export (data hasil olahan & gambar milik user)
+/evermos-export/
+
+# dump/debug di root (screenshot & probe) — pola sama seperti /*.png di atas
+/*.jpg
+/*.jpeg
+/_*.txt
+
+# data kerja blibli (file upload & hasil scrape — milik user)
+/blibli-upload/
+
+# gambar kerja revisi (lokal saja — bukan bagian build situs)
+/_revisi-img/
+
+# skrip debug one-off (hanya skrip pipeline stabil yang di-commit)
+/scripts/_*
