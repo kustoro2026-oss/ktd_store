@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { filterByRelevance } from "@/lib/search";
+import { filterByRelevance, shuffleSeeded } from "@/lib/search";
 import { getLocalImages } from "@/lib/localImages";
 import { getStaticCategories, getStaticProducts } from "@/lib/products-cache";
 import { isFlashSaleProduct, shuffleArray } from "@/lib/promo";
@@ -41,6 +41,15 @@ export async function GET(req: NextRequest) {
           ?.name ?? category;
       products = filterByRelevance(products, catName);
     }
+  }
+
+  // Shuffle search results so aneka & Evermos products are mixed — same seed
+  // as SSR /produk so ordering & pagination stay consistent.
+  if (search) {
+    products = shuffleSeeded(
+      products,
+      `search|${search.trim().toLowerCase()}|${category.trim().toLowerCase()}`,
+    );
   }
 
   // Flash Sale: hanya produk eligible (harga, stok, profit) dari seluruh katalog

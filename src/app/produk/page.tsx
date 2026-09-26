@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import PlpContent from "./PlpContent";
-import { filterByRelevance } from "@/lib/search";
+import { filterByRelevance, shuffleSeeded } from "@/lib/search";
 import { getLocalImages } from "@/lib/localImages";
 import { getStaticCategories, getStaticProducts } from "@/lib/products-cache";
 
@@ -27,6 +27,16 @@ function getProducts(search: string, category: string, page: number) {
           ?.name ?? category;
       products = filterByRelevance(products, catName);
     }
+  }
+
+  // Shuffle search results so aneka & Evermos products are mixed instead of
+  // grouped per source. Deterministic per keyword + category so pages 1..N
+  // stay consistent (no duplicates / gaps) and match /api/products order.
+  if (search) {
+    products = shuffleSeeded(
+      products,
+      `search|${search.trim().toLowerCase()}|${category.trim().toLowerCase()}`,
+    );
   }
 
   const localized = products.map((p) => {
