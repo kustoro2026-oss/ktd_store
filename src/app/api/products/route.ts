@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { filterByRelevance, shuffleSeeded } from "@/lib/search";
+import { filterByRelevance, prioritizeAneka } from "@/lib/search";
 import { getLocalImages } from "@/lib/localImages";
 import { getStaticCategories, getStaticProducts } from "@/lib/products-cache";
 import { isFlashSaleProduct, shuffleArray } from "@/lib/promo";
@@ -46,14 +46,12 @@ export async function GET(req: NextRequest) {
     products = [...exactMatch, ...nameMatch];
   }
 
-  // Shuffle search/category results so aneka & Evermos products are mixed —
-  // same seed as SSR /produk so ordering & pagination stay consistent.
-  if (search || category) {
-    products = shuffleSeeded(
-      products,
-      `search|${search.trim().toLowerCase()}|${category.trim().toLowerCase()}`,
-    );
-  }
+  // Prioritize aneka products in every listing — same seed as SSR /produk so
+  // ordering & pagination stay identical (3 aneka : 1 Evermos per group).
+  products = prioritizeAneka(
+    products,
+    `listing|${search.trim().toLowerCase()}|${category.trim().toLowerCase()}`,
+  );
 
   // Flash Sale: hanya produk eligible (harga, stok, profit) dari seluruh katalog
   if (flashsale) {

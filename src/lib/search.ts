@@ -160,3 +160,54 @@ export function shuffleSeeded<T>(items: T[], seed: string): T[] {
   }
   return out;
 }
+
+/** Listing priority ratio: aneka products per 1 Evermos product. */
+const ANEKA_PER_EVM = 3;
+
+/**
+ * Order a listing with aneka priority: early pages are aneka-majority (e.g.
+ * 15 of 20 slots) while Evermos products stay sprinkled in (~1 per group of
+ * ANEKA_PER_EVM + 1, insertion slot jittered deterministically). Orders
+ * within each source are seeded-shuffled from a shared seed so SSR /produk
+ * and /api/products stay identical and pagination pages 1..N remain
+ * consistent (no duplicates / gaps). When one source runs out, the other
+ * continues (aneka-only or Evermos-only tail).
+ */
+export function prioritizeAneka<T extends { id: string }>(items: T[], seed: string): T[] {
+  const aneka: T[] = [];
+  const evermos: T[] = [];
+  for (const p of items) {
+    if (p.id.startsWith("EVM-")) evermos.push(p);
+    else aneka.push(p);
+  }
+  const a = shuffleSeeded(aneka, `${seed}|a`);
+  const e = shuffleSeeded(evermos, `${seed}|e`);
+  const out: T[] = [];
+  let i = 0;
+  let j = 0;
+  let s = hashSeed(`${seed}|pos`) || 0x9e3779b9;
+  const next = (): number => {
+    s ^= s << 13;
+    s >>>= 0;
+    s ^= s >>> 17;
+    s ^= s << 5;
+    s >>>= 0;
+    return s / 4294967296;
+  };
+  while (i < a.length || j < e.length) {
+    if (i >= a.length) {
+      // Aneka habis — sisanya produk Evermos.
+      out.push(...e.slice(j));
+      break;
+    }
+    const takeA = Math.min(ANEKA_PER_EVM, a.length - i);
+    const hasEvm = j < e.length;
+    const pos = hasEvm ? Math.floor(next() * (takeA + 1)) : takeA;
+    for (let k = 0; k < takeA; k += 1) {
+      if (hasEvm && k === pos) out.push(e[j++]);
+      out.push(a[i++]);
+    }
+    if (hasEvm && pos === takeA) out.push(e[j++]);
+  }
+  return out;
+}

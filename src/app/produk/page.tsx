@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import PlpContent from "./PlpContent";
-import { filterByRelevance, shuffleSeeded } from "@/lib/search";
+import { filterByRelevance, prioritizeAneka } from "@/lib/search";
 import { getLocalImages } from "@/lib/localImages";
 import { getStaticCategories, getStaticProducts } from "@/lib/products-cache";
 
@@ -32,16 +32,15 @@ function getProducts(search: string, category: string, page: number) {
     products = [...exactMatch, ...nameMatch];
   }
 
-  // Shuffle search/category results so aneka & Evermos products are mixed
-  // instead of grouped per source. Deterministic per keyword + category so
-  // pages 1..N stay consistent (no duplicates / gaps) and match the
-  // /api/products order.
-  if (search || category) {
-    products = shuffleSeeded(
-      products,
-      `search|${search.trim().toLowerCase()}|${category.trim().toLowerCase()}`,
-    );
-  }
+  // Prioritize aneka products in every listing: early pages are
+  // aneka-majority while Evermos items stay sprinkled in (3 aneka : 1
+  // Evermos). Deterministic per keyword + category so SSR /produk and
+  // /api/products stay identical and pagination pages 1..N remain consistent
+  // (no duplicates / gaps).
+  products = prioritizeAneka(
+    products,
+    `listing|${search.trim().toLowerCase()}|${category.trim().toLowerCase()}`,
+  );
 
   const localized = products.map((p) => {
     const local = getLocalImages(p.id);
