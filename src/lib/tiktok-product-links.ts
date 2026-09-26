@@ -35,6 +35,7 @@ const KEYS = [...byName.keys()];
 /**
  * Alias manual: nama produk di anekadropship (live) yang susunan katanya
  * berbeda dari nama di tokopedia-products.json, tapi produknya sama.
+ * Termasuk listing baru yang belum ikut ter-scrape (link dari seller).
  * Key = nama live hasil normalize(); value = url produk.
  */
 const ALIASES: Record<string, string> = {
@@ -56,6 +57,14 @@ const ALIASES: Record<string, string> = {
   // "Madu Bawang Hitam Tunggal 250ml - Black Garlic Honey Fermentasi Herbal Alami"
   "black garlic honey madu bawang hitam 250ml":
     "https://shop-id.tokopedia.com/view/product/1737454037802583600?region=ID&locale=id-ID",
+  // Produk 1039: "Glowhome Pembersih Stainless Steel dan Anti Lengket 180ml Cairan Penghilang Kerak Noda Hitam Alat Dapur"
+  // (listing baru di TikTok Shop, belum ikut scrape tokopedia-products.json — link dari seller)
+  "glowhome pembersih stainless steel dan anti lengket 180ml cairan penghilang kerak noda hitam alat dapur":
+    "https://shop-id.tokopedia.com/view/product/1737704837772183088",
+  // Produk 2174: "Pupuk Booster Tanaman Buah 250 Gram – Perangsang Bunga & Buah Lebat"
+  // (listing baru di TikTok Shop, belum ikut scrape tokopedia-products.json — link dari seller)
+  "pupuk booster tanaman buah 250 gram perangsang bunga buah lebat":
+    "https://shop-id.tokopedia.com/view/product/1737704674627913264",
 };
 
 /**
