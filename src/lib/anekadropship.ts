@@ -372,7 +372,13 @@ export class AnekaClient {
   async ensureLoggedIn() {
     if (this.loggedIn && this.cookie) return;
     const email = process.env.ANEKA_EMAIL;
-    const password = process.env.ANEKA_PASSWORD;
+    // Password di .env.local disimpan sebagai base64 (ANEKA_PASSWORD_B64):
+    // loader env dev (Turbopack) meng-expand '$' berlapis, sehingga password
+    // literal ber-'$' rusak (mis. "@$xxx" → "@"). Format base64 bebas '$'.
+    const b64 = process.env.ANEKA_PASSWORD_B64;
+    const password = b64
+      ? Buffer.from(b64, "base64").toString("utf8")
+      : process.env.ANEKA_PASSWORD;
     if (!email || !password) {
       throw new Error("ANEKA_EMAIL / ANEKA_PASSWORD env vars are not set");
     }

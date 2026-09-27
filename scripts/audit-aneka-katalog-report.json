@@ -1,12 +1,12 @@
 {
-  "generatedAt": "2026-09-23T07:51:55.603Z",
+  "generatedAt": "2026-09-27T13:16:55.851Z",
   "pass": true,
   "counts": {
-    "cache": 707,
-    "main": 412,
-    "sorted": 412,
+    "cache": 752,
+    "main": 457,
+    "sorted": 457,
     "malaysia": 295,
-    "terbaru": 13
+    "terbaru": 54
   },
   "stokZeroCards": [],
   "candidates": [],
