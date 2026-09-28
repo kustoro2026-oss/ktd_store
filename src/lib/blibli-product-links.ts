@@ -1,6 +1,6 @@
 // Pemetaan nama produk -> link produk Blibli.
 // Sumber data: blibli-products.json (hasil scrape Blibli Seller Center, API
-// filterProductSkus — 612 produk aktif; dibuat oleh scripts/build-blibli-products.cjs).
+// filterProductSkus — 680 produk aktif; dibuat oleh scripts/build-blibli-products.cjs).
 // Semua URL memakai format kanonik https://www.blibli.com/p/<slug>/ps--<SKU> —
 // format lama productDetailPageLink (…-KTS.70007.xxxxx.html) membuat aplikasi
 // Blibli terbuka tanpa menampilkan produk saat link di-tap dari HP.
@@ -63,6 +63,12 @@ const ALIASES: Record<string, string> = {
   // [2174]: idem untuk varian "Booster Tanaman Buah".
   "pupuk booster tanaman buah 250 gram perangsang bunga buah lebat":
     "https://www.blibli.com/p/pupuk-booster-tanaman-buah-250-gram-booster-bunga-buah-lebat/ps--KTS-70007-00729",
+  // [2142]: "Lampu Kipas LED" di katalog -> listing "Lampu Kipas Putih LED ... Fitting".
+  "lampu kipas led 2 in 1 e27 50w kipas plafon mini multifungsi 360 dengan remote control 3 mode cahaya":
+    "https://www.blibli.com/p/lampu-kipas-putih-led-2-in-1-fitting-e27-50w-kipas-plafon-mini-multifungsi-360-dengan-remote-control-3-mode-cahaya/ps--KTS-70007-00785",
+  // [1639]: "AL K | ..." di katalog -> listing menulis "ALK | ...".
+  "al k penghilang bau amoniak kandang 1 liter cairan pengurang bau untuk kandang ayam sapi kambing bebek dan ternak":
+    "https://www.blibli.com/p/alk-penghilang-bau-amoniak-kandang-1-liter-cairan-pengurang-bau-untuk-kandang-ayam-sapi-kambing-bebek-dan-ternak/ps--KTS-70007-00735",
 };
 
 /**
