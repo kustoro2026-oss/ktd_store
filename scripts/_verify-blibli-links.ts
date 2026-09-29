@@ -1,5 +1,7 @@
 // Verifikasi cakupan link Blibli terhadap SELURUH katalog statis
 // (src/lib/products-cache.json — nama yang dipakai situs di daftar, detail, keranjang).
+// Bagian dari alur resync Blibli: scrape Seller Center -> build-blibli-products.cjs
+// -> build -> verifikasi ini -> triage unmatched (antrean revisi / alias / belum upload).
 // Jalankan: npx --yes tsx scripts/_verify-blibli-links.ts
 import { getBlibliProductLink } from "../src/lib/blibli-product-links";
 import productsCache from "../src/lib/products-cache.json";
