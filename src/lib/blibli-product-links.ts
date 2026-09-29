@@ -1,6 +1,6 @@
 // Pemetaan nama produk -> link produk Blibli.
 // Sumber data: blibli-products.json (hasil scrape Blibli Seller Center, API
-// filterProductSkus — 680 produk aktif; dibuat oleh scripts/build-blibli-products.cjs).
+// filterProductSkus — 752 produk aktif per 29 Sep 2026; dibuat oleh scripts/build-blibli-products.cjs).
 // Semua URL memakai format kanonik https://www.blibli.com/p/<slug>/ps--<SKU> —
 // format lama productDetailPageLink (…-KTS.70007.xxxxx.html) membuat aplikasi
 // Blibli terbuka tanpa menampilkan produk saat link di-tap dari HP.
@@ -69,6 +69,9 @@ const ALIASES: Record<string, string> = {
   // [1639]: "AL K | ..." di katalog -> listing menulis "ALK | ...".
   "al k penghilang bau amoniak kandang 1 liter cairan pengurang bau untuk kandang ayam sapi kambing bebek dan ternak":
     "https://www.blibli.com/p/alk-penghilang-bau-amoniak-kandang-1-liter-cairan-pengurang-bau-untuk-kandang-ayam-sapi-kambing-bebek-dan-ternak/ps--KTS-70007-00735",
+  // [2123]: katalog memakai kata "Racun" -> listing Blibli disanitasi jadi "Perisa".
+  "essen strike racun 60 ml perisa umpan galatama harian dan lomba":
+    "https://www.blibli.com/p/essen-strike-60-ml-perisa-umpan-galatama-harian-dan-lomba/ps--KTS-70007-00893",
 };
 
 /**
