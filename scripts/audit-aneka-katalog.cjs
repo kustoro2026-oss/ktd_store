@@ -176,7 +176,16 @@ async function searchIds(query) {
     const cachePath = path.join(ROOT, "src", "lib", "products-cache.json");
     const cache = JSON.parse(fs.readFileSync(cachePath, "utf8"));
     const cacheProducts = cache.products ?? [];
-    console.log(`Cache: ${cacheProducts.length} produk (generatedAt ${cache.generatedAt})`);
+
+    // Produk manual (scripts/manual-products.json): sengaja tampil tanpa listing
+    // aneka (disembunyikan seller). Dikecualikan dari pemeriksaan listing/search,
+    // tapi tetap ikut sapu detail (--details) supaya produk mati terdeteksi.
+    const manualPath = path.join(__dirname, "manual-products.json");
+    const manualIds = fs.existsSync(manualPath)
+        ? new Set((JSON.parse(fs.readFileSync(manualPath, "utf8")).products ?? []).map((p) => String(p.id)))
+        : new Set();
+
+    console.log(`Cache: ${cacheProducts.length} produk (generatedAt ${cache.generatedAt}) + manual: ${manualIds.size}`);
 
     await login();
 
@@ -197,7 +206,7 @@ async function searchIds(query) {
 
     // --- 1. Produk cache yang tidak tampil di listing manapun ---
     const cacheIds = cacheProducts.map((p) => String(p.id));
-    let candidates = cacheProducts.filter((p) => !listingAll.has(String(p.id)));
+    let candidates = cacheProducts.filter((p) => !listingAll.has(String(p.id)) && !manualIds.has(String(p.id)));
     console.log(`\nProduk cache tidak tampil di listing manapun: ${candidates.length}`);
     const candidateResults = [];
     let ci = 0;
@@ -249,6 +258,7 @@ async function searchIds(query) {
 
     console.log("\n================ RINGKASAN AUDIT ================");
     console.log(`Cache              : ${cacheIds.length} produk`);
+    console.log(`Manual (luar listing): ${manualIds.size}${manualIds.size ? ` (${[...manualIds].join(",")})` : ""}`);
     console.log(`Listing live       : main=${main.seen.size} sorted=${sorted.seen.size} malaysia=${malaysia.seen.size} terbaru=${terbaru.seen.size}`);
     console.log(`Kartu stok-0 tampil: ${stokZeroCards.length}${stokZeroCards.length ? ` (${stokZeroCards.slice(0, 10).join(",")})` : ""}`);
     console.log(`Cache TIDAK tampil : ${candidates.length} (tidak ketemu via search: ${fullyHidden.length})`);
@@ -261,6 +271,7 @@ async function searchIds(query) {
     fs.writeFileSync(OUT_PATH, JSON.stringify({
         generatedAt: new Date().toISOString(),
         pass,
+        manualIds: [...manualIds],
         counts: {
             cache: cacheIds.length,
             main: main.seen.size,

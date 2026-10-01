@@ -14223,6 +14223,29 @@
       "stok": "50",
       "profit": "Profit +81%",
       "category": "malaysia"
+    },
+    {
+      "id": "544",
+      "name": "Alfa Tox 100 ml - Obat Kutu Ternak - Pembasmi Larva Lalat Gurem Kutu Ampuh 100 ml",
+      "image": "/images/products/544-0.jpg",
+      "location": "Tangerang Selatan",
+      "rekomendasiJual": "Rp 50.000",
+      "hargaModal": "Rp38.700",
+      "hargaModalCut": "Rp43.000",
+      "terjual": "2",
+      "stok": "993",
+      "profit": "Profit +16%",
+      "category": "",
+      "beratGram": 110,
+      "berat": "110.00 Gram",
+      "alamatSeller": "Jl. Vinca IV G7 No.10, Rw. Buntu, Kec. Serpong, Kota Tangerang Selatan, Banten 15310",
+      "ekspedisi": "Anteraja, ID Express, SPX",
+      "ekspedisiList": [
+        "Anteraja",
+        "ID Express",
+        "SPX"
+      ],
+      "volume": "4 x 4 x 10.5 CM"
     }
   ]
 }

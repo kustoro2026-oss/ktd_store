@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-09-27T13:12:33.970Z",
-  "scanned": 752,
-  "withVariants": 483,
-  "totalVariants": 4523,
+  "generatedAt": "2026-10-01T12:24:24.198Z",
+  "scanned": 753,
+  "withVariants": 484,
+  "totalVariants": 4524,
   "products": {
     "9": {
       "hasVariants": true,
@@ -3957,6 +3957,19 @@
           "color": null,
           "size": "120 ml",
           "stock": 999,
+          "isActive": true
+        }
+      ]
+    },
+    "544": {
+      "hasVariants": true,
+      "variants": [
+        {
+          "id": "30417",
+          "name": "Alfa Tox Obat Kutu Ternak / 100",
+          "color": null,
+          "size": "100",
+          "stock": 993,
           "isActive": true
         }
       ]
