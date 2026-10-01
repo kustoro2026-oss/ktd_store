@@ -17,11 +17,17 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as zlib from "node:zlib";
+import { isWaOnlyProduct } from "../src/lib/config";
 
 const ROOT = process.cwd();
 const RAW_DIR = path.join(ROOT, "tiktok-template", "raw");
 const OUT_DIR = path.join(ROOT, "tiktok-upload");
-const TOP100 = JSON.parse(fs.readFileSync(path.join(ROOT, "tiktok-export", "top100.json"), "utf8")) as any[];
+const TOP100_ALL = JSON.parse(fs.readFileSync(path.join(ROOT, "tiktok-export", "top100.json"), "utf8")) as any[];
+// Parfum WA-only (terblokir HKI) tidak boleh masuk file upload marketplace.
+const TOP100 = TOP100_ALL.filter((p) => !isWaOnlyProduct(p.name));
+if (TOP100.length !== TOP100_ALL.length) {
+  console.log(`(dibuang) ${TOP100_ALL.length - TOP100.length} parfum WA-only/terblokir agar tidak ikut upload`);
+}
 
 const TPL_NAMES: Record<string, string> = {
   t1: "Kesehatan", t2: "Pakaian Anak", t3: "Alat & Perangkat Keras",

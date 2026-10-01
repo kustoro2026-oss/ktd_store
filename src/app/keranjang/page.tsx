@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ShoppingCart, Trash2 } from "lucide-react";
 import { useCart, type CartItem } from "@/lib/cart";
-import { marketplaces } from "@/lib/config";
+import { marketplaces, isWaOnlyProduct } from "@/lib/config";
 import { getBlibliProductLink } from "@/lib/blibli-product-links";
 import { getTikTokProductLink } from "@/lib/tiktok-product-links";
 import { getLazadaProductLink } from "@/lib/lazada-product-links";
@@ -118,6 +118,7 @@ export default function CartPage() {
                       WhatsApp
                     </button>
                     {item.marketplace !== "evermos" &&
+                      !isWaOnlyProduct(item.name) &&
                       marketplaces.map((m) => (
                         <button
                           key={m.key}

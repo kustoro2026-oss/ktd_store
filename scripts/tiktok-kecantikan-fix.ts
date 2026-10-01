@@ -24,6 +24,7 @@
  */
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { isWaOnlyProduct } from "../src/lib/config";
 import * as XLSXNS from "xlsx";
 const XLSX: any = (XLSXNS as any).default ?? XLSXNS;
 
@@ -120,6 +121,7 @@ for (const k of Object.keys(ws)) {
 const rows: any[][] = [];
 let skipped = 0;
 let excluded = 0;
+let blockedWa = 0;
 
 for (let r = 5; r <= maxR; r++) {
   const nama = String(get(r, 2) ?? "").trim();
@@ -127,6 +129,11 @@ for (let r = 5; r <= maxR; r++) {
   const kat = katRaw.replace(/\s*\(\d+\)\s*$/, "").trim();
   if (!nama) { skipped++; console.log(`Baris ${r + 1} dilewati (kosong: ${kat.slice(0, 40)})`); continue; }
   if (nama.includes("Dress Malam")) { skipped++; console.log(`Baris ${r + 1} dilewati (contoh template)`); continue; }
+  if (isWaOnlyProduct(nama)) {
+    blockedWa++;
+    console.log(`Baris ${r + 1} DIKELUARKAN (parfum WA-only/terblokir HKI): ${nama.slice(0, 50)}`);
+    continue;
+  }
   if (BPOM_REQUIRED.some((k) => kat.endsWith(k))) {
     excluded++;
     console.log(`Baris ${r + 1} DIKELUARKAN (wajib BPOM): ${nama.slice(0, 50)}`);
@@ -199,7 +206,7 @@ XLSX.writeFile(wb, OUT);
 const wb2 = XLSX.readFile(OUT);
 const t = XLSX.utils.sheet_to_json(wb2.Sheets["Template"], { header: 1, defval: "" });
 console.log("\nSignature A1:", JSON.stringify(wb2.Sheets["Template"]["A1"]?.v), "| A2:", JSON.stringify(wb2.Sheets["Template"]["A2"]?.v));
-console.log("Baris total Template:", t.length, "| dilewati:", skipped, "| dikeluarkan (BPOM):", excluded, "| produk ditulis:", rows.length);
+console.log("Baris total Template:", t.length, "| dilewati:", skipped, "| dikeluarkan (BPOM):", excluded, "| dikeluarkan (WA-only):", blockedWa, "| produk ditulis:", rows.length);
 let wsrvCount = 0;
 for (let r = 5; r < t.length; r++) {
   const row = t[r];

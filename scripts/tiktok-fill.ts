@@ -16,6 +16,7 @@
  */
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { isWaOnlyProduct } from "../src/lib/config";
 // xlsx adalah package CJS; di bawah ESM, named export hasil deteksi
 // cjs-module-lexer tidak lengkap (readFile hilang). Ambil .default bila ada.
 import * as XLSXNS from "xlsx";
@@ -191,7 +192,12 @@ function main() {
     console.error("products.json belum ada. Jalankan dulu: node scripts/tiktok-collect.ts");
     process.exit(1);
   }
-  const products = JSON.parse(fs.readFileSync(PRODUCTS_FILE, "utf8")) as Product[];
+  const allProducts = JSON.parse(fs.readFileSync(PRODUCTS_FILE, "utf8")) as Product[];
+  // Parfum WA-only (terblokir HKI) tidak boleh masuk file upload marketplace.
+  const products = allProducts.filter((p) => !isWaOnlyProduct(p.name));
+  if (products.length !== allProducts.length) {
+    console.log(`(dibuang) ${allProducts.length - products.length} parfum WA-only/terblokir agar tidak ikut upload`);
+  }
 
   // Template: file .xlsx pertama di folder tiktok-template/
   const templates = fs

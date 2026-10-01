@@ -4,6 +4,7 @@
 // dipakai untuk tombol marketplace "TikTok Shop" di halaman produk & keranjang.
 
 import tokopediaProducts from "../../tokopedia-products.json";
+import { isWaOnlyProduct } from "./config";
 
 type TokopediaProductEntry = {
   id: string;
@@ -73,6 +74,9 @@ const ALIASES: Record<string, string> = {
  * lainnya (min. 2 kata) -> tidak ditemukan (null).
  */
 export function getTikTokProductLink(name: string): string | null {
+  // Produk WA-only (ditolak Blibli / indikasi merek): jangan pernah dilink.
+  if (isWaOnlyProduct(name)) return null;
+
   const key = normalize(name);
   if (!key) return null;
 

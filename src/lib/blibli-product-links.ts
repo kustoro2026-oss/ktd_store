@@ -7,6 +7,7 @@
 // Dipakai untuk tombol marketplace "Blibli" di halaman produk & keranjang.
 
 import blibliProducts from "../../blibli-products.json";
+import { isWaOnlyProduct } from "./config";
 
 type BlibliProductEntry = {
   id: string;
@@ -80,6 +81,9 @@ const ALIASES: Record<string, string> = {
  * (prefix) nama lainnya (min. 2 kata) -> tidak ditemukan (null).
  */
 export function getBlibliProductLink(name: string): string | null {
+  // Produk WA-only (ditolak Blibli / indikasi merek): jangan pernah dilink.
+  if (isWaOnlyProduct(name)) return null;
+
   const key = normalize(name);
   if (!key) return null;
 

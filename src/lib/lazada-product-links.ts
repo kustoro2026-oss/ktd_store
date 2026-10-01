@@ -3,6 +3,7 @@
 // Dipakai untuk tombol marketplace "Lazada" di halaman produk & keranjang.
 
 import lazadaProducts from "../../lazada-products.json";
+import { isWaOnlyProduct } from "./config";
 
 type LazadaProductEntry = {
     name: string;
@@ -45,6 +46,9 @@ const ALIASES: Record<string, string> = {
  * lainnya (min. 2 kata) -> tidak ditemukan (null).
  */
 export function getLazadaProductLink(name: string): string | null {
+    // Produk WA-only (ditolak Blibli / indikasi merek): jangan pernah dilink.
+    if (isWaOnlyProduct(name)) return null;
+
     const key = normalize(name);
     if (!key) return null;
 

@@ -5,6 +5,7 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { isWaOnlyProduct } from "../src/lib/config";
 
 const root = process.cwd();
 const products: any[] = JSON.parse(
@@ -245,6 +246,8 @@ const distByLeaf: Record<string, number> = {};
 const errors: string[] = [];
 
 for (const p of products) {
+  // Parfum WA-only (terblokir HKI) tidak boleh dipetakan untuk upload marketplace.
+  if (isWaOnlyProduct(p.name)) continue;
   let m;
   try {
     m = mapProduct(p);

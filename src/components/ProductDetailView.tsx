@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Boxes, MessageCircle, Package, Percent, Share2, ShoppingBag, Tag } from "lucide-react";
-import { marketplaces } from "@/lib/config";
+import { marketplaces, isWaOnlyProduct } from "@/lib/config";
 import { getBlibliProductLink } from "@/lib/blibli-product-links";
 import { getTikTokProductLink } from "@/lib/tiktok-product-links";
 import { getLazadaProductLink } from "@/lib/lazada-product-links";
@@ -110,6 +110,10 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
   /** Produk katalog tambahan Evermos (EVM-): tanpa tautan keluar, pemesanan via
    *  WhatsApp; badge huruf "E" menandai asal produk. */
   const isEvermos = detail.marketplace === "evermos";
+
+  /** Parfum WA-only (ditolak Blibli / indikasi merek): tombol marketplace
+   *  disembunyikan, pemesanan hanya via WhatsApp. */
+  const waOnly = isWaOnlyProduct(detail.name);
 
   /** Buka link marketplace; Blibli, TikTok Shop & Lazada pakai link produk dari data JSON. */
   const openMarketplace = (label: string, key: string) => {
@@ -430,8 +434,9 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
             </p>
           </div>
 
-          {/* Order via marketplace — produk Evermos tanpa tautan keluar (via WhatsApp) */}
-          {!isEvermos && (
+          {/* Order via marketplace — produk Evermos & parfum WA-only tanpa
+              tautan keluar (via WhatsApp) */}
+          {!isEvermos && !waOnly && (
             <div className="mt-6">
               <p className="mb-3 text-sm font-bold text-ink">Beli di marketplace resmi:</p>
               {missingMp && (
@@ -521,6 +526,7 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
               WA
             </button>
             {!isEvermos &&
+              !waOnly &&
               marketplaces.map((m) => (
                 <button
                   key={m.key}

@@ -8,8 +8,14 @@
 */
 const fs = require('fs');
 const XLSX = require('xlsx');
+const { isWaOnlyName } = require('./wa-only-blocks.cjs');
 
-const products = JSON.parse(fs.readFileSync('tiktok-upload/lazada-cengkareng.json', 'utf8'));
+const rawProducts = JSON.parse(fs.readFileSync('tiktok-upload/lazada-cengkareng.json', 'utf8'));
+// Parfum WA-only (terblokir HKI) tidak boleh ikut file upload marketplace mana pun.
+const products = rawProducts.filter((p) => !isWaOnlyName(p.name));
+if (products.length !== rawProducts.length) {
+  console.log(`(dibuang) ${rawProducts.length - products.length} parfum WA-only/terblokir dari sumber`);
+}
 
 // catId -> [catId, ENGLISH category path]  (verified against template_hide dropdown 2026-09-12)
 const CAT = {
