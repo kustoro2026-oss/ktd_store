@@ -23,6 +23,170 @@
         "SPX"
       ],
       "volume": "4 x 4 x 10.5 CM"
+    },
+    {
+      "id": "528",
+      "name": "Lincospec 10 ml - Obat Sakit Ayam - Lincospec 200 10 ml - Obat Sakit Ayam 10 ml",
+      "image": "/images/products/528-0.jpg",
+      "location": "Tangerang Selatan",
+      "rekomendasiJual": "Rp 50.000",
+      "hargaModal": "Rp25.200",
+      "hargaModalCut": "Rp28.000",
+      "terjual": "",
+      "stok": "999",
+      "profit": "Profit +79%",
+      "category": "",
+      "beratGram": 30,
+      "berat": "30.00 Gram",
+      "alamatSeller": "Jl. Vinca IV G7 No.10, Rw. Buntu, Kec. Serpong, Kota Tangerang Selatan, Banten 15310",
+      "ekspedisi": "Anteraja, ID Express, SPX",
+      "ekspedisiList": [
+        "Anteraja",
+        "ID Express",
+        "SPX"
+      ],
+      "volume": "2.4 × 2.4 × 6 cm CM"
+    },
+    {
+      "id": "529",
+      "name": "TERRAMYCIN PLUS 10 ml - Obat Ayam Pasca Bertarung - Obat Ayam Yang Terkena Jalu - Obat CRD Ngorok Ayam - Obat Ayam Berak Kapur",
+      "image": "/images/products/529-0.jpeg",
+      "location": "Tangerang Selatan",
+      "rekomendasiJual": "Rp 30.000",
+      "hargaModal": "Rp24.300",
+      "hargaModalCut": "Rp27.000",
+      "terjual": "",
+      "stok": "999",
+      "profit": "Profit +11%",
+      "category": "",
+      "beratGram": 30,
+      "berat": "30.00 Gram",
+      "alamatSeller": "Jl. Vinca IV G7 No.10, Rw. Buntu, Kec. Serpong, Kota Tangerang Selatan, Banten 15310",
+      "ekspedisi": "Anteraja, ID Express, SPX",
+      "ekspedisiList": [
+        "Anteraja",
+        "ID Express",
+        "SPX"
+      ],
+      "volume": "2.4 × 2.4 × 6 cm CM"
+    },
+    {
+      "id": "530",
+      "name": "Desinfektan Kandang 1 Liter - Destan Plus 1 L - Desinfektan BKC 10% Aroma Segar - Desinfektan",
+      "image": "/images/products/530-0.jpg",
+      "location": "Tangerang Selatan",
+      "rekomendasiJual": "Rp 57.000",
+      "hargaModal": "Rp37.800",
+      "hargaModalCut": "Rp42.000",
+      "terjual": "46",
+      "stok": "991",
+      "profit": "Profit +36%",
+      "category": "",
+      "beratGram": 1300,
+      "berat": "1300.00 Gram",
+      "alamatSeller": "Jl. Vinca IV G7 No.10, Rw. Buntu, Kec. Serpong, Kota Tangerang Selatan, Banten 15310",
+      "ekspedisi": "Anteraja, ID Express, SPX",
+      "ekspedisiList": [
+        "Anteraja",
+        "ID Express",
+        "SPX"
+      ],
+      "volume": "12 × 6 × 20 cm CM"
+    },
+    {
+      "id": "543",
+      "name": "Delta Plus 55 EC 100ml Cairan Pembasmi Kutu Caplak Tungau untuk Anjing Kucing Kandang dan Lingkungan Hewan",
+      "image": "/images/products/543-0.jpg",
+      "location": "Tangerang Selatan",
+      "rekomendasiJual": "Rp 48.000",
+      "hargaModal": "Rp38.700",
+      "hargaModalCut": "Rp43.000",
+      "terjual": "1",
+      "stok": "999",
+      "profit": "Profit +12%",
+      "category": "",
+      "beratGram": 110,
+      "berat": "110.00 Gram",
+      "alamatSeller": "Jl. Vinca IV G7 No.10, Rw. Buntu, Kec. Serpong, Kota Tangerang Selatan, Banten 15310",
+      "ekspedisi": "Anteraja, ID Express, SPX",
+      "ekspedisiList": [
+        "Anteraja",
+        "ID Express",
+        "SPX"
+      ],
+      "volume": "4.5 x 4.5 x 10 cm CM"
+    },
+    {
+      "id": "557",
+      "name": "100 gram ENROFLOXS 25 Enrofloxacin HCl Antibiotik Ikan dan Udang - ENROFLOXS Obat Antibiotik",
+      "image": "/images/products/557-0.jpeg",
+      "location": "Tangerang Selatan",
+      "rekomendasiJual": "Rp 43.000",
+      "hargaModal": "",
+      "hargaModalCut": "",
+      "terjual": "",
+      "stok": "9999",
+      "profit": "",
+      "category": "",
+      "beratGram": 110,
+      "berat": "110.00 Gram",
+      "alamatSeller": "Jl. Vinca IV G7 No.10, Rw. Buntu, Kec. Serpong, Kota Tangerang Selatan, Banten 15310",
+      "ekspedisi": "Anteraja, ID Express, SPX",
+      "ekspedisiList": [
+        "Anteraja",
+        "ID Express",
+        "SPX"
+      ],
+      "volume": "14 × 20 × 1 cm CM"
+    },
+    {
+      "id": "1640",
+      "name": "Radoc 500 Ec Cairan Pengusir Tikus Burung dan Hama Sawah untuk Tanaman Padi Area Pertanian",
+      "image": "/images/products/1640-0.png",
+      "location": "Sukoharjo",
+      "rekomendasiJual": "Rp 28.000",
+      "hargaModal": "Rp18.000",
+      "hargaModalCut": "Rp20.000",
+      "terjual": "2",
+      "stok": "298",
+      "profit": "Profit +40%",
+      "category": "",
+      "beratGram": 110,
+      "berat": "110.00 Gram",
+      "alamatSeller": "Kauman, RT 1/RW 7, Karanganyar, Weru, Sukoharjo, Jawa Tengah 57562",
+      "ekspedisi": "JNE, JNT, Anteraja, SAP, SPX",
+      "ekspedisiList": [
+        "JNE",
+        "JNT",
+        "Anteraja",
+        "SAP",
+        "SPX"
+      ],
+      "volume": "5 x 5 x 10 CM"
+    },
+    {
+      "id": "2231",
+      "name": "Kabel Charger Silicone 65W Type-C to Type-C 1M C939",
+      "image": "/images/products/2231-0.webp",
+      "location": "Jakarta Timur",
+      "rekomendasiJual": "Rp 50.000",
+      "hargaModal": "Rp27.900",
+      "hargaModalCut": "Rp31.000",
+      "terjual": "1,3rb",
+      "stok": "100",
+      "profit": "Profit +61%",
+      "category": "",
+      "beratGram": 50,
+      "berat": "50.00 Gram",
+      "alamatSeller": "Gudang FAS - Cawang Kramat Jati Jl. Dewi Sartika No.184 Cawang, Kramat Jati Jakarta Timur, 13630",
+      "ekspedisi": "JNE, JNT, SiCepat, SPX",
+      "ekspedisiList": [
+        "JNE",
+        "JNT",
+        "SiCepat",
+        "SPX"
+      ],
+      "volume": "1x1x1 CM"
     }
   ]
 }

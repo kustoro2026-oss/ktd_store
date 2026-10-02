@@ -1,12 +1,22 @@
 {
-  "generatedAt": "2026-09-27T13:16:55.851Z",
+  "generatedAt": "2026-10-02T00:59:37.829Z",
   "pass": true,
+  "manualIds": [
+    "544",
+    "528",
+    "529",
+    "530",
+    "543",
+    "557",
+    "1640",
+    "2231"
+  ],
   "counts": {
-    "cache": 752,
-    "main": 457,
-    "sorted": 457,
+    "cache": 766,
+    "main": 463,
+    "sorted": 463,
     "malaysia": 295,
-    "terbaru": 54
+    "terbaru": 60
   },
   "stokZeroCards": [],
   "candidates": [],

@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-10-01T12:24:24.198Z",
-  "scanned": 753,
-  "withVariants": 484,
-  "totalVariants": 4524,
+  "generatedAt": "2026-10-01T22:57:44.616Z",
+  "scanned": 766,
+  "withVariants": 490,
+  "totalVariants": 4533,
   "products": {
     "9": {
       "hasVariants": true,
@@ -3850,6 +3850,45 @@
       "hasVariants": false,
       "variants": []
     },
+    "528": {
+      "hasVariants": true,
+      "variants": [
+        {
+          "id": "30414",
+          "name": "Lincospec / 10 ml",
+          "color": null,
+          "size": "10 ml",
+          "stock": 999,
+          "isActive": true
+        }
+      ]
+    },
+    "529": {
+      "hasVariants": true,
+      "variants": [
+        {
+          "id": "25593",
+          "name": "TERRAMYCIN PLUS / 10 ml",
+          "color": null,
+          "size": "10 ml",
+          "stock": 999,
+          "isActive": true
+        }
+      ]
+    },
+    "530": {
+      "hasVariants": true,
+      "variants": [
+        {
+          "id": "30411",
+          "name": "Desinfektan Kandang / 1 Liter",
+          "color": null,
+          "size": "1 Liter",
+          "stock": 991,
+          "isActive": true
+        }
+      ]
+    },
     "531": {
       "hasVariants": true,
       "variants": [
@@ -3961,6 +4000,19 @@
         }
       ]
     },
+    "543": {
+      "hasVariants": true,
+      "variants": [
+        {
+          "id": "30405",
+          "name": "Dalmat Plus 55 EC / 100",
+          "color": null,
+          "size": "100",
+          "stock": 999,
+          "isActive": true
+        }
+      ]
+    },
     "544": {
       "hasVariants": true,
       "variants": [
@@ -4040,6 +4092,10 @@
           "isActive": true
         }
       ]
+    },
+    "557": {
+      "hasVariants": false,
+      "variants": []
     },
     "619": {
       "hasVariants": true,
@@ -33722,6 +33778,35 @@
         }
       ]
     },
+    "1640": {
+      "hasVariants": true,
+      "variants": [
+        {
+          "id": "44422",
+          "name": "RADOC 100 ML / 100 ml",
+          "color": null,
+          "size": "100 ml",
+          "stock": 298,
+          "isActive": true
+        },
+        {
+          "id": "44423",
+          "name": "RADOC 250 ML / 250 ml",
+          "color": null,
+          "size": "250 ml",
+          "stock": 299,
+          "isActive": true
+        },
+        {
+          "id": "44424",
+          "name": "RADOC 500 ML / 500 ml",
+          "color": null,
+          "size": "500 ml",
+          "stock": 299,
+          "isActive": true
+        }
+      ]
+    },
     "1641": {
       "hasVariants": true,
       "variants": [
@@ -39065,6 +39150,27 @@
       "hasVariants": false,
       "variants": []
     },
+    "2231": {
+      "hasVariants": true,
+      "variants": [
+        {
+          "id": "44642",
+          "name": "Warna / Putih",
+          "color": "Putih",
+          "size": null,
+          "stock": 100,
+          "isActive": true
+        },
+        {
+          "id": "44643",
+          "name": "Warna / Hitam",
+          "color": "Hitam",
+          "size": null,
+          "stock": 100,
+          "isActive": true
+        }
+      ]
+    },
     "2232": {
       "hasVariants": true,
       "variants": [
@@ -39689,6 +39795,30 @@
       "variants": []
     },
     "2312": {
+      "hasVariants": false,
+      "variants": []
+    },
+    "2313": {
+      "hasVariants": false,
+      "variants": []
+    },
+    "2314": {
+      "hasVariants": false,
+      "variants": []
+    },
+    "2315": {
+      "hasVariants": false,
+      "variants": []
+    },
+    "2316": {
+      "hasVariants": false,
+      "variants": []
+    },
+    "2317": {
+      "hasVariants": false,
+      "variants": []
+    },
+    "2318": {
       "hasVariants": false,
       "variants": []
     }
