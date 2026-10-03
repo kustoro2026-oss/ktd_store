@@ -45,6 +45,7 @@ export default function Footer() {
         <Link href="/tips" className="transition-colors hover:text-brand">Blog</Link>
         <Link href="/bantuan" className="transition-colors hover:text-brand">Bantuan</Link>
         <Link href="/syarat-ketentuan" className="transition-colors hover:text-brand">Syarat & Ketentuan</Link>
+        <Link href="/kebijakan-privasi" className="transition-colors hover:text-brand">Kebijakan Privasi</Link>
       </div>
 
       <div className="bg-gray-50/70">
