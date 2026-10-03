@@ -67,12 +67,18 @@ function isOrderMessage(text: string): boolean {
   const t = text.toLowerCase();
   // Format pre-filled dari tombol Order via WhatsApp di situs.
   if (/saya ingin memesan produk|data penerima|nama produk:/.test(t)) return true;
-  // Alamat gaya Indonesia: RT/RW + nomor.
-  if (/\brt\s*[./:]\s*\d|\brw\s*[./:]\s*\d/.test(t)) return true;
-  // Kata kunci wilayah administratif.
-  if (/\b(kecamatan|kelurahan|kabupaten|provinsi|kode pos)\b/.test(t)) return true;
-  // Kode pos 5 digit + kata "alamat".
+  // Alamat gaya Indonesia: RT/RW + nomor (dengan atau tanpa pemisah).
+  if (/\brt[\s.,:/_-]*\d|\brw[\s.,:/_-]*\d/.test(t)) return true;
+  // Kata kunci wilayah administratif, termasuk singkatan umum
+  // (kec./kab./prov./desa/kodepos) — hindari kata niaga seperti "pesan".
+  if (
+    /\b(kecamatan|kelurahan|kabupaten|provinsi|kode\s*pos|kodepos|desa|kec|kab|kel|prov)\b/.test(t) ||
+    /\b(kec|kab|kel|prov)\./.test(t)
+  )
+    return true;
+  // Kode pos 5 digit + kata "alamat", atau nama + alamat disebut bersama.
   if (/\b\d{5}\b/.test(t) && /\balamat\b/.test(t)) return true;
+  if (/\bnama\b/.test(t) && /\balamat\b/.test(t)) return true;
   return false;
 }
 
