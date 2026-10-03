@@ -72,3 +72,7 @@ next-env.d.ts
 
 # skrip debug one-off (hanya skrip pipeline stabil yang di-commit)
 /scripts/_*
+
+# dashboard KTD Hub (repo terpisah)
+/ktd-hub/
+
