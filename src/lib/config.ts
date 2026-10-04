@@ -103,10 +103,10 @@ export const SITE_URL = resolveSiteUrl().replace(/\/+$/, "");
 //
 // Products can also be ordered directly via WhatsApp. The destination number is
 // the store owner's number (set it in .env.local as NEXT_PUBLIC_WHATSAPP_NUMBER,
-// digits only with country code, e.g. 6285171157938).
+// digits only with country code, e.g. 6282173427249).
 
 export const WHATSAPP_NUMBER =
-  process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "6285171157938";
+  process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "6282173427249";
 
 /** Build a wa.me deep link with a pre-filled message. */
 export function whatsappLink(message: string): string {
