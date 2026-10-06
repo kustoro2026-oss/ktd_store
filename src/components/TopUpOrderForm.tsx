@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, Send, Zap } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { CheckCircle2, Loader2, Send, Zap } from "lucide-react";
 import {
   TOPUP_CATEGORIES,
   TOPUP_PRODUCTS,
@@ -14,7 +15,18 @@ import { BANK_ACCOUNTS, whatsappLink } from "@/lib/config";
 /** Daftar produk untuk satu kategori tampilan. */
 const productsFor = (cat: TopUpCategory) => TOPUP_PRODUCTS.filter((p) => p.category === cat);
 
+type OrderResponse = {
+  ok?: boolean;
+  error?: string;
+  orderId?: string;
+  mode?: "ipaymu" | "wa";
+  paymentUrl?: string;
+  waLink?: string;
+  gatewayError?: string;
+};
+
 export default function TopUpOrderForm() {
+  const router = useRouter();
   const [category, setCategory] = useState<TopUpCategory>(TOPUP_CATEGORIES[0].id);
   const [product, setProduct] = useState<TopUpProduct | null>(null);
   const [name, setName] = useState("");
@@ -23,26 +35,26 @@ export default function TopUpOrderForm() {
   const [server, setServer] = useState("");
   const [error, setError] = useState("");
   const [sent, setSent] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   const bank = BANK_ACCOUNTS[0];
   // Nomor pelanggan (K-Vision) dibiarkan teks bebas; lainnya angka saja.
   const targetIsNumeric = product?.customerNoLabel !== "Nomor Pelanggan";
 
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    if (!product) {
-      setError("Silakan pilih produk terlebih dahulu.");
-      return;
-    }
-    if (!name.trim() || !target.trim()) {
-      setError(`Mohon lengkapi Nama dan ${product.customerNoLabel}.`);
-      return;
-    }
-    if (product.needsServer && !server.trim()) {
-      setError("Mohon isi Server/Zone untuk produk Mobile Legends.");
-      return;
-    }
+  /** Validasi form — mengembalikan pesan error atau null bila lolos. */
+  const validate = (): string | null => {
+    if (!product) return "Silakan pilih produk terlebih dahulu.";
+    if (!name.trim() || !target.trim())
+      return `Mohon lengkapi Nama dan ${product.customerNoLabel}.`;
+    if (product.needsServer && !server.trim())
+      return "Mohon isi Server/Zone untuk produk Mobile Legends.";
+    return null;
+  };
+
+  /** Jalur manual: buka WhatsApp dengan draf pesanan (transfer bank, CS
+   *  memverifikasi lalu eksekusi dari /topup/admin). */
+  const openWaDraft = () => {
+    if (!product) return;
     const lines = [
       "Halo, saya ingin melakukan top up:",
       "",
@@ -60,18 +72,66 @@ export default function TopUpOrderForm() {
       `Pembayaran akan saya transfer ke rekening ${bank.bank} ${bank.accountNumber} a.n. ${bank.accountName} dan bukti transfer saya lampirkan di chat ini.`,
     );
     window.open(whatsappLink(lines.join("\n")), "_blank", "noopener,noreferrer");
-    setSent(true);
+  };
+
+  /** Alur utama: buat pesanan di server → halaman bayar iPaymu (atau
+   *  fallback WhatsApp bila gateway belum aktif). */
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    const v = validate();
+    if (v) {
+      setError(v);
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await fetch("/api/topup/order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sku: product!.sku,
+          id: target.trim(),
+          server: server.trim(),
+          buyerName: name.trim(),
+          buyerPhone: phone.trim(),
+        }),
+      });
+      const j = (await res.json()) as OrderResponse;
+      if (j.ok && j.mode === "ipaymu" && j.orderId) {
+        router.push(`/topup/bayar/${j.orderId}`);
+        return;
+      }
+      if (j.ok && j.mode === "wa" && j.orderId) {
+        // Gateway belum aktif / sesi gagal — pesanan tetap tercatat, pembeli
+        // lanjut verifikasi manual via WhatsApp.
+        if (j.waLink) window.open(j.waLink, "_blank", "noopener,noreferrer");
+        setSent(true);
+        return;
+      }
+      const messages: Record<string, string> = {
+        sku_tidak_dikenal: "Produk yang dipilih tidak dikenali. Muat ulang halaman lalu coba lagi.",
+        server_wajib: "Mohon isi Server/Zone untuk produk Mobile Legends.",
+        gagal_menyimpan_pesanan: "Pesanan gagal disimpan. Silakan coba beberapa saat lagi.",
+        bad_json: "Permintaan tidak valid. Silakan coba lagi.",
+      };
+      setError(messages[j.error ?? ""] ?? j.error ?? "Terjadi kesalahan. Silakan coba lagi.");
+    } catch {
+      setError("Jaringan bermasalah — periksa koneksi lalu coba lagi.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   if (sent && product) {
     return (
       <div className="flex flex-col items-center gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-8 text-center">
         <CheckCircle2 className="h-12 w-12 text-emerald-500" />
-        <h3 className="text-lg font-bold text-ink">WhatsApp Terbuka</h3>
+        <h3 className="text-lg font-bold text-ink">Pesanan Tercatat — WhatsApp Terbuka</h3>
         <p className="max-w-md text-sm text-muted">
-          Pesanan top up Anda sudah disiapkan di WhatsApp. Kirim pesan tersebut,
-          lampirkan bukti transfer, dan pengisian akan diproses otomatis setelah
-          pembayaran terverifikasi.
+          Pesanan top up Anda sudah tercatat. Lanjutkan pembayaran via WhatsApp
+          yang terbuka: lampirkan bukti transfer dan CS kami akan memverifikasi,
+          lalu pengisian diproses otomatis.
         </p>
         <button
           type="button"
@@ -158,7 +218,7 @@ export default function TopUpOrderForm() {
             type="tel"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            placeholder="08xxxxxxxxxx"
+            placeholder="08xxxxxxxxxx (untuk notifikasi WhatsApp)"
             className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20"
           />
         </div>
@@ -226,26 +286,34 @@ export default function TopUpOrderForm() {
               ID {target} • Server {server}
             </p>
           )}
-          {bank && (
-            <p className="mt-1 text-[11px] text-muted">
-              Transfer ke {bank.bank} {bank.accountNumber} a.n. {bank.accountName}
-            </p>
-          )}
+          <p className="mt-1 text-[11px] text-muted">
+            Bayar via QRIS / Virtual Account — pengisian otomatis setelah pembayaran terverifikasi.
+          </p>
         </div>
         <button
           type="submit"
-          className="flex items-center gap-2 rounded-xl bg-[#25D366] px-5 py-3 text-sm font-bold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-[#1eb85a]"
+          disabled={busy}
+          className="flex items-center gap-2 rounded-xl bg-brand px-5 py-3 text-sm font-bold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-brand-2 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <Send className="h-4 w-4" />
-          Lanjutkan via WhatsApp
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          {busy ? "Membuat Pesanan..." : "Bayar Sekarang"}
         </button>
       </div>
 
-      <p className="flex items-start gap-2 text-xs leading-relaxed text-muted">
-        <Zap className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
-        Pengisian diproses otomatis setelah pembayaran terverifikasi, biasanya dalam
-        beberapa menit. Jika ada kendala, CS kami siap membantu melalui WhatsApp.
-      </p>
+      <div className="flex items-center justify-between gap-2 text-xs text-muted">
+        <p className="flex items-start gap-2 leading-relaxed">
+          <Zap className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
+          Pengisian diproses otomatis setelah pembayaran terverifikasi, biasanya dalam
+          beberapa menit.
+        </p>
+        <button
+          type="button"
+          onClick={openWaDraft}
+          className="shrink-0 font-semibold text-muted-2 underline-offset-2 transition-colors hover:text-brand hover:underline"
+        >
+          Pesan via WhatsApp (transfer manual)
+        </button>
+      </div>
     </form>
   );
 }

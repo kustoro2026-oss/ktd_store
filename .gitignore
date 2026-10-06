@@ -73,6 +73,9 @@ next-env.d.ts
 # skrip debug one-off (hanya skrip pipeline stabil yang di-commit)
 /scripts/_*
 
+# database lokal (SQLite dev — produksi pakai Neon/Postgres)
+/data/
+
 # dashboard KTD Hub (repo terpisah)
 /ktd-hub/
 

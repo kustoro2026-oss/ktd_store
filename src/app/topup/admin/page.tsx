@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Loader2, Play, RefreshCw, Wallet } from "lucide-react";
 import { TOPUP_CATEGORIES, TOPUP_PRODUCTS, customerNoFor, formatRupiah } from "@/lib/topup";
 
@@ -13,6 +13,32 @@ import { TOPUP_CATEGORIES, TOPUP_PRODUCTS, customerNoFor, formatRupiah } from "@
 
 type Result = { ok?: boolean; status?: number; error?: string; data?: unknown; detail?: string };
 
+type OrderRow = {
+  id: string;
+  product_name: string;
+  customer_no: string;
+  amount: number;
+  cost: number;
+  buyer_name: string;
+  buyer_phone: string;
+  payment_status: string;
+  topup_status: string;
+  paid_at: string;
+  digiflazz_sn: string;
+  error_message: string;
+  created_at: string;
+};
+
+/** Warna badge status pembayaran/top-up. */
+const statusBadge = (s: string) =>
+  s === "paid" || s === "success"
+    ? "bg-emerald-100 text-emerald-700"
+    : s === "expired" || s === "failed"
+      ? "bg-red-100 text-red-700"
+      : s === "processing" || s === "pending"
+        ? "bg-amber-100 text-amber-700"
+        : "bg-gray-100 text-gray-600";
+
 export default function TopUpAdminPage() {
   const [secret, setSecret] = useState("");
   const [sku, setSku] = useState(TOPUP_PRODUCTS[0].sku);
@@ -22,6 +48,11 @@ export default function TopUpAdminPage() {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const [saldo, setSaldo] = useState<string | null>(null);
+  const [orders, setOrders] = useState<OrderRow[]>([]);
+  const [ordersBusy, setOrdersBusy] = useState(false);
+  const [ordersError, setOrdersError] = useState("");
+  const [rechecking, setRechecking] = useState(false);
+  const [recheckMsg, setRecheckMsg] = useState("");
 
   // Ingat secret per sesi browser (bukan keamanan tinggi, cukup untuk gating).
   useEffect(() => {
@@ -69,6 +100,62 @@ export default function TopUpAdminPage() {
       setSaldo("Gagal: " + String(e));
     } finally {
       setBusy(false);
+    }
+  };
+
+  /** Muat daftar pesanan terbaru (dilindungi x-topup-secret). */
+  const loadOrders = useCallback(async () => {
+    if (!secret) return;
+    setOrdersBusy(true);
+    setOrdersError("");
+    try {
+      const res = await fetch("/api/topup/orders", {
+        headers: { "x-topup-secret": secret },
+        cache: "no-store",
+      });
+      const j = await res.json();
+      if (res.ok && j.ok) {
+        setOrders((j.orders as OrderRow[]) ?? []);
+      } else {
+        setOrdersError(j?.error === "forbidden" ? "Kode admin salah." : "Gagal memuat pesanan.");
+      }
+    } catch {
+      setOrdersError("Jaringan bermasalah saat memuat pesanan.");
+    } finally {
+      setOrdersBusy(false);
+    }
+  }, [secret]);
+
+  // Muat saat secret tersedia, lalu segarkan tiap 60 detik.
+  useEffect(() => {
+    loadOrders();
+    const t = setInterval(loadOrders, 60_000);
+    return () => clearInterval(t);
+  }, [loadOrders]);
+
+  /** Cek ulang transaksi Digiflazz yang masih Pending (idempoten) +
+   *  tandai pesanan gateway yang kedaluwarsa. */
+  const doRecheckPending = async () => {
+    setRechecking(true);
+    setRecheckMsg("");
+    try {
+      const res = await fetch("/api/topup/cron/pending", {
+        headers: { "x-topup-secret": secret },
+        cache: "no-store",
+      });
+      const j = await res.json();
+      if (j.ok) {
+        setRecheckMsg(
+          `${j.expired} pesanan kedaluwarsa • ${j.rechecked} transaksi Pending dicek ulang.`,
+        );
+        loadOrders();
+      } else {
+        setRecheckMsg(`Gagal: ${j.error ?? "tidak diketahui"}`);
+      }
+    } catch {
+      setRecheckMsg("Gagal: jaringan bermasalah.");
+    } finally {
+      setRechecking(false);
     }
   };
 
@@ -241,6 +328,109 @@ export default function TopUpAdminPage() {
           Reset Hasil
         </button>
       </div>
+
+      {/* Pesanan terbaru + cek ulang Pending */}
+      <section className="mt-8 max-w-4xl">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold text-ink">Pesanan Terbaru</h2>
+            <p className="mt-0.5 text-xs text-muted">
+              Diperbarui otomatis tiap 60 detik. Transaksi Digiflazz Pending
+              dicek ulang lewat tombol di samping (kirim ulang ref_id sama).
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={doRecheckPending}
+            disabled={rechecking || !secret}
+            className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-ink transition-colors hover:border-brand hover:text-brand disabled:opacity-50"
+          >
+            {rechecking ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            Cek Ulang Pending
+          </button>
+        </div>
+
+        {recheckMsg && (
+          <p className="mt-2 rounded-xl border border-sky-100 bg-sky-50 px-4 py-2 text-xs text-sky-700">
+            {recheckMsg}
+          </p>
+        )}
+        {ordersError && (
+          <p className="mt-2 rounded-xl border border-red-100 bg-red-50 px-4 py-2 text-xs text-red-700">
+            {ordersError}
+          </p>
+        )}
+
+        <div className="mt-3 overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-sm">
+          {ordersBusy && orders.length === 0 ? (
+            <p className="flex items-center gap-2 px-5 py-6 text-sm text-muted">
+              <Loader2 className="h-4 w-4 animate-spin" /> Memuat pesanan...
+            </p>
+          ) : orders.length === 0 ? (
+            <p className="px-5 py-6 text-sm text-muted">
+              Belum ada pesanan. Masukkan kode admin yang benar untuk melihat daftar.
+            </p>
+          ) : (
+            <table className="w-full min-w-[720px] text-left text-sm">
+              <thead className="border-b border-gray-100 text-xs uppercase tracking-wide text-muted-2">
+                <tr>
+                  <th className="px-4 py-3 font-semibold">Waktu (UTC)</th>
+                  <th className="px-4 py-3 font-semibold">Pesanan</th>
+                  <th className="px-4 py-3 font-semibold">Tujuan</th>
+                  <th className="px-4 py-3 font-semibold">Total</th>
+                  <th className="px-4 py-3 font-semibold">Bayar</th>
+                  <th className="px-4 py-3 font-semibold">Top Up</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {orders.map((o) => (
+                  <tr key={o.id} className="align-top">
+                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-muted">
+                      {o.created_at.slice(5, 16)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="font-semibold text-ink">{o.id}</p>
+                      <p className="text-xs text-muted">{o.product_name}</p>
+                      <p className="text-xs text-muted-2">
+                        {o.buyer_name} • {o.buyer_phone || "-"}
+                      </p>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-ink">
+                      {o.customer_no}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <p className="font-semibold text-ink">{formatRupiah(o.amount)}</p>
+                      <p className="text-xs text-muted-2">modal {formatRupiah(o.cost)}</p>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusBadge(o.payment_status)}`}
+                      >
+                        {o.payment_status}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusBadge(o.topup_status)}`}
+                      >
+                        {o.topup_status}
+                      </span>
+                      {o.error_message && (
+                        <p
+                          className="mt-1 max-w-[180px] truncate text-[11px] text-red-500"
+                          title={o.error_message}
+                        >
+                          {o.error_message}
+                        </p>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </section>
     </div>
   );
 }
