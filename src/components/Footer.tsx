@@ -40,7 +40,7 @@ export default function Footer() {
       {/* Link Lainnya */}
       <div className="container-site flex flex-wrap items-center gap-x-6 gap-y-2 py-4 text-sm text-muted">
         <span className="font-semibold text-ink">Link Lainnya:</span>
-        <Link href="/topup" className="font-semibold text-brand transition-colors hover:underline">Top Up Game</Link>
+        <Link href="/topup" className="font-semibold text-brand transition-colors hover:underline">Top Up & Isi Saldo</Link>
         <Link href="/tentang-kami" className="transition-colors hover:text-brand">Tentang Kami</Link>
         <Link href="/karir" className="transition-colors hover:text-brand">Karir</Link>
         <Link href="/tips" className="transition-colors hover:text-brand">Blog</Link>

@@ -5,12 +5,12 @@ import Link from "next/link";
 import {
   ArrowRight,
   ChevronDown,
-  Gamepad2,
   LayoutGrid,
   Menu,
   ShoppingCart,
   Trash2,
   X,
+  Zap,
 } from "lucide-react";
 import { WHATSAPP_NUMBER } from "@/lib/config";
 import { useApi } from "@/lib/useApi";
@@ -61,7 +61,7 @@ export default function Header() {
       <div className="bg-brand text-white">
         <div className="container-site flex items-center justify-between py-1.5 text-xs">
           <div className="hidden items-center gap-4 md:flex">
-            <Link href="/topup" className="font-semibold transition-colors hover:underline">Top Up Game</Link>
+            <Link href="/topup" className="font-semibold transition-colors hover:underline">Top Up & Isi Saldo</Link>
             <Link href="/produk" className="transition-colors hover:underline">Semua Produk</Link>
             <Link href="/cara-belanja" className="transition-colors hover:underline">Cara Belanja</Link>
             <Link href="/konfirmasi-pembayaran" className="transition-colors hover:underline">Konfirmasi Pembayaran</Link>
@@ -204,7 +204,7 @@ export default function Header() {
             href="/topup"
             className="shrink-0 rounded-full bg-white/15 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/25"
           >
-            Top Up Game
+            Top Up & Isi Saldo
           </Link>
           <Link
             href="/produk"
@@ -324,8 +324,8 @@ export default function Header() {
                 onClick={() => setMobileOpen(false)}
                 className="mb-1 flex items-center gap-3 rounded-lg bg-brand/5 px-3 py-2.5 text-sm font-semibold text-brand"
               >
-                <Gamepad2 className="h-5 w-5" />
-                Top Up Game
+                <Zap className="h-5 w-5" />
+                Top Up & Isi Saldo
               </Link>
               <Link
                 href="/produk"

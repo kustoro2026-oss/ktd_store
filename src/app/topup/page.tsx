@@ -1,37 +1,37 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertCircle, Clock, Gamepad2, ShieldCheck, Wallet } from "lucide-react";
+import { AlertCircle, Clock, ShieldCheck, Wallet, Zap } from "lucide-react";
 import TopUpOrderForm from "@/components/TopUpOrderForm";
 
 export const metadata: Metadata = {
-  title: "Top Up Game — KTD Store",
+  title: "Top Up & Isi Saldo — KTD Store",
   description:
-    "Top up game murah dan cepat di KTD Store: Mobile Legends dan Free Fire. Proses otomatis setelah pembayaran terverifikasi.",
+    "Top up game, pulsa, paket data, token listrik, dan e-wallet di KTD Store. Pengisian otomatis setelah pembayaran terverifikasi.",
   alternates: { canonical: "/topup" },
   openGraph: {
     type: "website",
     url: "/topup",
-    title: "Top Up Game — KTD Store",
+    title: "Top Up & Isi Saldo — KTD Store",
     description:
-      "Top up game murah dan cepat di KTD Store: Mobile Legends dan Free Fire. Proses otomatis setelah pembayaran terverifikasi.",
+      "Top up game, pulsa, paket data, token listrik, dan e-wallet di KTD Store. Pengisian otomatis setelah pembayaran terverifikasi.",
     images: [{ url: "/images/logo.png", width: 512, height: 512, alt: "KTD Store" }],
     siteName: "KTD Store",
     locale: "id_ID",
   },
   twitter: {
     card: "summary",
-    title: "Top Up Game — KTD Store",
+    title: "Top Up & Isi Saldo — KTD Store",
     description:
-      "Top up game murah dan cepat di KTD Store: Mobile Legends dan Free Fire.",
+      "Top up game, pulsa, paket data, token listrik, dan e-wallet di KTD Store.",
     images: ["/images/logo.png"],
   },
 };
 
 const STEPS = [
   {
-    icon: Gamepad2,
-    title: "Pilih Game & Nominal",
-    desc: "Pilih game (Mobile Legends / Free Fire) dan nominal diamond yang diinginkan.",
+    icon: Zap,
+    title: "Pilih Produk & Nominal",
+    desc: "Pilih kategori (game, pulsa & data, token listrik, e-wallet) dan produk yang diinginkan.",
   },
   {
     icon: Wallet,
@@ -40,8 +40,8 @@ const STEPS = [
   },
   {
     icon: Clock,
-    title: "Top Up Otomatis",
-    desc: "Setelah pembayaran terverifikasi, diamond dikirim otomatis ke akun game Anda.",
+    title: "Pengisian Otomatis",
+    desc: "Setelah pembayaran terverifikasi, saldo dikirim otomatis ke nomor/ID tujuan Anda.",
   },
 ];
 
@@ -52,17 +52,17 @@ export default function TopUpPage() {
       <nav className="mb-4 flex flex-wrap items-center gap-1 text-xs text-muted-2" aria-label="Breadcrumb">
         <Link href="/" className="transition-colors hover:text-brand">Beranda</Link>
         <span>/</span>
-        <span className="text-muted">Top Up Game</span>
+        <span className="text-muted">Top Up & Isi Saldo</span>
       </nav>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
         {/* Form */}
         <section>
-          <h1 className="text-2xl font-bold text-ink sm:text-3xl">Top Up Game</h1>
+          <h1 className="text-2xl font-bold text-ink sm:text-3xl">Top Up & Isi Saldo</h1>
           <p className="mt-2 text-sm text-muted">
-            Isi diamond game favorit Anda dengan cepat. Pilih nominal, lengkapi ID
-            game, lalu selesaikan pembayaran melalui WhatsApp — diamond dikirim
-            otomatis.
+            Isi diamond game, pulsa, paket data, token listrik, dan e-wallet dalam
+            satu tempat. Pilih produk, lengkapi nomor tujuan, lalu selesaikan
+            pembayaran melalui WhatsApp — pengisian dikirim otomatis.
           </p>
 
           <div className="mt-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm sm:p-8">
@@ -96,8 +96,8 @@ export default function TopUpPage() {
             <div className="flex items-start gap-3">
               <AlertCircle className="h-5 w-5 shrink-0 text-amber-500" />
               <p className="text-xs leading-relaxed text-amber-800">
-                Pastikan ID Game dan Server yang Anda isi sudah benar. Top up yang
-                masuk ke ID salah tidak dapat dikembalikan.
+                Pastikan ID Game, nomor HP, atau nomor meter yang Anda isi sudah
+                benar. Pengisian ke nomor/ID yang salah tidak dapat dikembalikan.
               </p>
             </div>
           </div>

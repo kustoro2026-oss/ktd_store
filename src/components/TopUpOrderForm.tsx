@@ -1,40 +1,42 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, Gamepad2, Send } from "lucide-react";
+import { CheckCircle2, Send, Zap } from "lucide-react";
 import {
-  TOPUP_BRANDS,
+  TOPUP_CATEGORIES,
   TOPUP_PRODUCTS,
   formatRupiah,
-  type TopUpBrand,
+  type TopUpCategory,
   type TopUpProduct,
 } from "@/lib/topup";
 import { BANK_ACCOUNTS, whatsappLink } from "@/lib/config";
 
-/** Daftar produk untuk satu brand. */
-const productsFor = (brand: TopUpBrand) => TOPUP_PRODUCTS.filter((p) => p.brand === brand);
+/** Daftar produk untuk satu kategori tampilan. */
+const productsFor = (cat: TopUpCategory) => TOPUP_PRODUCTS.filter((p) => p.category === cat);
 
 export default function TopUpOrderForm() {
-  const [brand, setBrand] = useState<TopUpBrand>(TOPUP_BRANDS[0]);
+  const [category, setCategory] = useState<TopUpCategory>(TOPUP_CATEGORIES[0].id);
   const [product, setProduct] = useState<TopUpProduct | null>(null);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [gameId, setGameId] = useState("");
+  const [target, setTarget] = useState("");
   const [server, setServer] = useState("");
   const [error, setError] = useState("");
   const [sent, setSent] = useState(false);
 
   const bank = BANK_ACCOUNTS[0];
+  // Nomor pelanggan (K-Vision) dibiarkan teks bebas; lainnya angka saja.
+  const targetIsNumeric = product?.customerNoLabel !== "Nomor Pelanggan";
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     if (!product) {
-      setError("Silakan pilih nominal top up terlebih dahulu.");
+      setError("Silakan pilih produk terlebih dahulu.");
       return;
     }
-    if (!name.trim() || !gameId.trim()) {
-      setError("Mohon lengkapi Nama dan ID Game.");
+    if (!name.trim() || !target.trim()) {
+      setError(`Mohon lengkapi Nama dan ${product.customerNoLabel}.`);
       return;
     }
     if (product.needsServer && !server.trim()) {
@@ -42,10 +44,10 @@ export default function TopUpOrderForm() {
       return;
     }
     const lines = [
-      "Halo, saya ingin melakukan top up game:",
+      "Halo, saya ingin melakukan top up:",
       "",
       `Produk: ${product.name}`,
-      `ID Game: ${gameId.trim()}`,
+      `${product.customerNoLabel}: ${target.trim()}`,
     ];
     if (product.needsServer) lines.push(`Server: ${server.trim()}`);
     lines.push(
@@ -68,7 +70,7 @@ export default function TopUpOrderForm() {
         <h3 className="text-lg font-bold text-ink">WhatsApp Terbuka</h3>
         <p className="max-w-md text-sm text-muted">
           Pesanan top up Anda sudah disiapkan di WhatsApp. Kirim pesan tersebut,
-          lampirkan bukti transfer, dan top up akan diproses otomatis setelah
+          lampirkan bukti transfer, dan pengisian akan diproses otomatis setelah
           pembayaran terverifikasi.
         </p>
         <button
@@ -84,35 +86,37 @@ export default function TopUpOrderForm() {
 
   return (
     <form onSubmit={submit} id="topup-form" className="space-y-5" noValidate>
-      {/* Pilih game */}
+      {/* Pilih kategori */}
       <div>
-        <p className="mb-2 text-sm font-semibold text-ink">Pilih Game</p>
+        <p className="mb-2 text-sm font-semibold text-ink">Pilih Kategori</p>
         <div className="flex flex-wrap gap-2">
-          {TOPUP_BRANDS.map((b) => (
+          {TOPUP_CATEGORIES.map((c) => (
             <button
-              key={b}
+              key={c.id}
               type="button"
               onClick={() => {
-                setBrand(b);
+                setCategory(c.id);
                 setProduct(null);
+                setTarget("");
+                setServer("");
               }}
               className={`rounded-xl border px-4 py-2 text-sm font-semibold transition-colors ${
-                brand === b
+                category === c.id
                   ? "border-brand bg-brand text-white"
                   : "border-gray-200 bg-white text-ink hover:border-brand hover:text-brand"
               }`}
             >
-              {b === "MOBILE LEGENDS" ? "Mobile Legends" : "Free Fire"}
+              {c.label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Pilih nominal */}
+      {/* Pilih produk */}
       <div>
-        <p className="mb-2 text-sm font-semibold text-ink">Pilih Nominal</p>
+        <p className="mb-2 text-sm font-semibold text-ink">Pilih Produk</p>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {productsFor(brand).map((p) => (
+          {productsFor(category).map((p) => (
             <button
               key={p.sku}
               type="button"
@@ -147,7 +151,7 @@ export default function TopUpOrderForm() {
         </div>
         <div>
           <label htmlFor="tu-phone" className="mb-1.5 block text-sm font-semibold text-ink">
-            No. HP
+            No. HP Pemesan
           </label>
           <input
             id="tu-phone"
@@ -162,21 +166,29 @@ export default function TopUpOrderForm() {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label htmlFor="tu-id" className="mb-1.5 block text-sm font-semibold text-ink">
-            ID Game (User ID) <span className="text-red-500">*</span>
+          <label htmlFor="tu-target" className="mb-1.5 block text-sm font-semibold text-ink">
+            {product?.customerNoLabel ?? "Nomor Tujuan"} <span className="text-red-500">*</span>
           </label>
           <input
-            id="tu-id"
+            id="tu-target"
             type="text"
-            inputMode="numeric"
-            value={gameId}
-            onChange={(e) => setGameId(e.target.value.replace(/\D/g, ""))}
-            placeholder={product?.needsServer ? "Contoh: 12345678" : "Contoh: 1234567890"}
+            inputMode={targetIsNumeric ? "numeric" : "text"}
+            value={target}
+            onChange={(e) =>
+              setTarget(targetIsNumeric ? e.target.value.replace(/\D/g, "") : e.target.value)
+            }
+            placeholder={product?.customerNoLabel.includes("HP") ? "08xxxxxxxxxx" : "Contoh: 12345678"}
             className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20"
           />
-          <p className="mt-1 text-[11px] text-muted-2">
-            Cek ID di profil game Anda (pastikan benar — top up yang salah ID tidak dapat dikembalikan).
-          </p>
+          {product && (
+            <p className="mt-1 text-[11px] text-muted-2">
+              {product.category === "game"
+                ? "Cek ID di profil game Anda (pastikan benar — top up yang salah ID tidak dapat dikembalikan)."
+                : product.category === "pln"
+                  ? "Nomor meter tertera di meteran PLN atau ID pelanggan di struk/tagihan listrik."
+                  : "Pastikan nomor benar — pengisian ke nomor yang salah tidak dapat dikembalikan."}
+            </p>
+          )}
         </div>
         {product?.needsServer && (
           <div>
@@ -209,9 +221,9 @@ export default function TopUpOrderForm() {
           <p className="text-xl font-extrabold text-brand">
             {product ? formatRupiah(product.sellPrice) : "—"}
           </p>
-          {product?.needsServer && gameId && server && (
+          {product?.needsServer && target && server && (
             <p className="mt-0.5 text-[11px] text-muted-2">
-              ID {gameId} • Server {server}
+              ID {target} • Server {server}
             </p>
           )}
           {bank && (
@@ -230,8 +242,8 @@ export default function TopUpOrderForm() {
       </div>
 
       <p className="flex items-start gap-2 text-xs leading-relaxed text-muted">
-        <Gamepad2 className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
-        Top up diproses otomatis setelah pembayaran terverifikasi, biasanya dalam
+        <Zap className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
+        Pengisian diproses otomatis setelah pembayaran terverifikasi, biasanya dalam
         beberapa menit. Jika ada kendala, CS kami siap membantu melalui WhatsApp.
       </p>
     </form>

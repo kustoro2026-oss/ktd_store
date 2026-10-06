@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Loader2, Play, RefreshCw, Wallet } from "lucide-react";
-import { TOPUP_PRODUCTS, customerNoFor, formatRupiah } from "@/lib/topup";
+import { TOPUP_CATEGORIES, TOPUP_PRODUCTS, customerNoFor, formatRupiah } from "@/lib/topup";
 
 /**
  * Halaman admin eksekusi top-up (internal CS).
@@ -33,6 +33,8 @@ export default function TopUpAdminPage() {
 
   const product = TOPUP_PRODUCTS.find((p) => p.sku === sku) ?? TOPUP_PRODUCTS[0];
   const customerNo = customerNoFor(product, gameId, server);
+  // Nomor pelanggan (K-Vision) dibiarkan teks bebas; lainnya angka saja.
+  const targetIsNumeric = product.customerNoLabel !== "Nomor Pelanggan";
 
   const doExecute = async () => {
     setBusy(true);
@@ -81,7 +83,7 @@ export default function TopUpAdminPage() {
         <span className="text-muted">Top Up Admin</span>
       </nav>
 
-      <h1 className="text-xl font-bold text-ink sm:text-2xl">Eksekusi Top Up (Admin)</h1>
+      <h1 className="text-xl font-bold text-ink sm:text-2xl">Eksekusi Top Up & Isi Saldo (Admin)</h1>
       <p className="mt-1 text-sm text-muted">
         Halaman internal CS: eksekusi top-up setelah pembayaran terverifikasi.
       </p>
@@ -115,10 +117,14 @@ export default function TopUpAdminPage() {
               onChange={(e) => setSku(e.target.value)}
               className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20"
             >
-              {TOPUP_PRODUCTS.map((p) => (
-                <option key={p.sku} value={p.sku}>
-                  {p.sku} — {p.name} ({formatRupiah(p.sellPrice)})
-                </option>
+              {TOPUP_CATEGORIES.map((c) => (
+                <optgroup key={c.id} label={c.label}>
+                  {TOPUP_PRODUCTS.filter((p) => p.category === c.id).map((p) => (
+                    <option key={p.sku} value={p.sku}>
+                      {p.sku} — {p.name} ({formatRupiah(p.sellPrice)})
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </div>
@@ -140,14 +146,16 @@ export default function TopUpAdminPage() {
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="ta-id" className="mb-1.5 block text-sm font-semibold text-ink">
-              ID Game
+              {product.customerNoLabel}
             </label>
             <input
               id="ta-id"
               type="text"
-              inputMode="numeric"
+              inputMode={targetIsNumeric ? "numeric" : "text"}
               value={gameId}
-              onChange={(e) => setGameId(e.target.value.replace(/\D/g, ""))}
+              onChange={(e) =>
+                setGameId(targetIsNumeric ? e.target.value.replace(/\D/g, "") : e.target.value)
+              }
               className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20"
             />
           </div>
