@@ -19,7 +19,7 @@ type OrderResponse = {
   ok?: boolean;
   error?: string;
   orderId?: string;
-  mode?: "ipaymu" | "wa";
+  mode?: "duitku" | "wa";
   paymentUrl?: string;
   waLink?: string;
   gatewayError?: string;
@@ -74,8 +74,8 @@ export default function TopUpOrderForm() {
     window.open(whatsappLink(lines.join("\n")), "_blank", "noopener,noreferrer");
   };
 
-  /** Alur utama: buat pesanan di server → halaman bayar iPaymu (atau
-   *  fallback WhatsApp bila gateway belum aktif). */
+  /** Alur utama: buat pesanan di server → halaman bayar Duitku (atau
+   *  fallback WhatsApp bila gateway belum aktif / nominal < Rp 10.000). */
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -98,7 +98,7 @@ export default function TopUpOrderForm() {
         }),
       });
       const j = (await res.json()) as OrderResponse;
-      if (j.ok && j.mode === "ipaymu" && j.orderId) {
+      if (j.ok && j.mode === "duitku" && j.orderId) {
         router.push(`/topup/bayar/${j.orderId}`);
         return;
       }

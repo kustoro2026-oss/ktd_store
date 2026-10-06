@@ -1,17 +1,17 @@
 // Buat pesanan top-up: validasi SKU dari katalog (harga dihitung ulang
 // server-side — harga dari klien diabaikan), simpan pesanan ke database,
-// lalu buat sesi pembayaran iPaymu. Bila gateway belum dikonfigurasi (atau
-// gagal membuat sesi), pesanan tetap tersimpan dan pembeli diarahkan ke
-// fallback WhatsApp (CS memverifikasi transfer manual lalu eksekusi dari
-// /topup/admin).
+// lalu buat sesi pembayaran Duitku. Bila gateway belum dikonfigurasi (atau
+// gagal membuat sesi — termasuk nominal di bawah minimum Rp 10.000),
+// pesanan tetap tersimpan dan pembeli diarahkan ke fallback WhatsApp (CS
+// memverifikasi transfer manual lalu eksekusi dari /topup/admin).
 //
 // Body: { sku, id, server?, buyerName, buyerPhone }
-// Respons: { ok, orderId, mode: "ipaymu" | "wa", paymentUrl?, waLink? }
+// Respons: { ok, orderId, mode: "duitku" | "wa", paymentUrl?, waLink? }
 
 import { NextResponse } from "next/server";
 import { TOPUP_PRODUCTS, customerNoFor } from "@/lib/topup";
 import { createTopupOrder, newOrderId, newRefId, setOrderPaymentSession } from "@/lib/db";
-import { createIpaymuPayment, ipaymuConfigured } from "@/lib/ipaymu";
+import { createDuitkuPayment, duitkuConfigured, DUITKU_MIN_AMOUNT } from "@/lib/duitku";
 import { SITE_URL, whatsappLink } from "@/lib/config";
 
 export const runtime = "nodejs";
@@ -87,23 +87,32 @@ export async function POST(req: Request) {
     ].join("\n"),
   );
 
-  if (ipaymuConfigured()) {
-    const pay = await createIpaymuPayment({
-      referenceId: refId,
+  if (duitkuConfigured()) {
+    if (product.sellPrice < DUITKU_MIN_AMOUNT) {
+      // Duitku menolak transaksi di bawah Rp 10.000 — arahkan ke WhatsApp.
+      return NextResponse.json({
+        ok: true,
+        orderId,
+        mode: "wa",
+        waLink,
+        gatewayError: `Nominal di bawah minimum Duitku (Rp ${DUITKU_MIN_AMOUNT.toLocaleString("id-ID")})`,
+      });
+    }
+    const pay = await createDuitkuPayment({
+      merchantOrderId: refId,
       productName: `${product.name} (${orderId})`,
       amount: product.sellPrice,
       buyerName,
       buyerPhone,
       returnUrl: `${SITE_URL}/topup/bayar/${orderId}`,
-      cancelUrl: `${SITE_URL}/topup/bayar/${orderId}?dibatalkan=1`,
-      notifyUrl: `${SITE_URL}/api/topup/pay/webhook`,
+      callbackUrl: `${SITE_URL}/api/topup/pay/webhook`,
     });
-    if (pay.ok && pay.sessionId && pay.paymentUrl) {
-      await setOrderPaymentSession(orderId, pay.sessionId, pay.paymentUrl);
+    if (pay.ok && pay.paymentUrl) {
+      await setOrderPaymentSession(orderId, pay.reference ?? "", pay.paymentUrl);
       return NextResponse.json({
         ok: true,
         orderId,
-        mode: "ipaymu",
+        mode: "duitku",
         paymentUrl: pay.paymentUrl,
       });
     }
@@ -113,7 +122,7 @@ export async function POST(req: Request) {
       orderId,
       mode: "wa",
       waLink,
-      gatewayError: pay.error ?? "sesi iPaymu gagal dibuat",
+      gatewayError: pay.error ?? "sesi Duitku gagal dibuat",
     });
   }
 

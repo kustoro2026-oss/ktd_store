@@ -3,7 +3,7 @@
 // idempoten). Dipanggil oleh:
 //   - cron Vercel harian (vercel.json) dengan header x-cron-secret,
 //   - tombol "Cek Ulang Pending" di /topup/admin dengan x-topup-secret,
-//   - webhook iPaymu secara internal (tick latar belakang) — jalur tercepat,
+//   - webhook Duitku secara internal (tick latar belakang) — jalur tercepat,
 //     karena Vercel Hobby hanya mengizinkan 1 cron/hari.
 
 import { NextResponse } from "next/server";

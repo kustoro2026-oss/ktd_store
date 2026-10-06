@@ -1,8 +1,8 @@
 "use client";
 
-// Halaman pembayaran top-up: tampilkan halaman bayar iPaymu (QRIS/VA) +
+// Halaman pembayaran top-up: tampilkan halaman bayar Duitku (VA/QRIS) +
 // polling status pesanan tiap 5 detik. Status diperbarui server-side oleh
-// webhook iPaymu (dibayar → eksekusi otomatis → WA), jadi halaman ini cukup
+// webhook Duitku (dibayar → eksekusi otomatis → WA), jadi halaman ini cukup
 // memantau tabel pesanan.
 
 import { useCallback, useEffect, useState } from "react";
@@ -40,7 +40,9 @@ const POLL_MS = 5000;
 export default function TopupBayarPage() {
   const { id } = useParams<{ id: string }>();
   const search = useSearchParams();
-  const canceled = search.get("dibatalkan") === "1";
+  // Redirect Duitku membawa resultCode: 00 sukses, 01 pending, 02 dibatalkan.
+  const canceled =
+    search.get("dibatalkan") === "1" || search.get("resultCode") === "02";
 
   const [order, setOrder] = useState<OrderView | null>(null);
   const [missing, setMissing] = useState(false);
@@ -142,7 +144,7 @@ export default function TopupBayarPage() {
                     <Clock3 className="h-4 w-4 text-amber-500" /> Menunggu Pembayaran
                   </p>
                   <p className="mt-1 text-xs text-muted">
-                    Selesaikan pembayaran QRIS / Virtual Account pada halaman iPaymu.
+                    Selesaikan pembayaran QRIS / Virtual Account pada halaman Duitku.
                     Halaman ini otomatis berubah setelah pembayaran terverifikasi.
                   </p>
                 </div>
@@ -157,7 +159,7 @@ export default function TopupBayarPage() {
               </div>
               <iframe
                 src={order.payment_url}
-                title="Halaman pembayaran iPaymu"
+                title="Halaman pembayaran Duitku"
                 className="h-[560px] w-full rounded-2xl border border-gray-200 bg-white"
               />
             </>

@@ -27,7 +27,8 @@ export type TopupStatus =
 export type TopUpOrder = {
   /** ID pesanan tampilan, mis. KTD-M2XQ9K. */
   id: string;
-  /** Referensi unik — dipakai sebagai referenceId iPaymu DAN ref_id Digiflazz. */
+  /** Referensi unik — dipakai sebagai merchantOrderId Duitku DAN ref_id
+   *  Digiflazz. */
   ref_id: string;
   sku: string;
   product_name: string;
@@ -40,8 +41,10 @@ export type TopUpOrder = {
   buyer_phone: string;
   payment_status: PaymentStatus;
   topup_status: TopupStatus;
-  ipaymu_session: string;
-  ipaymu_trx: string;
+  /** Referensi transaksi dari payment gateway (Duitku reference). */
+  gateway_session: string;
+  /** ID transaksi dari payment gateway (Duitku publisherOrderId/reference). */
+  gateway_trx: string;
   payment_url: string;
   paid_at: string;
   digiflazz_sn: string;
@@ -97,12 +100,30 @@ async function sqliteDb(): Promise<DatabaseSync> {
     const db = new Db(path.join(dir, "topup.db"));
     db.exec("PRAGMA journal_mode = WAL;");
     db.exec(SCHEMA_SQL);
+    migrateSqliteColumns(db);
     g.__ktdTopupSqlite = db;
   }
   return g.__ktdTopupSqlite;
 }
 
 type Row = Record<string, unknown>;
+
+/** Migrasi SQLite file lama: tambah kolom gateway_* bila belum ada
+ *  (tabel lokal dibuat sebelum kolom diganti nama dari ipaymu_*). Kolom
+ *  lama dibiarkan — data sesi iPaymu tidak relevan untuk Duitku. */
+function migrateSqliteColumns(db: DatabaseSync): void {
+  const cols = new Set(
+    (db.prepare("PRAGMA table_info(topup_orders)").all() as { name: string }[]).map(
+      (c) => c.name,
+    ),
+  );
+  if (!cols.has("gateway_session")) {
+    db.exec("ALTER TABLE topup_orders ADD COLUMN gateway_session TEXT NOT NULL DEFAULT ''");
+  }
+  if (!cols.has("gateway_trx")) {
+    db.exec("ALTER TABLE topup_orders ADD COLUMN gateway_trx TEXT NOT NULL DEFAULT ''");
+  }
+}
 
 // Postgres mengembalikan kolom timestamptz sebagai objek Date — ubah ke
 // string "YYYY-MM-DD HH:MM:SS" (UTC) supaya tampilan seragam dengan SQLite.
@@ -178,8 +199,8 @@ const SCHEMA_SQL = `
     buyer_phone TEXT NOT NULL DEFAULT '',
     payment_status TEXT NOT NULL DEFAULT 'pending',
     topup_status TEXT NOT NULL DEFAULT 'waiting_payment',
-    ipaymu_session TEXT NOT NULL DEFAULT '',
-    ipaymu_trx TEXT NOT NULL DEFAULT '',
+    gateway_session TEXT NOT NULL DEFAULT '',
+    gateway_trx TEXT NOT NULL DEFAULT '',
     payment_url TEXT NOT NULL DEFAULT '',
     paid_at TEXT NOT NULL DEFAULT '',
     digiflazz_sn TEXT NOT NULL DEFAULT '',
@@ -208,7 +229,7 @@ export function newOrderId(): string {
   return `KTD-${t}${r}`;
 }
 
-/** Ref unik internal — dipakai sebagai referenceId iPaymu sekaligus
+/** Ref unik internal — dipakai sebagai merchantOrderId Duitku sekaligus
  *  ref_id Digiflazz (tanpa strip supaya aman di kedua sistem). */
 export function newRefId(): string {
   const t = Date.now().toString(36).toUpperCase();
@@ -269,19 +290,19 @@ export async function getTopupOrderByRef(
   );
 }
 
-/** Simpan data sesi iPaymu hasil buat pembayaran. */
+/** Simpan data sesi payment gateway hasil buat pembayaran. */
 export async function setOrderPaymentSession(
   id: string,
   sessionId: string,
   paymentUrl: string,
 ): Promise<void> {
   await queryRun(
-    "UPDATE topup_orders SET ipaymu_session = ?, payment_url = ?, updated_at = ? WHERE id = ?",
+    "UPDATE topup_orders SET gateway_session = ?, payment_url = ?, updated_at = ? WHERE id = ?",
     [sessionId, paymentUrl, nowUtc(), id],
   );
 }
 
-/** Tandai pembayaran lunas (webhook terverifikasi / cek transaksi iPaymu).
+/** Tandai pembayaran lunas (webhook terverifikasi / cek transaksi gateway).
  *  Idempoten: tidak menimpa paid_at yang sudah ada. */
 export async function markOrderPaid(
   id: string,
@@ -290,7 +311,7 @@ export async function markOrderPaid(
 ): Promise<void> {
   await queryRun(
     `UPDATE topup_orders
-     SET payment_status = 'paid', ipaymu_trx = ?,
+     SET payment_status = 'paid', gateway_trx = ?,
          paid_at = CASE WHEN paid_at = '' THEN ? ELSE paid_at END,
          error_message = '', updated_at = ?
      WHERE id = ? AND payment_status != 'paid'`,
@@ -357,7 +378,7 @@ export async function listPendingTopups(): Promise<TopUpOrder[]> {
 }
 
 /** Pesanan gateway yang tak kunjung dibayar → expired (hanya yang punya
- *  sesi iPaymu; pesanan fallback WA tanpa sesi tetap pending untuk CS). */
+ *  sesi gateway; pesanan fallback WA tanpa sesi tetap pending untuk CS). */
 export async function expireStalePendingOrders(
   olderThanHours = 26,
 ): Promise<number> {
@@ -369,7 +390,7 @@ export async function expireStalePendingOrders(
     `UPDATE topup_orders
      SET payment_status = 'expired', topup_status = 'failed',
          error_message = 'Pembayaran kedaluwarsa', updated_at = ?
-     WHERE payment_status = 'pending' AND ipaymu_session != '' AND created_at <= ?
+     WHERE payment_status = 'pending' AND gateway_session != '' AND created_at <= ?
      RETURNING id`,
     [nowUtc(), cutoff],
   );

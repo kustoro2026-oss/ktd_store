@@ -1,6 +1,6 @@
 // Eksekusi manual transaksi top-up Digiflazz (fallback admin).
 //
-// Alur otomatis kini lewat webhook iPaymu → topup-execute.ts; endpoint ini
+// Alur otomatis kini lewat webhook Duitku → topup-execute.ts; endpoint ini
 // tetap dipakai halaman /topup/admin untuk eksekusi manual (mis. pesanan
 // fallback WhatsApp yang dibayar transfer manual).
 //
