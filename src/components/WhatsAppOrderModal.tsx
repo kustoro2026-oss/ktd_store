@@ -3,20 +3,24 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Banknote,
+  CheckCircle2,
   ChevronRight,
+  CreditCard,
+  ExternalLink,
   Loader2,
   Lock,
   MapPin,
   MessageCircle,
   Navigation,
   Package,
+  ShieldCheck,
   ShoppingBag,
   Truck,
   User,
   X,
+  XCircle,
 } from "lucide-react";
 import {
-  BANK_ACCOUNTS,
   COD_FEE,
   PAYMENT_METHODS,
   buildWhatsAppOrderMessage,
@@ -54,6 +58,15 @@ function saveBuyerData(data: SavedBuyerData) {
     localStorage.setItem(BUYER_DATA_KEY, JSON.stringify(data));
   } catch { /* quota */ }
 }
+
+/** Status overlay pembayaran online Duitku di dalam modal checkout. */
+type PayState = {
+  step: "paying" | "success" | "failed" | "wa";
+  orderId?: string;
+  paymentUrl?: string;
+  total?: number;
+  error?: string;
+};
 
 type Props = {
   open: boolean;
@@ -112,6 +125,18 @@ const rateKey = (r: Rate) => `${r.service}::${r.service_type}`;
 const ONGKIR_UNAVAILABLE =
   "Cek ongkir sementara tidak tersedia. Silakan coba beberapa saat lagi.";
 
+/** Pesan ramah untuk kode error API checkout (total/ongkir berubah, dll). */
+const CHECKOUT_ERRORS: Record<string, string> = {
+  total_berubah: "Total pembayaran berubah — muat ulang halaman lalu coba lagi.",
+  ongkir_berubah: 'Ongkir berubah — klik "Cek Ongkir" lalu pilih kurir lagi.',
+  produk_tidak_dikenal:
+    "Produk tidak dikenali — muat ulang halaman lalu coba lagi.",
+  harga_tidak_dikenal:
+    "Harga produk tidak dikenali — muat ulang halaman lalu coba lagi.",
+  gagal_menyimpan_pesanan:
+    "Gagal menyimpan pesanan — silakan coba beberapa saat lagi.",
+};
+
 async function readJson<T>(res: Response, fallbackMsg: string): Promise<T> {
   const ct = res.headers.get("content-type") ?? "";
   if (ct.includes("application/json")) return (await res.json()) as T;
@@ -141,6 +166,10 @@ export default function WhatsAppOrderModal({
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const [payment, setPayment] = useState("");
+  /** Overlay pembayaran Duitku aktif (null = form biasa). */
+  const [pay, setPay] = useState<PayState | null>(null);
+  /** Sedang membuat pesanan / sesi Duitku (tombol busy). */
+  const [paying, setPaying] = useState(false);
 
   const [provinces, setProvinces] = useState<Province[]>(provinceCache);
   const [cities, setCities] = useState<City[]>([]);
@@ -329,6 +358,8 @@ export default function WhatsAppOrderModal({
       setDistricts([]);
       setLocationError("");
       setPayment("");
+      setPay(null);
+      setPaying(false);
       setWeightStr(lockedWeight !== null ? String(lockedWeight) : "1000");
       setGroups([]);
       setSelectedByGroup({});
@@ -366,11 +397,56 @@ export default function WhatsAppOrderModal({
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key !== "Escape") return;
+      // Overlay pembayaran terbuka? Tutup overlay dulu — bukan seluruh modal,
+      // agar pembayaran masih bisa dilanjutkan.
+      if (pay) setPay(null);
+      else onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  }, [open, onClose, pay]);
+
+  // Polling status pembayaran Duitku saat overlay "paying" aktif — status
+  // lunas ditulis webhook Duitku, overlay ini cukup memantau tabel pesanan.
+  useEffect(() => {
+    if (!pay || pay.step !== "paying") return;
+    const oid = pay.orderId;
+    if (!oid) return;
+    // load() asinkron — setState terjadi setelah fetch, bukan sinkron di
+    // badan efek.
+    /* eslint-disable react-hooks/set-state-in-effect */
+    const load = async () => {
+      try {
+        const res = await fetch(`/api/checkout/${encodeURIComponent(oid)}`, {
+          cache: "no-store",
+        });
+        const j = await res.json();
+        if (j.ok && j.order?.payment_status === "paid") {
+          setPay((p) => (p ? { ...p, step: "success" } : p));
+        } else if (
+          j.ok &&
+          (j.order?.payment_status === "failed" ||
+            j.order?.payment_status === "expired")
+        ) {
+          setPay((p) =>
+            p
+              ? {
+                  ...p,
+                  step: "failed",
+                  error: j.order?.error_message || "Pembayaran tidak berhasil.",
+                }
+              : p,
+          );
+        }
+      } catch {
+        // Jaringan bermasalah — biarkan polling ronde berikutnya.
+      }
+    };
+    load();
+    const t = setInterval(load, 4000);
+    return () => clearInterval(t);
+  }, [pay]);
 
   // Auto cek ongkir begitu kecamatan dipilih
   useEffect(() => {
@@ -448,7 +524,7 @@ export default function WhatsAppOrderModal({
     });
   }, [open, items, productId, price]);
 
-  /** Produk Evermos (EVM-) hanya mendukung Transfer Bank — COD tidak tersedia. */
+  /** Produk Evermos (EVM-) hanya mendukung Bayar Online — COD tidak tersedia. */
   const hasEvermos = Boolean(
     productId?.startsWith("EVM-") ||
       items?.some((it) => it.id.startsWith("EVM-"))
@@ -650,50 +726,16 @@ export default function WhatsAppOrderModal({
     payment === "cod" ? COD_FEE * Math.max(1, groups.length) : 0;
   const grandTotal = subtotal + totalOngkir + codFeeAmount;
 
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim() || !address.trim()) {
-      setError("Nama penerima dan alamat lengkap wajib diisi.");
-      return;
-    }
-    if (!districtId) {
-      setError("Pilih provinsi, kota, dan kecamatan tujuan.");
-      return;
-    }
-    if (!allSelected) {
-      setError(
-        hasEmptyGroups
-          ? payment === "cod"
-            ? `Ada ${emptyGroupCount} paket tanpa kurir yang mendukung COD. Pilih Transfer Bank atau gunakan tombol "Tanya Admin via WA".`
-            : `Ada ${emptyGroupCount} paket yang belum punya kurir. Gunakan tombol "Tanya Admin via WA" agar admin bantu hitung ongkirnya.`
-          : 'Klik "Cek Ongkir" lalu pilih kurir pengiriman.'
-      );
-      return;
-    }
-    if (!payment) {
-      setError(
-        hasEvermos
-          ? "Pilih metode pembayaran (Transfer Bank)."
-          : "Pilih metode pembayaran (COD atau Transfer Bank)."
-      );
-      return;
-    }
-    // Simpan data pembeli untuk auto-fill di pesanan berikutnya
-    saveBuyerData({
-      name: name.trim(),
-      phone: phone.trim(),
-      address: address.trim(),
-      provinceId,
-      cityId,
-      districtId,
-    });
-    const paymentLabel =
-      PAYMENT_METHODS.find((p) => p.key === payment)?.label ?? payment;
+  /**
+   * Susun draf pesan WhatsApp pesanan — dipakai jalur COD dan fallback
+   * "bayar online belum tersedia" (mode "wa" dari API checkout).
+   */
+  const buildOrderMessage = (paymentLabel: string, helperNote?: string) => {
     const productUrl =
       typeof window !== "undefined" ? window.location.href : "";
     const selectedRates = groups.map((g, idx) => ({ g, r: selectedFor(idx)! }));
     const first = selectedRates[0];
-    const message = buildWhatsAppOrderMessage({
+    return buildWhatsAppOrderMessage({
       productName: isCart ? "Checkout Keranjang" : productName,
       price: isCart ? formatRupiah(subtotal) : price,
       items: isCart ? items : undefined,
@@ -702,7 +744,7 @@ export default function WhatsAppOrderModal({
       phone: phone.trim(),
       address: address.trim(),
       qty: isCart ? "" : qty.trim(),
-      note: note.trim(),
+      note: helperNote ?? note.trim(),
       payment: paymentLabel,
       codFee: codFeeAmount || undefined,
       shipping: {
@@ -723,6 +765,138 @@ export default function WhatsAppOrderModal({
             : undefined,
       },
     });
+  };
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || !address.trim()) {
+      setError("Nama penerima dan alamat lengkap wajib diisi.");
+      return;
+    }
+    if (!districtId) {
+      setError("Pilih provinsi, kota, dan kecamatan tujuan.");
+      return;
+    }
+    if (!allSelected) {
+      setError(
+        hasEmptyGroups
+          ? payment === "cod"
+            ? `Ada ${emptyGroupCount} paket tanpa kurir yang mendukung COD. Pilih Bayar Online atau gunakan tombol "Tanya Admin via WA".`
+            : `Ada ${emptyGroupCount} paket yang belum punya kurir. Gunakan tombol "Tanya Admin via WA" agar admin bantu hitung ongkirnya.`
+          : 'Klik "Cek Ongkir" lalu pilih kurir pengiriman.'
+      );
+      return;
+    }
+    if (!payment) {
+      setError(
+        hasEvermos
+          ? "Pilih metode pembayaran (Bayar Online)."
+          : "Pilih metode pembayaran (Bayar Online atau COD)."
+      );
+      return;
+    }
+    // Simpan data pembeli untuk auto-fill di pesanan berikutnya
+    saveBuyerData({
+      name: name.trim(),
+      phone: phone.trim(),
+      address: address.trim(),
+      provinceId,
+      cityId,
+      districtId,
+    });
+    const paymentLabel =
+      PAYMENT_METHODS.find((p) => p.key === payment)?.label ?? payment;
+
+    // Bayar Online (Duitku): pesanan + sesi gateway dibuat di server (harga
+    // & ongkir dihitung ulang), lalu overlay pembayaran ditampilkan.
+    if (payment === "duitku") {
+      setPaying(true);
+      setError("");
+      try {
+        const districtLabel =
+          districts.find((d) => String(d.id) === String(districtId))
+            ?.kecamatan_name ?? "";
+        const payload: Record<string, unknown> = {
+          destination: districtId,
+          name: name.trim(),
+          phone: phone.trim(),
+          address: address.trim(),
+          note: note.trim(),
+          districtLabel,
+          selectedRates: groups.map((_, idx) => {
+            const r = selectedFor(idx)!;
+            return {
+              index: idx,
+              service: r.service,
+              serviceType: r.service_type,
+            };
+          }),
+          clientTotal: grandTotal,
+          pageUrl:
+            typeof window !== "undefined" ? window.location.href : undefined,
+        };
+        if (isCart) {
+          payload.items = (items ?? []).map((it) => ({ id: it.id, qty: 1 }));
+        } else {
+          payload.productId = productId;
+          payload.qty = qtyNum;
+          payload.weight = Math.round(perItemWeight);
+        }
+        const res = await fetch("/api/checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const j = await readJson<{
+          ok?: boolean;
+          error?: string;
+          message?: string;
+          mode?: string;
+          orderId?: string;
+          paymentUrl?: string;
+          total?: number;
+          gatewayError?: string;
+        }>(res, "Gagal membuat pesanan. Silakan coba lagi.");
+        if (!j.ok) {
+          setError(
+            j.message ??
+              CHECKOUT_ERRORS[j.error ?? ""] ??
+              (typeof j.error === "string" && j.error
+                ? j.error
+                : "Gagal membuat pesanan. Silakan coba lagi."),
+          );
+          return;
+        }
+        if (j.mode === "duitku" && j.orderId && j.paymentUrl) {
+          setPay({
+            step: "paying",
+            orderId: j.orderId,
+            paymentUrl: j.paymentUrl,
+            total: j.total,
+          });
+        } else {
+          // Gateway belum dikonfigurasi / nominal di bawah minimum — jatuh
+          // ke jalur WhatsApp (pesanan tetap tersimpan di server).
+          setPay({
+            step: "wa",
+            orderId: j.orderId,
+            error: j.gatewayError,
+          });
+        }
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Gagal membuat pesanan. Silakan coba lagi.",
+        );
+      } finally {
+        setPaying(false);
+      }
+      return;
+    }
+
+    // COD: draft WhatsApp seperti sebelumnya (admin konfirmasi manual).
+    const message = buildOrderMessage(paymentLabel);
     window.open(whatsappLink(message), "_blank", "noopener,noreferrer");
     // Meta Pixel: pesanan terkirim ke WhatsApp — konversi utama situs (Lead).
     pixelLead({
@@ -799,10 +973,189 @@ export default function WhatsAppOrderModal({
   // ─── Render ────────────────────────────────────────────────────────────
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4"
-      onClick={onClose}
-    >
+    <>
+      {/* ── Overlay Pembayaran Duitku ── */}
+      {pay && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
+          {pay.step === "paying" && (
+            <div className="flex max-h-[92vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+              <div className="flex shrink-0 items-center justify-between border-b border-gray-100 px-5 py-4">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand/10">
+                    <CreditCard className="h-4.5 w-4.5 text-brand" />
+                  </span>
+                  <div>
+                    <h3 className="text-sm font-bold text-ink">
+                      Pembayaran Duitku
+                    </h3>
+                    <p className="text-xs text-muted-2">
+                      {pay.total
+                        ? `Total ${formatRupiah(pay.total)} — status dicek otomatis`
+                        : "Status pembayaran dicek otomatis"}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPay(null)}
+                  aria-label="Tutup"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-2 transition-colors hover:bg-gray-100 hover:text-ink"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="h-[460px] w-full bg-gray-50">
+                <iframe
+                  src={pay.paymentUrl}
+                  title="Pembayaran Duitku"
+                  className="h-full w-full border-0"
+                />
+              </div>
+              <div className="flex shrink-0 items-center justify-between gap-3 border-t border-gray-100 px-5 py-3">
+                <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-2">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-brand" />
+                  Menunggu pembayaran…
+                </span>
+                <a
+                  href={pay.paymentUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:border-brand hover:text-brand"
+                >
+                  Buka di Tab Baru <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              </div>
+            </div>
+          )}
+
+          {pay.step === "success" && (
+            <div className="w-full max-w-md rounded-2xl bg-white px-6 py-8 text-center shadow-2xl">
+              <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-100">
+                <CheckCircle2 className="h-7 w-7 text-green-600" />
+              </span>
+              <h3 className="mt-4 text-base font-bold text-ink">
+                Pembayaran Berhasil
+              </h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-muted-2">
+                {pay.total
+                  ? `Pembayaran ${formatRupiah(pay.total)} sudah kami terima. `
+                  : ""}
+                Detail pesanan dan alamat pengiriman sudah diteruskan ke admin
+                via WhatsApp — pesanan Anda akan segera diproses.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  // Meta Pixel: konversi pesanan lunas (Lead).
+                  pixelLead({
+                    ids: isCart
+                      ? (items ?? []).map((it) => it.id)
+                      : productId
+                        ? [productId]
+                        : [],
+                    value: pay.total ?? grandTotal,
+                  });
+                  onClose();
+                }}
+                className="mt-5 w-full rounded-xl bg-brand px-4 py-3 text-sm font-bold text-white shadow-lg shadow-brand/25 transition-all hover:bg-brand/90 active:scale-[0.98]"
+              >
+                Selesai
+              </button>
+            </div>
+          )}
+
+          {pay.step === "failed" && (
+            <div className="w-full max-w-md rounded-2xl bg-white px-6 py-8 text-center shadow-2xl">
+              <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-100">
+                <XCircle className="h-7 w-7 text-red-600" />
+              </span>
+              <h3 className="mt-4 text-base font-bold text-ink">
+                Pembayaran Belum Berhasil
+              </h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-muted-2">
+                {pay.error ?? "Pembayaran tidak berhasil. Silakan coba lagi."}
+              </p>
+              <div className="mt-5 space-y-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPay((p) => (p ? { ...p, step: "paying" } : p))
+                  }
+                  className="w-full rounded-xl bg-brand px-4 py-3 text-sm font-bold text-white shadow-lg shadow-brand/25 transition-all hover:bg-brand/90 active:scale-[0.98]"
+                >
+                  Coba Bayar Lagi
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPay(null)}
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm font-semibold text-muted-2 transition-colors hover:bg-gray-50"
+                >
+                  Kembali ke Form
+                </button>
+              </div>
+            </div>
+          )}
+
+          {pay.step === "wa" && (
+            <div className="w-full max-w-md rounded-2xl bg-white px-6 py-8 text-center shadow-2xl">
+              <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#25D366]/10">
+                <WhatsAppIcon className="h-6 w-6 text-[#128C4A]" />
+              </span>
+              <h3 className="mt-4 text-base font-bold text-ink">
+                Pembayaran Online Belum Tersedia
+              </h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-muted-2">
+                {pay.error
+                  ? `${pay.error}. Pesanan tetap bisa dilanjutkan — admin akan bantu proses pembayarannya via WhatsApp.`
+                  : "Pesanan tetap bisa dilanjutkan — admin akan bantu proses pembayarannya via WhatsApp."}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  const label =
+                    PAYMENT_METHODS.find((p) => p.key === "duitku")?.label ??
+                    "Bayar Online";
+                  const helperNote = [
+                    note.trim(),
+                    "Bayar online belum tersedia — mohon bantu proses & kirim petunjuk pembayaran.",
+                  ]
+                    .filter(Boolean)
+                    .join(" ");
+                  window.open(
+                    whatsappLink(buildOrderMessage(label, helperNote)),
+                    "_blank",
+                    "noopener,noreferrer",
+                  );
+                  pixelLead({
+                    ids: isCart
+                      ? (items ?? []).map((it) => it.id)
+                      : productId
+                        ? [productId]
+                        : [],
+                    value: grandTotal,
+                  });
+                  onClose();
+                }}
+                className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-3 text-sm font-bold text-white shadow-lg shadow-[#25D366]/25 transition-all hover:bg-[#1eb85a] active:scale-[0.98]"
+              >
+                <WhatsAppIcon className="h-5 w-5" />
+                Lanjutkan via WhatsApp
+              </button>
+              <button
+                type="button"
+                onClick={() => setPay(null)}
+                className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-3 text-sm font-semibold text-muted-2 transition-colors hover:bg-gray-50"
+              >
+                Kembali ke Form
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+      <div
+        className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4"
+        onClick={onClose}
+      >
       <div
         className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-white shadow-xl sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
@@ -1141,10 +1494,10 @@ export default function WhatsAppOrderModal({
                   Hanya kurir yang mendukung COD yang ditampilkan.{" "}
                   <button
                     type="button"
-                    onClick={() => setPayment("transfer")}
+                    onClick={() => setPayment("duitku")}
                     className="font-semibold text-brand underline underline-offset-2"
                   >
-                    Ganti ke Transfer Bank
+                    Ganti ke Bayar Online
                   </button>
                 </p>
               )}
@@ -1192,7 +1545,7 @@ export default function WhatsAppOrderModal({
                       )}
                       <p className="mt-1 text-[11px] text-amber-700/80">
                         {payment === "cod"
-                          ? "Tidak ada kurir yang mendukung COD untuk paket ini — pilih Transfer Bank, atau gunakan tombol “Tanya Admin via WA” di bawah."
+                          ? "Tidak ada kurir yang mendukung COD untuk paket ini — pilih Bayar Online, atau gunakan tombol “Tanya Admin via WA” di bawah."
                           : "Pesanan tetap bisa diproses — admin akan bantu hitung ongkir paket ini lewat tombol “Tanya Admin via WA” di bawah."}
                       </p>
                     </div>
@@ -1311,54 +1664,19 @@ export default function WhatsAppOrderModal({
               {hasEvermos && (
                 <p className="mt-3 text-[11px] leading-relaxed text-muted-2">
                   Pesanan ini memuat produk Evermos — pembayaran hanya tersedia
-                  via Transfer Bank.
+                  via Bayar Online (tanpa COD).
                 </p>
               )}
 
-              {payment === "transfer" && (
-                <div className="mt-3 space-y-2">
-                  <p className="text-xs font-semibold text-ink">
-                    Rekening Tujuan:
+              {payment === "duitku" && (
+                <div className="mt-3 flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5">
+                  <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
+                  <p className="text-[11px] leading-relaxed text-green-700">
+                    Pembayaran diverifikasi otomatis oleh Duitku — tidak perlu
+                    kirim bukti transfer. Setelah lunas, detail pesanan dan
+                    alamat pengiriman langsung diteruskan ke admin via
+                    WhatsApp.
                   </p>
-                  {BANK_ACCOUNTS.length > 0 ? (
-                    <>
-                      {BANK_ACCOUNTS.map((acc) => (
-                        <div
-                          key={`${acc.bank}-${acc.accountNumber}`}
-                          className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2.5"
-                        >
-                          <div className="min-w-0">
-                            <p className="text-xs font-semibold text-ink">
-                              {acc.bank} · a.n. {acc.accountName}
-                            </p>
-                            <p className="truncate font-mono text-sm font-bold text-brand">
-                              {acc.accountNumber}
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard
-                                ?.writeText(acc.accountNumber)
-                                .catch(() => { });
-                            }}
-                            className="shrink-0 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-muted-2 transition-colors hover:border-brand hover:text-brand"
-                          >
-                            Salin
-                          </button>
-                        </div>
-                      ))}
-                      <p className="text-[11px] text-muted-2">
-                        Setelah transfer, kirim bukti pembayaran ke WhatsApp
-                        kami untuk konfirmasi pesanan.
-                      </p>
-                    </>
-                  ) : (
-                    <p className="text-[11px] text-muted-2">
-                      Nomor rekening akan dikirimkan admin via WhatsApp setelah
-                      pesanan Anda kami terima.
-                    </p>
-                  )}
                 </div>
               )}
             </div>
@@ -1436,14 +1754,34 @@ export default function WhatsAppOrderModal({
             </div>
           </div>
 
-          {/* Tombol */}
+          {/* Tombol: "Klik Pesan Sekarang" — Bayar Online memakai gaya brand,
+              COD tetap gaya WhatsApp. */}
           <button
             type="button"
             onClick={submit}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-3.5 text-sm font-bold text-white shadow-lg shadow-[#25D366]/25 transition-all hover:bg-[#1eb85a] hover:shadow-xl hover:shadow-[#25D366]/30 active:scale-[0.98]"
+            disabled={paying}
+            className={`flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3.5 text-sm font-bold text-white transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 ${
+              payment === "cod"
+                ? "bg-[#25D366] shadow-lg shadow-[#25D366]/25 hover:bg-[#1eb85a] hover:shadow-xl hover:shadow-[#25D366]/30"
+                : "bg-brand shadow-lg shadow-brand/25 hover:bg-brand/90 hover:shadow-xl hover:shadow-brand/30"
+            }`}
           >
-            <WhatsAppIcon className="h-5 w-5" />
-            Buat Pesanan via WhatsApp
+            {paying ? (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Membuat Pesanan…
+              </>
+            ) : payment === "cod" ? (
+              <>
+                <WhatsAppIcon className="h-5 w-5" />
+                Klik Pesan Sekarang
+              </>
+            ) : (
+              <>
+                <CreditCard className="h-5 w-5" />
+                Klik Pesan Sekarang
+              </>
+            )}
           </button>
           {hasEmptyGroups && !ratesLoading && (
             <button
@@ -1457,10 +1795,13 @@ export default function WhatsAppOrderModal({
             </button>
           )}
           <p className="mt-2 text-center text-[11px] text-muted-2">
-            Pesanan akan dikirim ke WhatsApp admin untuk diproses
+            {payment === "cod"
+              ? "Pesanan akan dikirim ke WhatsApp admin untuk diproses"
+              : "Setelah klik, Anda diarahkan ke pembayaran aman Duitku — pesanan + alamat otomatis diteruskan ke WhatsApp admin setelah lunas"}
           </p>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 }

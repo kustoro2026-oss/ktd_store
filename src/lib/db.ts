@@ -82,6 +82,11 @@ async function pgPool(): Promise<Pool> {
     const { Pool } = await import("@neondatabase/serverless");
     const pool = new Pool({ connectionString: pgUrl() });
     await pool.query(SCHEMA_SQL);
+    await pool.query(STORE_SCHEMA_SQL);
+    // Migrasi kolom baru pada tabel store_orders yang sudah ada (Neon).
+    await pool.query(
+      "ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS note TEXT NOT NULL DEFAULT ''",
+    );
     g.__ktdTopupPg = pool;
   }
   return g.__ktdTopupPg;
@@ -100,6 +105,7 @@ async function sqliteDb(): Promise<DatabaseSync> {
     const db = new Db(path.join(dir, "topup.db"));
     db.exec("PRAGMA journal_mode = WAL;");
     db.exec(SCHEMA_SQL);
+    db.exec(STORE_SCHEMA_SQL);
     migrateSqliteColumns(db);
     g.__ktdTopupSqlite = db;
   }
@@ -122,6 +128,14 @@ function migrateSqliteColumns(db: DatabaseSync): void {
   }
   if (!cols.has("gateway_trx")) {
     db.exec("ALTER TABLE topup_orders ADD COLUMN gateway_trx TEXT NOT NULL DEFAULT ''");
+  }
+  const storeCols = new Set(
+    (
+      db.prepare("PRAGMA table_info(store_orders)").all() as { name: string }[]
+    ).map((c) => c.name),
+  );
+  if (!storeCols.has("note")) {
+    db.exec("ALTER TABLE store_orders ADD COLUMN note TEXT NOT NULL DEFAULT ''");
   }
 }
 
@@ -395,4 +409,175 @@ export async function expireStalePendingOrders(
     [nowUtc(), cutoff],
   );
   return claimed.length;
+}
+
+// ============================================================================
+// Pesanan checkout toko (produk fisik — modal Checkout Pesanan) dengan
+// pembayaran Duitku. Tabel terpisah dari topup_orders: isi kolomnya beda
+// (alamat kirim, item keranjang, ongkir). Dibaca webhook Duitku untuk
+// menandai lunas + notifikasi otomatis ke WA bot.
+// ============================================================================
+
+/** Item pesanan tersimpan sebagai JSON di kolom items. */
+export type StoreOrderItem = {
+  id: string;
+  name: string;
+  qty: number;
+  price: number;
+};
+
+export type StoreOrder = {
+  id: string;
+  /** ref_id = merchantOrderId Duitku. */
+  ref_id: string;
+  /** JSON StoreOrderItem[]. */
+  items: string;
+  buyer_name: string;
+  buyer_phone: string;
+  address: string;
+  /** Catatan pembeli (warna/ukuran, dll) — ikut di pesan WA pemilik. */
+  note: string;
+  /** Label kecamatan/kota/provinsi untuk pesan WA. */
+  district_label: string;
+  /** Ringkasan kurir + ongkir untuk pesan WA. */
+  shipping_label: string;
+  subtotal: number;
+  shipping_cost: number;
+  cod_fee: number;
+  total: number;
+  payment_method: string;
+  payment_status: "pending" | "paid" | "expired" | "failed";
+  gateway_session: string;
+  gateway_trx: string;
+  payment_url: string;
+  error_message: string;
+  created_at: string;
+  updated_at: string;
+};
+
+const STORE_SCHEMA_SQL = `
+  CREATE TABLE IF NOT EXISTS store_orders (
+    id TEXT PRIMARY KEY,
+    ref_id TEXT NOT NULL UNIQUE,
+    items TEXT NOT NULL DEFAULT '[]',
+    buyer_name TEXT NOT NULL DEFAULT '',
+    buyer_phone TEXT NOT NULL DEFAULT '',
+    address TEXT NOT NULL DEFAULT '',
+    note TEXT NOT NULL DEFAULT '',
+    district_label TEXT NOT NULL DEFAULT '',
+    shipping_label TEXT NOT NULL DEFAULT '',
+    subtotal INTEGER NOT NULL DEFAULT 0,
+    shipping_cost INTEGER NOT NULL DEFAULT 0,
+    cod_fee INTEGER NOT NULL DEFAULT 0,
+    total INTEGER NOT NULL DEFAULT 0,
+    payment_method TEXT NOT NULL DEFAULT '',
+    payment_status TEXT NOT NULL DEFAULT 'pending',
+    gateway_session TEXT NOT NULL DEFAULT '',
+    gateway_trx TEXT NOT NULL DEFAULT '',
+    payment_url TEXT NOT NULL DEFAULT '',
+    error_message TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL DEFAULT ''
+  );
+  CREATE INDEX IF NOT EXISTS idx_store_orders_created
+    ON store_orders (created_at DESC);
+`;
+
+export async function createStoreOrder(o: {
+  id: string;
+  ref_id: string;
+  items: StoreOrderItem[];
+  buyer_name: string;
+  buyer_phone: string;
+  address: string;
+  note: string;
+  district_label: string;
+  shipping_label: string;
+  subtotal: number;
+  shipping_cost: number;
+  cod_fee: number;
+  total: number;
+  payment_method: string;
+}): Promise<StoreOrder> {
+  const now = nowUtc();
+  const row = await queryOne<StoreOrder>(
+    `INSERT INTO store_orders
+       (id, ref_id, items, buyer_name, buyer_phone, address, note,
+        district_label,
+        shipping_label, subtotal, shipping_cost, cod_fee, total,
+        payment_method, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     RETURNING *`,
+    [
+      o.id,
+      o.ref_id,
+      JSON.stringify(o.items),
+      o.buyer_name,
+      o.buyer_phone,
+      o.address,
+      o.note,
+      o.district_label,
+      o.shipping_label,
+      o.subtotal,
+      o.shipping_cost,
+      o.cod_fee,
+      o.total,
+      o.payment_method,
+      now,
+      now,
+    ],
+  );
+  if (!row) throw new Error("gagal menyimpan pesanan toko");
+  return row;
+}
+
+export async function getStoreOrder(id: string): Promise<StoreOrder | undefined> {
+  return queryOne<StoreOrder>("SELECT * FROM store_orders WHERE id = ?", [id]);
+}
+
+export async function getStoreOrderByRef(
+  refId: string,
+): Promise<StoreOrder | undefined> {
+  return queryOne<StoreOrder>(
+    "SELECT * FROM store_orders WHERE ref_id = ?",
+    [refId],
+  );
+}
+
+/** Simpan sesi pembayaran gateway hasil inquiry Duitku. */
+export async function setStoreOrderSession(
+  id: string,
+  sessionId: string,
+  paymentUrl: string,
+): Promise<void> {
+  await queryRun(
+    "UPDATE store_orders SET gateway_session = ?, payment_url = ?, updated_at = ? WHERE id = ?",
+    [sessionId, paymentUrl, nowUtc(), id],
+  );
+}
+
+/** Tandai lunas (webhook Duitku terverifikasi). Idempoten. */
+export async function markStoreOrderPaid(
+  id: string,
+  trxId = "",
+  paidAt = nowUtc(),
+): Promise<void> {
+  await queryRun(
+    `UPDATE store_orders
+     SET payment_status = 'paid', gateway_trx = ?,
+         error_message = '', updated_at = ?
+     WHERE id = ? AND payment_status != 'paid'`,
+    [trxId, paidAt, id],
+  );
+}
+
+/** Tandai pembayaran gagal (webhook resultCode 01). */
+export async function markStoreOrderFailed(
+  id: string,
+  message = "Pembayaran gagal",
+): Promise<void> {
+  await queryRun(
+    "UPDATE store_orders SET payment_status = 'failed', error_message = ?, updated_at = ? WHERE id = ? AND payment_status = 'pending'",
+    [message, nowUtc(), id],
+  );
 }

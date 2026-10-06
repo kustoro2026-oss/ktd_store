@@ -137,25 +137,27 @@ export type WhatsAppShipping = {
 
 // ─── Metode pembayaran ───────────────────────────────────────────────────────
 //
-// Pilihan pembayaran pada form pesanan WhatsApp: COD (bayar di tempat) atau
-// transfer bank. Nomor rekening diisi di BANK_ACCOUNTS di bawah.
+// Pilihan pembayaran pada modal Checkout Pesanan: pembayaran online via
+// gateway Duitku (QRIS/VA — diverifikasi otomatis webhook, tanpa kirim bukti
+// transfer manual) atau COD (bayar di tempat). Nomor rekening manual di
+// BANK_ACCOUNTS tetap ada untuk halaman konfirmasi pembayaran lama.
 
 export type PaymentMethod = {
-  key: "cod" | "transfer";
+  key: "cod" | "duitku";
   label: string;
   note: string;
 };
 
 export const PAYMENT_METHODS: PaymentMethod[] = [
   {
+    key: "duitku",
+    label: "Bayar Online (QRIS / Virtual Account)",
+    note: "Pembayaran via Duitku — diverifikasi otomatis, tanpa kirim bukti transfer.",
+  },
+  {
     key: "cod",
     label: "COD (Bayar di Tempat)",
     note: "Bayar tunai saat paket diterima (biaya COD per paket).",
-  },
-  {
-    key: "transfer",
-    label: "Transfer Bank",
-    note: "Transfer ke rekening di bawah, lalu kirim bukti via WhatsApp.",
   },
 ];
 
