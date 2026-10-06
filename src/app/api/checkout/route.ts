@@ -243,7 +243,7 @@ export async function POST(req: Request) {
     buyerName: name,
     buyerPhone: phone,
     returnUrl: safePageUrl(body.pageUrl),
-    callbackUrl: `${SITE_URL}/api/checkout/webhook`,
+    callbackUrl: `${SITE_URL}/api/duitku/callback`,
   });
   if (pay.ok && pay.paymentUrl) {
     await setStoreOrderSession(orderId, pay.reference ?? "", pay.paymentUrl);

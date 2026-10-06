@@ -105,7 +105,7 @@ export async function POST(req: Request) {
       buyerName,
       buyerPhone,
       returnUrl: `${SITE_URL}/topup/bayar/${orderId}`,
-      callbackUrl: `${SITE_URL}/api/topup/pay/webhook`,
+      callbackUrl: `${SITE_URL}/api/duitku/callback`,
     });
     if (pay.ok && pay.paymentUrl) {
       await setOrderPaymentSession(orderId, pay.reference ?? "", pay.paymentUrl);

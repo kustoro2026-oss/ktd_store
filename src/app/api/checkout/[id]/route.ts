@@ -1,5 +1,5 @@
 // Status pesanan checkout — dipolling modal pembayaran Duitku (4 detik).
-// Status lunas ditulis webhook Duitku (/api/checkout/webhook).
+// Status lunas ditulis webhook Duitku (/api/duitku/callback).
 import { NextResponse } from "next/server";
 import { getStoreOrder, type StoreOrder } from "@/lib/db";
 
