@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   ArrowRight,
   ChevronDown,
+  Gamepad2,
   LayoutGrid,
   Menu,
   ShoppingCart,
@@ -60,6 +61,7 @@ export default function Header() {
       <div className="bg-brand text-white">
         <div className="container-site flex items-center justify-between py-1.5 text-xs">
           <div className="hidden items-center gap-4 md:flex">
+            <Link href="/topup" className="font-semibold transition-colors hover:underline">Top Up Game</Link>
             <Link href="/produk" className="transition-colors hover:underline">Semua Produk</Link>
             <Link href="/cara-belanja" className="transition-colors hover:underline">Cara Belanja</Link>
             <Link href="/konfirmasi-pembayaran" className="transition-colors hover:underline">Konfirmasi Pembayaran</Link>
@@ -199,6 +201,12 @@ export default function Header() {
           className="container-site flex gap-1.5 overflow-x-auto pb-2 md:hidden scrollbar-hide"
         >
           <Link
+            href="/topup"
+            className="shrink-0 rounded-full bg-white/15 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/25"
+          >
+            Top Up Game
+          </Link>
+          <Link
             href="/produk"
             className="shrink-0 rounded-full bg-white/15 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/25"
           >
@@ -311,6 +319,14 @@ export default function Header() {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-3 thin-scroll">
+              <Link
+                href="/topup"
+                onClick={() => setMobileOpen(false)}
+                className="mb-1 flex items-center gap-3 rounded-lg bg-brand/5 px-3 py-2.5 text-sm font-semibold text-brand"
+              >
+                <Gamepad2 className="h-5 w-5" />
+                Top Up Game
+              </Link>
               <Link
                 href="/produk"
                 onClick={() => setMobileOpen(false)}
