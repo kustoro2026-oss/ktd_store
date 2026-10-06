@@ -77,16 +77,31 @@ function toPg(query: string): string {
   return query.replace(/\?/g, () => `$${++i}`);
 }
 
+/** Pecah blok SQL multi-statement menjadi daftar statement tunggal. */
+function splitStatements(sql: string): string[] {
+  return sql
+    .split(";")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 async function pgPool(): Promise<Pool> {
   if (!g.__ktdTopupPg) {
     const { Pool } = await import("@neondatabase/serverless");
     const pool = new Pool({ connectionString: pgUrl() });
-    await pool.query(SCHEMA_SQL);
-    await pool.query(STORE_SCHEMA_SQL);
-    // Migrasi kolom baru pada tabel store_orders yang sudah ada (Neon).
-    await pool.query(
-      "ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS note TEXT NOT NULL DEFAULT ''",
-    );
+    // Driver serverless Neon tidak dijamin mendukung query multi-statement —
+    // jalankan tiap statement satu per satu. Kegagalan init tidak boleh
+    // mengunci seluruh lapisan DB (tabel lama tetap bisa dipakai).
+    for (const stmt of splitStatements(SCHEMA_SQL + "\n" + STORE_SCHEMA_SQL)) {
+      try {
+        await pool.query(stmt);
+      } catch (e) {
+        console.error(
+          "[db] init schema gagal:",
+          e instanceof Error ? e.message : e,
+        );
+      }
+    }
     g.__ktdTopupPg = pool;
   }
   return g.__ktdTopupPg;
