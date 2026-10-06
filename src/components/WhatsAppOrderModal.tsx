@@ -1041,8 +1041,45 @@ export default function WhatsAppOrderModal({
                   ? `Pembayaran ${formatRupiah(pay.total)} sudah kami terima. `
                   : ""}
                 Detail pesanan dan alamat pengiriman sudah diteruskan ke admin
-                via WhatsApp — pesanan Anda akan segera diproses.
+                via WhatsApp. Untuk mempercepat proses, kirim juga bukti
+                pembayaran Anda via WhatsApp.
               </p>
+              <button
+                type="button"
+                onClick={() => {
+                  // Lanjutkan ke WhatsApp: pembeli mengirim pesanan + bukti
+                  // pembayaran (lampiran screenshot). Admin tetap menerima
+                  // notifikasi otomatis dari webhook Duitku.
+                  const label =
+                    PAYMENT_METHODS.find((p) => p.key === "duitku")?.label ??
+                    "Bayar Online";
+                  const helperNote = [
+                    note.trim(),
+                    "Pembayaran sudah berhasil — bukti pembayaran saya lampirkan di chat ini.",
+                  ]
+                    .filter(Boolean)
+                    .join(" ");
+                  window.open(
+                    whatsappLink(buildOrderMessage(label, helperNote)),
+                    "_blank",
+                    "noopener,noreferrer",
+                  );
+                  // Meta Pixel: konversi pesanan lunas (Lead).
+                  pixelLead({
+                    ids: isCart
+                      ? (items ?? []).map((it) => it.id)
+                      : productId
+                        ? [productId]
+                        : [],
+                    value: pay.total ?? grandTotal,
+                  });
+                  onClose();
+                }}
+                className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-3 text-sm font-bold text-white shadow-lg shadow-[#25D366]/25 transition-all hover:bg-[#1eb85a] active:scale-[0.98]"
+              >
+                <WhatsAppIcon className="h-5 w-5" />
+                Kirim Pesanan & Bukti via WhatsApp
+              </button>
               <button
                 type="button"
                 onClick={() => {
@@ -1057,7 +1094,7 @@ export default function WhatsAppOrderModal({
                   });
                   onClose();
                 }}
-                className="mt-5 w-full rounded-xl bg-brand px-4 py-3 text-sm font-bold text-white shadow-lg shadow-brand/25 transition-all hover:bg-brand/90 active:scale-[0.98]"
+                className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-3 text-sm font-semibold text-muted-2 transition-colors hover:bg-gray-50"
               >
                 Selesai
               </button>
@@ -1754,7 +1791,7 @@ export default function WhatsAppOrderModal({
             </div>
           </div>
 
-          {/* Tombol: "Klik Pesan Sekarang" — Bayar Online memakai gaya brand,
+          {/* Tombol: "Pesan Sekarang" — Bayar Online memakai gaya brand,
               COD tetap gaya WhatsApp. */}
           <button
             type="button"
@@ -1774,12 +1811,12 @@ export default function WhatsAppOrderModal({
             ) : payment === "cod" ? (
               <>
                 <WhatsAppIcon className="h-5 w-5" />
-                Klik Pesan Sekarang
+                Pesan Sekarang
               </>
             ) : (
               <>
                 <CreditCard className="h-5 w-5" />
-                Klik Pesan Sekarang
+                Pesan Sekarang
               </>
             )}
           </button>
@@ -1797,7 +1834,7 @@ export default function WhatsAppOrderModal({
           <p className="mt-2 text-center text-[11px] text-muted-2">
             {payment === "cod"
               ? "Pesanan akan dikirim ke WhatsApp admin untuk diproses"
-              : "Setelah klik, Anda diarahkan ke pembayaran aman Duitku — pesanan + alamat otomatis diteruskan ke WhatsApp admin setelah lunas"}
+              : "Setelah ditekan, Anda akan diarahkan ke pembayaran aman Duitku — pesanan + alamat otomatis diteruskan ke WhatsApp admin setelah lunas"}
           </p>
         </div>
       </div>
