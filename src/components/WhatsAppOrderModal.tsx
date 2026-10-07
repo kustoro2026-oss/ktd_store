@@ -6,6 +6,7 @@ import {
   ArrowLeft,
   Banknote,
   CheckCircle2,
+  ChevronDown,
   ChevronRight,
   Copy,
   CreditCard,
@@ -266,6 +267,8 @@ export default function WhatsAppOrderModal({
   const [paying, setPaying] = useState(false);
   /** Tombol salin nomor VA baru saja diklik (label "Tersalin"). */
   const [vaCopied, setVaCopied] = useState(false);
+  /** Sub-kanal panduan cara bayar yang sedang terbuka (indeks akordeon). */
+  const [guideOpen, setGuideOpen] = useState(0);
   /** Daftar metode pembayaran aktif Duitku (kode + logo resmi gateway). */
   const [duitkuMethods, setDuitkuMethods] = useState<
     { code: string; name: string; image: string }[]
@@ -499,6 +502,7 @@ export default function WhatsAppOrderModal({
       setPayment("");
       setPay(null);
       setPaying(false);
+      setGuideOpen(0);
       setWeightStr(lockedWeight !== null ? String(lockedWeight) : "1000");
       setGroups([]);
       setSelectedByGroup({});
@@ -1059,6 +1063,8 @@ export default function WhatsAppOrderModal({
           // Nama & logo kanal diambil dari daftar metode Duitku yang sudah
           // dimuat di picker (j.channel = kode yang benar-benar dipakai).
           const prov = duitkuMethods.find((m) => m.code === j.channel);
+          // Sesi pembayaran baru — buka lagi sub-kanal pertama panduan.
+          setGuideOpen(0);
           setPay({
             step: "paying",
             orderId: j.orderId,
@@ -1404,24 +1410,60 @@ export default function WhatsAppOrderModal({
                       qr: Boolean(pay.qrString),
                       va: Boolean(pay.vaNumber),
                     });
+                    // Akordeon ala halaman pembayaran Duitku: satu sub-kanal
+                    // terbuka, sisanya bisa dibuka-tutup.
+                    const openIdx = Math.min(
+                      guideOpen,
+                      guide.groups.length - 1,
+                    );
                     return (
                       <>
-                        <p className="mt-1.5 text-[11px] font-semibold text-ink">
-                          {guide.via}
-                        </p>
-                        <ol className="mt-2 space-y-1.5">
-                          {guide.steps.map((s, i) => (
-                            <li
-                              key={i}
-                              className="flex items-start gap-2 text-xs leading-relaxed text-muted"
-                            >
-                              <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-brand/10 text-[10px] font-bold text-brand">
-                                {i + 1}
-                              </span>
-                              {s}
-                            </li>
-                          ))}
-                        </ol>
+                        {guide.via && (
+                          <p className="mt-1.5 text-[11px] font-semibold text-ink">
+                            {guide.via}
+                          </p>
+                        )}
+                        <div className="mt-2 divide-y divide-gray-100 overflow-hidden rounded-lg border border-gray-100">
+                          {guide.groups.map((g, i) => {
+                            const open = i === openIdx;
+                            return (
+                              <div key={g.title}>
+                                <button
+                                  type="button"
+                                  aria-expanded={open}
+                                  onClick={() =>
+                                    setGuideOpen(open ? -1 : i)
+                                  }
+                                  className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left transition-colors hover:bg-gray-50"
+                                >
+                                  <span className="text-xs font-semibold text-ink">
+                                    {g.title}
+                                  </span>
+                                  <ChevronDown
+                                    className={`h-4 w-4 shrink-0 text-muted-2 transition-transform duration-200 ${
+                                      open ? "rotate-180" : ""
+                                    }`}
+                                  />
+                                </button>
+                                {open && (
+                                  <ol className="space-y-1.5 px-3 pb-3">
+                                    {g.steps.map((s, si) => (
+                                      <li
+                                        key={si}
+                                        className="flex items-start gap-2 text-xs leading-relaxed text-muted"
+                                      >
+                                        <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-brand/10 text-[10px] font-bold text-brand">
+                                          {si + 1}
+                                        </span>
+                                        {s}
+                                      </li>
+                                    ))}
+                                  </ol>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
                         {guide.note && (
                           <p className="mt-2 text-[11px] leading-relaxed text-muted-2">
                             {guide.note}
