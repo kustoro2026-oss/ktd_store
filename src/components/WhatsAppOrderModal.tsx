@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import {
+  ArrowLeft,
   Banknote,
   CheckCircle2,
   ChevronRight,
@@ -675,6 +676,11 @@ export default function WhatsAppOrderModal({
     duitkuRows(duitkuMethods).find((r) => r.key === "qris")?.methods[0]?.code ||
     duitkuRows(duitkuMethods)[0]?.methods[0]?.code ||
     "SP";
+
+  /** Baris kategori yang sedang dibuka (step 2) — null = tampilkan daftar kategori. */
+  const openDuitkuRow = openChannel
+    ? duitkuRows(duitkuMethods).find((r) => r.key === openChannel) ?? null
+    : null;
 
   // Batal-kan pilihan COD bila pesanan memuat produk Evermos (mis. modal yang
   // sama dipakai ulang untuk keranjang yang isinya berubah). Hook wajib di
@@ -1930,29 +1936,128 @@ export default function WhatsAppOrderModal({
                         tepat di bawahnya — baru setelah itu opsi COD. */}
                     {p.key === "duitku" && payment === "duitku" && (
                       <div className="space-y-2">
-                        {/* Step 1 — baris kategori gaya marketplace: logo kiri,
-                            label + note kanan, chevron. Klik membuka daftar
-                            provider (step 2), memilih provider menutupnya. */}
-                        <div className="space-y-1.5">
-                          {duitkuRows(duitkuMethods).map((row) => {
-                            const selectedProvider = payProvider
-                              ? row.methods.find((m) => m.code === payProvider)
-                              : undefined;
-                            const open = openChannel === row.key;
-                            const chosen = selectedProvider !== undefined;
-                            return (
-                              <div key={row.key}>
+                        {openDuitkuRow ? (
+                          /* Step 2 — tampilan khusus kategori terpilih: tombol
+                              kembali + header kategori + daftar provider.
+                              Menggantikan daftar kategori agar area di
+                              bawahnya sepenuhnya milik kategori itu. */
+                          <div className="rounded-xl bg-gray-50 p-3">
+                            <button
+                              type="button"
+                              onClick={() => setOpenChannel(null)}
+                              className="mb-2 flex items-center gap-1.5 rounded-lg px-1 py-1 text-xs font-semibold text-brand transition-colors hover:bg-brand/10"
+                            >
+                              <ArrowLeft className="h-4 w-4" />
+                              Kembali
+                              <span className="font-normal text-muted-2">
+                                — pilih metode pembayaran lain
+                              </span>
+                            </button>
+
+                            {/* Header kategori (logo kiri, label + note kanan) */}
+                            <div className="mb-2 flex items-center gap-3 rounded-lg bg-white px-3 py-2.5">
+                              <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+                                {openDuitkuRow.methods.slice(0, 5).map((m) =>
+                                  m.image ? (
+                                    <img
+                                      key={m.code}
+                                      src={m.image}
+                                      alt={m.name}
+                                      className="h-6 w-auto rounded object-contain"
+                                    />
+                                  ) : (
+                                    <span
+                                      key={m.code}
+                                      className="text-[10px] font-semibold text-muted-2"
+                                    >
+                                      {m.name}
+                                    </span>
+                                  ),
+                                )}
+                              </span>
+                              <span className="shrink-0 text-right">
+                                <span className="block text-xs font-bold uppercase tracking-wide text-ink">
+                                  {openDuitkuRow.label}
+                                </span>
+                                <span className="block text-[10px] leading-snug text-muted-2">
+                                  {openDuitkuRow.note}
+                                </span>
+                              </span>
+                            </div>
+
+                            <p className="px-1 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-2">
+                              {openDuitkuRow.key === "qris"
+                                ? "Pilih aplikasi QRIS"
+                                : openDuitkuRow.key === "va"
+                                  ? "Pilih bank tujuan transfer"
+                                  : "Pilih metode"}
+                            </p>
+                            <div className="space-y-1">
+                              {openDuitkuRow.methods.map((m) => {
+                                const selected = payProvider === m.code;
+                                return (
+                                  <button
+                                    key={m.code}
+                                    type="button"
+                                    onClick={() => {
+                                      setPayProvider(m.code);
+                                      setOpenChannel(null);
+                                    }}
+                                    className={`flex w-full items-center gap-2.5 rounded-lg bg-white px-2.5 py-2.5 text-left transition-all ${
+                                      selected
+                                        ? "ring-2 ring-brand/30"
+                                        : "hover:bg-brand/5"
+                                    }`}
+                                  >
+                                    {m.image ? (
+                                      <img
+                                        src={m.image}
+                                        alt={m.name}
+                                        className="h-6 w-auto rounded object-contain"
+                                      />
+                                    ) : (
+                                      <span className="flex h-6 w-6 items-center justify-center rounded bg-gray-100 text-[9px] font-bold text-muted-2">
+                                        {m.code}
+                                      </span>
+                                    )}
+                                    <span className="min-w-0 flex-1 truncate text-xs font-semibold text-ink">
+                                      {m.name}
+                                    </span>
+                                    <span
+                                      className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 ${
+                                        selected
+                                          ? "border-brand bg-brand"
+                                          : "border-gray-300 bg-white"
+                                      }`}
+                                    >
+                                      {selected && (
+                                        <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                                      )}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ) : (
+                          /* Step 1 — baris kategori gaya marketplace: logo kiri,
+                              label + note kanan, chevron. Klik membuka tampilan
+                              khusus kategori tersebut (step 2). */
+                          <div className="space-y-1.5">
+                            {duitkuRows(duitkuMethods).map((row) => {
+                              const selectedProvider = payProvider
+                                ? row.methods.find((m) => m.code === payProvider)
+                                : undefined;
+                              const chosen = selectedProvider !== undefined;
+                              return (
                                 <button
+                                  key={row.key}
                                   type="button"
-                                  onClick={() =>
-                                    setOpenChannel(open ? null : row.key)
-                                  }
+                                  onClick={() => setOpenChannel(row.key)}
                                   className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-colors ${
-                                    open
-                                      ? "bg-brand/5 ring-2 ring-brand/30"
-                                      : chosen
-                                        ? "bg-brand/5 hover:bg-brand/10"
-                                        : "bg-gray-50 hover:bg-gray-100"
+                                    chosen
+                                      ? "bg-brand/5 hover:bg-brand/10"
+                                      : "bg-gray-50 hover:bg-gray-100"
                                   }`}
                                 >
                                   {/* Logo kanal (kiri) — setelah provider
@@ -1999,67 +2104,12 @@ export default function WhatsAppOrderModal({
                                         : row.note}
                                     </span>
                                   </span>
-                                  <ChevronRight
-                                    className={`h-4 w-4 shrink-0 text-muted-2 transition-transform ${
-                                      open ? "rotate-90" : ""
-                                    }`}
-                                  />
+                                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-2" />
                                 </button>
-
-                                {/* Step 2 — pilih provider dalam kategori */}
-                                {open && (
-                                  <div className="mt-1.5 space-y-1 rounded-xl bg-gray-50 p-2">
-                                    <p className="px-2 pb-1 pt-1 text-[10px] font-bold uppercase tracking-wider text-muted-2">
-                                      {row.key === "qris"
-                                        ? "Pilih aplikasi QRIS"
-                                        : row.key === "va"
-                                          ? "Pilih bank tujuan transfer"
-                                          : "Pilih metode"}
-                                    </p>
-                                    {row.methods.map((m) => {
-                                      const selected = payProvider === m.code;
-                                      return (
-                                        <button
-                                          key={m.code}
-                                          type="button"
-                                          onClick={() => {
-                                            setPayProvider(m.code);
-                                            setOpenChannel(null);
-                                          }}
-                                          className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors ${
-                                            selected
-                                              ? "bg-white ring-2 ring-brand/30"
-                                              : "bg-white hover:bg-brand/5"
-                                          }`}
-                                        >
-                                          {m.image ? (
-                                            <img
-                                              src={m.image}
-                                              alt={m.name}
-                                              className="h-6 w-auto rounded object-contain"
-                                            />
-                                          ) : (
-                                            <span className="flex h-6 w-6 items-center justify-center rounded bg-gray-100 text-[9px] font-bold text-muted-2">
-                                              {m.code}
-                                            </span>
-                                          )}
-                                          <span className="min-w-0 flex-1 truncate text-xs font-semibold text-ink">
-                                            {m.name}
-                                          </span>
-                                          {selected ? (
-                                            <CheckCircle2 className="h-4 w-4 shrink-0 text-brand" />
-                                          ) : (
-                                            <ChevronRight className="h-4 w-4 shrink-0 text-muted-2" />
-                                          )}
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
+                              );
+                            })}
+                          </div>
+                        )}
                         <div className="flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5">
                           <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
                           <p className="text-[11px] leading-relaxed text-green-700">
