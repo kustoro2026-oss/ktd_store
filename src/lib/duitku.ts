@@ -45,6 +45,79 @@ function duitkuSign(parts: (string | number)[]): string {
     .digest("hex");
 }
 
+// ---------- Daftar metode pembayaran aktif (getpaymentmethod) ----------
+
+/** Metode pembayaran aktif milik merchant — untuk picker kanal di UI. */
+export type DuitkuPaymentMethod = {
+  /** Kode kanal untuk inquiry (mis. SP = QRIS ShopeePay, VA = Maybank VA). */
+  code: string;
+  /** Nama tampilan (mis. "SHOPEEPAY QRIS", "BCA VA"). */
+  name: string;
+  /** URL logo resmi dari CDN Duitku. */
+  image: string;
+  /** Biaya kanal (string angka). */
+  fee: string;
+};
+
+/** Waktu WIB (Asia/Jakarta) format yyyy-MM-dd HH:mm:ss sesuai docs Duitku. */
+function duitkuDatetime(d = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const wib = new Date(d.getTime() + d.getTimezoneOffset() * 60000 + 7 * 3600 * 1000);
+  return (
+    `${wib.getFullYear()}-${pad(wib.getMonth() + 1)}-${pad(wib.getDate())} ` +
+    `${pad(wib.getHours())}:${pad(wib.getMinutes())}:${pad(wib.getSeconds())}`
+  );
+}
+
+let methodsCache: { at: number; amount: number; list: DuitkuPaymentMethod[] } | null = null;
+
+/** Daftar metode pembayaran aktif (getpaymentmethod) — di-cache in-memory
+ *  10 menit per nominal agar tidak memanggil API di setiap request. */
+export async function getDuitkuPaymentMethods(
+  amount = DUITKU_MIN_AMOUNT,
+): Promise<DuitkuPaymentMethod[]> {
+  if (!duitkuConfigured()) return [];
+  if (
+    methodsCache &&
+    methodsCache.amount === amount &&
+    Date.now() - methodsCache.at < 10 * 60 * 1000
+  ) {
+    return methodsCache.list;
+  }
+  const merchantCode = process.env.DUITKU_MERCHANT_CODE ?? "";
+  const datetime = duitkuDatetime();
+  const body = {
+    merchantcode: merchantCode,
+    amount,
+    datetime,
+    signature: duitkuSign([merchantCode, amount, datetime]),
+  };
+  try {
+    const res = await fetch(
+      `${duitkuBaseUrl()}/webapi/api/merchant/paymentmethod/getpaymentmethod`,
+      {
+        method: "POST",
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      },
+    );
+    const d = (await res.json()) as Record<string, unknown>;
+    const list: DuitkuPaymentMethod[] = Array.isArray(d.paymentFee)
+      ? (d.paymentFee as Record<string, unknown>[]).map((m) => ({
+          code: String(m.paymentMethod ?? ""),
+          name: String(m.paymentName ?? m.paymentMethod ?? ""),
+          image: String(m.paymentImage ?? ""),
+          fee: String(m.totalFee ?? "0"),
+        }))
+      : [];
+    methodsCache = { at: Date.now(), amount, list };
+    return list;
+  } catch (e) {
+    console.error("[duitku] getpaymentmethod gagal:", e);
+    return methodsCache?.list ?? [];
+  }
+}
+
 // ---------- Buat transaksi (inquiry) ----------
 
 export type DuitkuPaymentResult = {

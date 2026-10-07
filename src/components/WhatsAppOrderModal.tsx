@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import {
   Banknote,
@@ -131,6 +131,63 @@ const parseRupiah = (s: string) => {
 /** Kunci stabil pemilihan kurir — indeks daftar bisa berubah saat difilter COD. */
 const rateKey = (r: Rate) => `${r.service}::${r.service_type}`;
 
+/** Kode kanal Duitku yang termasuk QRIS — hasil inquiry memuat qrString. */
+const QRIS_CODES = new Set(["SP", "NQ", "SQ"]);
+/** Kode kanal e-wallet (OVO, DANA, LinkAja, dll) — belum didukung tanpa redirect. */
+const EWALLET_CODES = new Set(["OV", "DA", "LA", "SA", "Q1", "MY"]);
+/** Kode kanal tunai/ritel & minimarket (Indomaret, Alfamart, dll). */
+const RETAIL_CODES = new Set(["FT", "IR", "A2", "AT"]);
+
+/** Susun baris picker kanal pembayaran dari daftar metode aktif Duitku:
+ *  QRIS & Transfer Bank (VA) bisa dipilih; e-wallet/kartu kredit tampil
+ *  sebagai "Segera Hadir" bila aktif di merchant. */
+function duitkuRows(methods: { code: string; name: string; image: string }[]) {
+  const qris = methods.filter((m) => QRIS_CODES.has(m.code));
+  const va = methods.filter(
+    (m) =>
+      !QRIS_CODES.has(m.code) &&
+      !EWALLET_CODES.has(m.code) &&
+      !RETAIL_CODES.has(m.code) &&
+      m.code !== "VC",
+  );
+  const ewallet = methods.filter((m) => EWALLET_CODES.has(m.code));
+  const card = methods.filter((m) => m.code === "VC");
+  return [
+    {
+      key: "qris",
+      label: "QRIS",
+      note: "Scan dari semua e-wallet & m-banking",
+      methods: qris,
+    },
+    {
+      key: "va",
+      label: "Transfer Bank (VA)",
+      note: "Transfer ke nomor virtual account",
+      methods: va,
+    },
+    ...(ewallet.length
+      ? [
+          {
+            key: "ewallet",
+            label: "E-Wallet",
+            note: "OVO, DANA, LinkAja",
+            methods: ewallet,
+          },
+        ]
+      : []),
+    ...(card.length
+      ? [
+          {
+            key: "card",
+            label: "Kartu Kredit/Debit",
+            note: "Visa & Mastercard",
+            methods: card,
+          },
+        ]
+      : []),
+  ];
+}
+
 const ONGKIR_UNAVAILABLE =
   "Cek ongkir sementara tidak tersedia. Silakan coba beberapa saat lagi.";
 
@@ -183,6 +240,10 @@ export default function WhatsAppOrderModal({
   const [paying, setPaying] = useState(false);
   /** Tombol salin nomor VA baru saja diklik (label "Tersalin"). */
   const [vaCopied, setVaCopied] = useState(false);
+  /** Daftar metode pembayaran aktif Duitku (kode + logo resmi gateway). */
+  const [duitkuMethods, setDuitkuMethods] = useState<
+    { code: string; name: string; image: string }[]
+  >([]);
 
   const [provinces, setProvinces] = useState<Province[]>(provinceCache);
   const [cities, setCities] = useState<City[]>([]);
@@ -460,6 +521,27 @@ export default function WhatsAppOrderModal({
     const t = setInterval(load, 4000);
     return () => clearInterval(t);
   }, [pay]);
+
+  // Muat daftar metode pembayaran aktif Duitku (logo QRIS / bank) untuk
+  // picker kanal pembayaran di dalam modal. Bila gateway belum siap, picker
+  // tetap tampil dengan label saja.
+  useEffect(() => {
+    if (!open || payment !== "duitku" || duitkuMethods.length) return;
+    const load = async () => {
+      try {
+        const res = await fetch("/api/duitku/methods", { cache: "no-store" });
+        const j = await res.json();
+        if (j.ok && Array.isArray(j.methods)) {
+          setDuitkuMethods(
+            j.methods as { code: string; name: string; image: string }[],
+          );
+        }
+      } catch {
+        // Gateway belum siap — biarkan ronde berikutnya.
+      }
+    };
+    void load();
+  }, [open, payment, duitkuMethods.length]);
 
   // Auto cek ongkir begitu kecamatan dipilih
   useEffect(() => {
@@ -1758,30 +1840,121 @@ export default function WhatsAppOrderModal({
             <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-4">
               <div className="space-y-2">
                 {paymentMethods.map((p) => (
-                  <label
-                    key={p.key}
-                    className={`flex cursor-pointer items-start gap-3 rounded-lg border bg-white px-4 py-3 transition-all ${payment === p.key
-                      ? "border-brand ring-2 ring-brand/20 shadow-sm"
-                      : "border-gray-200 hover:border-gray-300"
-                      }`}
-                  >
-                    <input
-                      type="radio"
-                      name="payment-method"
-                      checked={payment === p.key}
-                      onChange={() => setPayment(p.key)}
-                      className="mt-0.5 h-4 w-4 accent-brand"
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-semibold text-ink">
-                        {p.label}
+                  <Fragment key={p.key}>
+                    <label
+                      className={`flex cursor-pointer items-start gap-3 rounded-lg border bg-white px-4 py-3 transition-all ${payment === p.key
+                        ? "border-brand ring-2 ring-brand/20 shadow-sm"
+                        : "border-gray-200 hover:border-gray-300"
+                        }`}
+                    >
+                      <input
+                        type="radio"
+                        name="payment-method"
+                        checked={payment === p.key}
+                        onChange={() => setPayment(p.key)}
+                        className="mt-0.5 h-4 w-4 accent-brand"
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-semibold text-ink">
+                          {p.label}
+                        </span>
+                        <span className="block text-[11px] text-muted-2">
+                          {p.note}
+                        </span>
                       </span>
-                      <span className="block text-[11px] text-muted-2">
-                        {p.note}
-                      </span>
-                    </span>
-                    <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-2" />
-                  </label>
+                      <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-2" />
+                    </label>
+
+                    {/* Bila Bayar Online dipilih, pilihan kanalnya tampil
+                        tepat di bawahnya — baru setelah itu opsi COD. */}
+                    {p.key === "duitku" && payment === "duitku" && (
+                      <>
+                        {/* Pilihan kanal gaya marketplace: baris kategori
+                            dengan logo resmi gateway + chevron. QRIS dirender
+                            jadi QR langsung di overlay, VA ditampilkan sebagai
+                            nomor + tombol salin — keduanya tanpa tab baru. */}
+                        <div className="space-y-2">
+                          {duitkuRows(duitkuMethods).map((row) => {
+                            const disabled =
+                              row.key !== "qris" && row.key !== "va";
+                            const rowCls = `flex items-center gap-3 rounded-xl border bg-white px-3 py-3 transition-all ${
+                              disabled
+                                ? "cursor-not-allowed border-gray-200 opacity-60"
+                                : payChannel === row.key
+                                  ? "cursor-pointer border-brand shadow-sm ring-2 ring-brand/20"
+                                  : "cursor-pointer border-gray-200 hover:border-gray-300"
+                            }`;
+                            const body = (
+                              <>
+                                <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                                  {row.methods.slice(0, 5).map((m) =>
+                                    m.image ? (
+                                      <img
+                                        key={m.code}
+                                        src={m.image}
+                                        alt={m.name}
+                                        className="h-6 w-auto object-contain"
+                                      />
+                                    ) : (
+                                      <span
+                                        key={m.code}
+                                        className="text-[10px] text-muted-2"
+                                      >
+                                        {m.name}
+                                      </span>
+                                    ),
+                                  )}
+                                </span>
+                                <span className="shrink-0 text-right">
+                                  <span className="block text-xs font-semibold text-ink">
+                                    {row.label}
+                                    {disabled && (
+                                      <span className="ml-1.5 rounded bg-gray-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-muted-2">
+                                        Segera Hadir
+                                      </span>
+                                    )}
+                                  </span>
+                                  <span className="hidden text-[10px] leading-snug text-muted-2 sm:block">
+                                    {row.note}
+                                  </span>
+                                </span>
+                                <ChevronRight className="h-4 w-4 shrink-0 text-muted-2" />
+                              </>
+                            );
+                            return disabled ? (
+                              <div key={row.key} className={rowCls}>
+                                <span className="h-4 w-4 shrink-0" />
+                                {body}
+                              </div>
+                            ) : (
+                              <label key={row.key} className={rowCls}>
+                                <input
+                                  type="radio"
+                                  name="duitku-channel"
+                                  checked={payChannel === row.key}
+                                  onChange={() =>
+                                    setPayChannel(row.key as "qris" | "va")
+                                  }
+                                  className="h-4 w-4 shrink-0 accent-brand"
+                                />
+                                {body}
+                              </label>
+                            );
+                          })}
+                        </div>
+                        <div className="flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5">
+                          <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
+                          <p className="text-[11px] leading-relaxed text-green-700">
+                            Pembayaran diverifikasi otomatis oleh Duitku. Kirim
+                            bukti transfer bersifat opsional — boleh dilampirkan
+                            sebagai konfirmasi tambahan ke admin. Setelah lunas,
+                            detail pesanan dan alamat pengiriman langsung
+                            diteruskan ke admin via WhatsApp.
+                          </p>
+                        </div>
+                      </>
+                    )}
+                  </Fragment>
                 ))}
               </div>
 
@@ -1790,63 +1963,6 @@ export default function WhatsAppOrderModal({
                   Pesanan ini memuat produk Evermos — pembayaran hanya tersedia
                   via Bayar Online (tanpa COD).
                 </p>
-              )}
-
-              {payment === "duitku" && (
-                <>
-                  {/* Pilihan kanal: QRIS dirender jadi QR langsung di overlay,
-                      VA ditampilkan sebagai nomor — keduanya tanpa tab baru. */}
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    {(
-                      [
-                        {
-                          key: "qris",
-                          label: "QRIS",
-                          note: "Scan QR dari bank / e-wallet",
-                        },
-                        {
-                          key: "va",
-                          label: "Virtual Account",
-                          note: "Transfer ke nomor VA",
-                        },
-                      ] as const
-                    ).map((c) => (
-                      <label
-                        key={c.key}
-                        className={`flex cursor-pointer items-start gap-2 rounded-lg border bg-white px-3 py-2.5 transition-all ${
-                          payChannel === c.key
-                            ? "border-brand shadow-sm ring-2 ring-brand/20"
-                            : "border-gray-200 hover:border-gray-300"
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="duitku-channel"
-                          checked={payChannel === c.key}
-                          onChange={() => setPayChannel(c.key)}
-                          className="mt-0.5 h-3.5 w-3.5 accent-brand"
-                        />
-                        <span className="min-w-0">
-                          <span className="block text-xs font-semibold text-ink">
-                            {c.label}
-                          </span>
-                          <span className="block text-[10px] leading-snug text-muted-2">
-                            {c.note}
-                          </span>
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                  <div className="mt-3 flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5">
-                    <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
-                    <p className="text-[11px] leading-relaxed text-green-700">
-                      Pembayaran diverifikasi otomatis oleh Duitku — tidak perlu
-                      kirim bukti transfer. Setelah lunas, detail pesanan dan
-                      alamat pengiriman langsung diteruskan ke admin via
-                      WhatsApp.
-                    </p>
-                  </div>
-                </>
               )}
             </div>
           </section>
