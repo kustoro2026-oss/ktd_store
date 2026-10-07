@@ -132,8 +132,8 @@ const rateKey = (r: Rate) => `${r.service}::${r.service_type}`;
 
 /** Kode kanal Duitku yang termasuk QRIS — hasil inquiry memuat qrString. */
 const QRIS_CODES = new Set(["SP", "NQ", "SQ"]);
-/** Kode kanal e-wallet (OVO, DANA, LinkAja, dll) — belum didukung tanpa redirect. */
-const EWALLET_CODES = new Set(["OV", "DA", "LA", "SA", "Q1", "MY"]);
+/** Kode kanal e-wallet/paylater (OVO, DANA, LinkAja, ShopeePay, Indodana, Jenius) — belum didukung tanpa redirect. */
+const EWALLET_CODES = new Set(["OV", "DA", "LA", "SA", "Q1", "MY", "DN", "JP"]);
 /** Kode kanal tunai/ritel & minimarket (Indomaret, Alfamart, dll). */
 const RETAIL_CODES = new Set(["FT", "IR", "A2", "AT"]);
 
