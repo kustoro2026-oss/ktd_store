@@ -1195,7 +1195,7 @@ export default function WhatsAppOrderModal({
                       Pembayaran Pesanan
                     </h3>
                     <p className="text-[11px] text-white/80">
-                      KTD Store · pembayaran aman via Duitku
+                      Pembayaran Online KTD Store
                     </p>
                   </div>
                 </div>
@@ -1370,8 +1370,8 @@ export default function WhatsAppOrderModal({
                       </p>
                       <p className="max-w-xs text-xs leading-relaxed text-muted-2">
                         Metode ini membutuhkan pengalihan ke halaman pembayaran
-                        aman Duitku. Pesanan Anda tersimpan dan statusnya
-                        dicek otomatis.
+                        aman. Pesanan Anda tersimpan dan statusnya dicek
+                        otomatis.
                       </p>
                       <a
                         href={pay.paymentUrl}
@@ -1483,6 +1483,10 @@ export default function WhatsAppOrderModal({
                     {pay.vaNumber ? " Virtual Account berlaku 24 jam." : ""}
                   </span>
                 </p>
+                <p className="mt-1.5 text-[10px] leading-relaxed text-muted-2">
+                  Pembayaran diproses secara aman oleh mitra resmi Duitku (PT
+                  Espay Debit Indonesia Koe).
+                </p>
               </div>
 
               {/* Footer */}
@@ -1491,14 +1495,6 @@ export default function WhatsAppOrderModal({
                   <Loader2 className="h-3.5 w-3.5 animate-spin text-brand" />
                   Menunggu pembayaran…
                 </span>
-                <a
-                  href={pay.paymentUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:border-brand hover:text-brand"
-                >
-                  Buka di Tab Baru <ExternalLink className="h-3.5 w-3.5" />
-                </a>
               </div>
             </div>
           )}
@@ -2357,7 +2353,7 @@ export default function WhatsAppOrderModal({
                         <div className="flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5">
                           <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
                           <p className="text-[11px] leading-relaxed text-green-700">
-                            Pembayaran diverifikasi otomatis oleh Duitku. Kirim
+                            Pembayaran diverifikasi otomatis. Kirim
                             bukti transfer bersifat opsional — boleh dilampirkan
                             sebagai konfirmasi tambahan ke admin. Setelah lunas,
                             detail pesanan dan alamat pengiriman langsung
@@ -2494,7 +2490,7 @@ export default function WhatsAppOrderModal({
           <p className="mt-2 text-center text-[11px] text-muted-2">
             {payment === "cod"
               ? "Pesanan akan dikirim ke WhatsApp admin untuk diproses"
-              : "Setelah ditekan, Anda akan diarahkan ke pembayaran aman Duitku — pesanan + alamat otomatis diteruskan ke WhatsApp admin setelah lunas"}
+              : "Setelah ditekan, Anda akan diarahkan ke halaman pembayaran aman — pesanan + alamat otomatis diteruskan ke WhatsApp admin setelah lunas"}
           </p>
         </div>
       </div>

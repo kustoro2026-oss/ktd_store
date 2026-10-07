@@ -110,7 +110,7 @@ const VA_GUIDES: Record<string, PaymentGuide> = {
         steps: [
           "Buka aplikasi Livin' by Mandiri lalu login.",
           "Pilih menu Bayar → Multipayment.",
-          "Pilih penyedia jasa DUITKU, lalu masukkan nomor Virtual Account di atas.",
+          "Pilih penyedia jasa DUITKU (mitra resmi KTD Store), lalu masukkan nomor Virtual Account di atas.",
           "Periksa halaman konfirmasi, lalu selesaikan dengan PIN transaksi.",
         ],
       },
@@ -119,7 +119,7 @@ const VA_GUIDES: Record<string, PaymentGuide> = {
         steps: [
           "Login ke situs Mandiri Online (ibank.bankmandiri.co.id).",
           "Pilih menu Pembayaran → Multipayment.",
-          "Pilih penyedia jasa DUITKU, masukkan nomor Virtual Account di atas dan nominalnya.",
+          "Pilih penyedia jasa DUITKU (mitra resmi KTD Store), masukkan nomor Virtual Account di atas dan nominalnya.",
           "Periksa konfirmasi, lalu selesaikan dengan PIN Token.",
         ],
       },
@@ -127,7 +127,7 @@ const VA_GUIDES: Record<string, PaymentGuide> = {
         title: "ATM Mandiri",
         steps: [
           "Pilih menu Bayar/Beli → Lainnya → Multipayment.",
-          "Masukkan kode biller DUITKU (jika diminta) lalu nomor Virtual Account di atas.",
+          "Masukkan kode biller DUITKU (mitra resmi KTD Store) lalu nomor Virtual Account di atas.",
           "Masukkan nominal, periksa kembali, lalu pilih Ya.",
         ],
       },
@@ -263,7 +263,7 @@ const VA_GUIDES: Record<string, PaymentGuide> = {
         title: "BYOND by BSI",
         steps: [
           "Buka aplikasi BYOND by BSI lalu login.",
-          "Pilih menu Bayar & Beli → kategori Lembaga, lalu cari DUITKU.",
+          "Pilih menu Bayar & Beli → kategori Lembaga, lalu cari DUITKU (mitra resmi KTD Store).",
           "Masukkan nomor Virtual Account di atas.",
           "Periksa nama dan nominal, lalu selesaikan pembayaran.",
         ],
@@ -271,7 +271,7 @@ const VA_GUIDES: Record<string, PaymentGuide> = {
       {
         title: "ATM BSI",
         steps: [
-          "Pilih menu Bayar/Beli → Lembaga → DUITKU.",
+          "Pilih menu Bayar/Beli → Lembaga → DUITKU (mitra resmi KTD Store).",
           "Masukkan nomor Virtual Account di atas dan nominalnya.",
           "Periksa kembali, lalu konfirmasi pembayaran.",
         ],
@@ -439,13 +439,13 @@ const REDIRECT_GUIDES: Record<string, PaymentGuide> = {
     ],
   },
   VC: {
-    via: "Halaman pembayaran aman Duitku",
+    via: "Halaman pembayaran aman",
     groups: [
       {
         title: "Bayar dengan Kartu Kredit/Debit",
         steps: [
           "Klik tombol Buka Pembayaran.",
-          "Masukkan nomor kartu, masa berlaku, dan CVV di halaman aman Duitku.",
+          "Masukkan nomor kartu, masa berlaku, dan CVV di halaman pembayaran aman.",
           "Selesaikan verifikasi 3DS / OTP dari bank penerbit kartu.",
         ],
       },
@@ -510,13 +510,13 @@ const FALLBACK_VA: PaymentGuide = {
 };
 
 const FALLBACK_REDIRECT: PaymentGuide = {
-  via: "Halaman pembayaran aman Duitku (tab baru)",
+  via: "Halaman pembayaran aman",
   groups: [
     {
-      title: "Selesaikan di halaman Duitku",
+      title: "Selesaikan di halaman pembayaran",
       steps: [
         "Klik tombol Buka Pembayaran.",
-        "Selesaikan pembayaran di halaman Duitku yang aman.",
+        "Selesaikan pembayaran di halaman pembayaran yang aman.",
         "Kembali ke tab ini — status pesanan dicek otomatis.",
       ],
     },

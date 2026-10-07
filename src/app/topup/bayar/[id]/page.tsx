@@ -218,7 +218,7 @@ export default function TopupBayarPage() {
                   rel="noopener noreferrer"
                   className="flex items-center justify-center gap-2 rounded-xl border border-gray-200 px-5 py-2.5 text-xs font-semibold text-muted transition-colors hover:border-brand hover:text-brand"
                 >
-                  Atau bayar lewat halaman Duitku (semua metode){" "}
+                  Atau bayar lewat halaman pembayaran aman (semua metode){" "}
                   <ExternalLink className="h-3.5 w-3.5" />
                 </a>
                 <p className="text-center text-xs text-muted">
