@@ -10,9 +10,10 @@
 //
 // Body: { productId?, items?[{id,qty}], qty?, weight?, destination, name,
 //         phone, address, note, districtLabel, selectedRates[{index,service,
-//         serviceType}], clientTotal, pageUrl }
+//         serviceType}], clientTotal, pageUrl,
+//         paymentChannel?: "qris" | "va" }
 // Respons: { ok, mode: "duitku" | "wa", orderId, paymentUrl?, total?,
-//            gatewayError? }
+//            qrString?, vaNumber?, gatewayError? }
 
 import { NextResponse } from "next/server";
 import { getDetailCached } from "@/lib/detail-cache";
@@ -56,6 +57,7 @@ export async function POST(req: Request) {
     selectedRates?: unknown;
     clientTotal?: unknown;
     pageUrl?: unknown;
+    paymentChannel?: unknown;
   } = {};
   try {
     body = await req.json();
@@ -236,22 +238,48 @@ export async function POST(req: Request) {
     items.length === 1
       ? `${items[0].name}${items[0].qty > 1 ? ` (×${items[0].qty})` : ""}`
       : `${items.length} produk KTD Store`;
-  const pay = await createDuitkuPayment({
-    merchantOrderId: refId,
-    productName: `${productSummary} — ${orderId}`,
-    amount: total,
-    buyerName: name,
-    buyerPhone: phone,
-    returnUrl: safePageUrl(body.pageUrl),
-    callbackUrl: `${SITE_URL}/api/duitku/callback`,
-  });
-  if (pay.ok && pay.paymentUrl) {
-    await setStoreOrderSession(orderId, pay.reference ?? "", pay.paymentUrl);
+
+  // Channel pilihan pembeli: QRIS (SP) atau Virtual Account (VA). Bila
+  // channel pilihan ditolak gateway (mis. belum aktif), coba satunya lagi.
+  const channelWanted = String(body.paymentChannel ?? "").trim();
+  const attempts =
+    channelWanted === "va" ? ["VA", "SP"] : ["SP", "VA"];
+  let pay: Awaited<ReturnType<typeof createDuitkuPayment>> | null = null;
+  let payChannel = "";
+  for (const code of attempts) {
+    const attempt = await createDuitkuPayment({
+      merchantOrderId: refId,
+      productName: `${productSummary} — ${orderId}`,
+      amount: total,
+      buyerName: name,
+      buyerPhone: phone,
+      returnUrl: safePageUrl(body.pageUrl),
+      callbackUrl: `${SITE_URL}/api/duitku/callback`,
+      paymentMethod: code,
+    });
+    if (attempt.ok) {
+      pay = attempt;
+      payChannel = code;
+      break;
+    }
+    pay = attempt; // simpan error terakhir untuk gatewayError
+  }
+  if (pay?.ok && pay.paymentUrl) {
+    await setStoreOrderSession(
+      orderId,
+      pay.reference ?? "",
+      pay.paymentUrl,
+      pay.vaNumber ?? "",
+      pay.qrString ?? "",
+    );
     return NextResponse.json({
       ok: true,
       orderId,
       mode: "duitku",
       paymentUrl: pay.paymentUrl,
+      qrString: pay.qrString ?? "",
+      vaNumber: pay.vaNumber ?? "",
+      channel: payChannel,
       total,
     });
   }
@@ -260,6 +288,6 @@ export async function POST(req: Request) {
     ok: true,
     orderId,
     mode: "wa",
-    gatewayError: pay.error ?? "sesi Duitku gagal dibuat",
+    gatewayError: pay?.error ?? "sesi Duitku gagal dibuat",
   });
 }

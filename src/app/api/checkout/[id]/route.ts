@@ -18,13 +18,21 @@ export async function GET(
     // Kirim hanya field yang aman ditampilkan ke pembeli.
     const view: Pick<
       StoreOrder,
-      "id" | "payment_status" | "total" | "error_message" | "payment_method"
+      | "id"
+      | "payment_status"
+      | "total"
+      | "error_message"
+      | "payment_method"
+      | "payment_va"
+      | "payment_qr"
     > = {
       id: order.id,
       payment_status: order.payment_status,
       total: order.total,
       error_message: order.error_message,
       payment_method: order.payment_method,
+      payment_va: order.payment_va,
+      payment_qr: order.payment_qr,
     };
     return NextResponse.json({ ok: true, order: view });
   } catch {

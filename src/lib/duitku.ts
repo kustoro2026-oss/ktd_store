@@ -55,6 +55,8 @@ export type DuitkuPaymentResult = {
   paymentUrl?: string;
   /** Nomor pembayaran / virtual account. */
   vaNumber?: string;
+  /** String QRIS untuk dirender jadi QR code di sisi kita (tanpa redirect). */
+  qrString?: string;
   error?: string;
 };
 
@@ -70,6 +72,10 @@ export async function createDuitkuPayment(i: {
   returnUrl: string;
   /** URL webhook callback. */
   callbackUrl: string;
+  /** Kode metode pembayaran (opsional — default env DUITKU_PAYMENT_METHOD).
+   *  "SP" = QRIS ShopeePay (hasil inquiry memuat qrString), kode VA lain
+   *  memuat vaNumber. */
+  paymentMethod?: string;
 }): Promise<DuitkuPaymentResult> {
   if (!duitkuConfigured()) {
     return {
@@ -84,7 +90,7 @@ export async function createDuitkuPayment(i: {
   const body: Record<string, unknown> = {
     merchantCode,
     paymentAmount: i.amount,
-    paymentMethod: duitkuPaymentMethod(),
+    paymentMethod: i.paymentMethod ?? duitkuPaymentMethod(),
     merchantOrderId: i.merchantOrderId,
     productDetails: i.productName.slice(0, 255),
     customerVaName: (i.buyerName || "KTD Store").slice(0, 20),
@@ -124,6 +130,7 @@ export async function createDuitkuPayment(i: {
       reference: String(d.reference ?? ""),
       paymentUrl: String(d.paymentUrl),
       vaNumber: String(d.vaNumber ?? ""),
+      qrString: String(d.qrString ?? ""),
     };
   } catch (e) {
     return { ok: false, error: String(e) };

@@ -46,6 +46,10 @@ export type TopUpOrder = {
   /** ID transaksi dari payment gateway (Duitku publisherOrderId/reference). */
   gateway_trx: string;
   payment_url: string;
+  /** Nomor VA (bila metode VA) — ditampilkan tanpa redirect. */
+  payment_va: string;
+  /** String QRIS (bila metode QRIS) — dirender jadi QR di sisi kita. */
+  payment_qr: string;
   paid_at: string;
   digiflazz_sn: string;
   error_message: string;
@@ -102,6 +106,20 @@ async function pgPool(): Promise<Pool> {
         );
       }
     }
+    // Tabel PG lama dibuat tanpa kolom payment_va/payment_qr — tambahkan
+    // idempoten (ADD COLUMN IF NOT EXISTS).
+    for (const alter of [
+      "ALTER TABLE topup_orders ADD COLUMN IF NOT EXISTS payment_va TEXT NOT NULL DEFAULT ''",
+      "ALTER TABLE topup_orders ADD COLUMN IF NOT EXISTS payment_qr TEXT NOT NULL DEFAULT ''",
+      "ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS payment_va TEXT NOT NULL DEFAULT ''",
+      "ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS payment_qr TEXT NOT NULL DEFAULT ''",
+    ]) {
+      try {
+        await pool.query(alter);
+      } catch (e) {
+        console.error("[db] alter gagal:", e instanceof Error ? e.message : e);
+      }
+    }
     g.__ktdTopupPg = pool;
   }
   return g.__ktdTopupPg;
@@ -151,6 +169,18 @@ function migrateSqliteColumns(db: DatabaseSync): void {
   );
   if (!storeCols.has("note")) {
     db.exec("ALTER TABLE store_orders ADD COLUMN note TEXT NOT NULL DEFAULT ''");
+  }
+  if (!storeCols.has("payment_va")) {
+    db.exec("ALTER TABLE store_orders ADD COLUMN payment_va TEXT NOT NULL DEFAULT ''");
+  }
+  if (!storeCols.has("payment_qr")) {
+    db.exec("ALTER TABLE store_orders ADD COLUMN payment_qr TEXT NOT NULL DEFAULT ''");
+  }
+  if (!cols.has("payment_va")) {
+    db.exec("ALTER TABLE topup_orders ADD COLUMN payment_va TEXT NOT NULL DEFAULT ''");
+  }
+  if (!cols.has("payment_qr")) {
+    db.exec("ALTER TABLE topup_orders ADD COLUMN payment_qr TEXT NOT NULL DEFAULT ''");
   }
 }
 
@@ -231,6 +261,8 @@ const SCHEMA_SQL = `
     gateway_session TEXT NOT NULL DEFAULT '',
     gateway_trx TEXT NOT NULL DEFAULT '',
     payment_url TEXT NOT NULL DEFAULT '',
+    payment_va TEXT NOT NULL DEFAULT '',
+    payment_qr TEXT NOT NULL DEFAULT '',
     paid_at TEXT NOT NULL DEFAULT '',
     digiflazz_sn TEXT NOT NULL DEFAULT '',
     error_message TEXT NOT NULL DEFAULT '',
@@ -324,10 +356,15 @@ export async function setOrderPaymentSession(
   id: string,
   sessionId: string,
   paymentUrl: string,
+  vaNumber = "",
+  qrString = "",
 ): Promise<void> {
   await queryRun(
-    "UPDATE topup_orders SET gateway_session = ?, payment_url = ?, updated_at = ? WHERE id = ?",
-    [sessionId, paymentUrl, nowUtc(), id],
+    `UPDATE topup_orders
+     SET gateway_session = ?, payment_url = ?, payment_va = ?, payment_qr = ?,
+         updated_at = ?
+     WHERE id = ?`,
+    [sessionId, paymentUrl, vaNumber, qrString, nowUtc(), id],
   );
 }
 
@@ -465,6 +502,10 @@ export type StoreOrder = {
   gateway_session: string;
   gateway_trx: string;
   payment_url: string;
+  /** Nomor VA (bila metode VA) — ditampilkan tanpa redirect. */
+  payment_va: string;
+  /** String QRIS (bila metode QRIS) — dirender jadi QR di sisi kita. */
+  payment_qr: string;
   error_message: string;
   created_at: string;
   updated_at: string;
@@ -490,6 +531,8 @@ const STORE_SCHEMA_SQL = `
     gateway_session TEXT NOT NULL DEFAULT '',
     gateway_trx TEXT NOT NULL DEFAULT '',
     payment_url TEXT NOT NULL DEFAULT '',
+    payment_va TEXT NOT NULL DEFAULT '',
+    payment_qr TEXT NOT NULL DEFAULT '',
     error_message TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT '',
     updated_at TEXT NOT NULL DEFAULT ''
@@ -564,10 +607,15 @@ export async function setStoreOrderSession(
   id: string,
   sessionId: string,
   paymentUrl: string,
+  vaNumber = "",
+  qrString = "",
 ): Promise<void> {
   await queryRun(
-    "UPDATE store_orders SET gateway_session = ?, payment_url = ?, updated_at = ? WHERE id = ?",
-    [sessionId, paymentUrl, nowUtc(), id],
+    `UPDATE store_orders
+     SET gateway_session = ?, payment_url = ?, payment_va = ?, payment_qr = ?,
+         updated_at = ?
+     WHERE id = ?`,
+    [sessionId, paymentUrl, vaNumber, qrString, nowUtc(), id],
   );
 }
 

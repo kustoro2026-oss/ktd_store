@@ -1,18 +1,21 @@
 "use client";
 
-// Halaman pembayaran top-up: tampilkan halaman bayar Duitku (VA/QRIS) +
-// polling status pesanan tiap 5 detik. Status diperbarui server-side oleh
-// webhook Duitku (dibayar → eksekusi otomatis → WA), jadi halaman ini cukup
-// memantau tabel pesanan.
+// Halaman pembayaran top-up: tampilkan pembayaran Duitku langsung di halaman
+// ini — QR code QRIS (dari qrString inquiry) atau nomor VA — + polling status
+// pesanan tiap 5 detik. Status diperbarui server-side oleh webhook Duitku
+// (dibayar → eksekusi otomatis → WA), jadi halaman ini cukup memantau tabel
+// pesanan.
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
+import { QRCodeSVG } from "qrcode.react";
 import {
   AlertTriangle,
   ArrowLeft,
   CheckCircle2,
   Clock3,
+  Copy,
   ExternalLink,
   Loader2,
   XCircle,
@@ -29,6 +32,10 @@ type OrderView = {
   payment_status: string;
   topup_status: string;
   payment_url: string;
+  /** Nomor VA (bila metode VA) — ditampilkan langsung tanpa redirect. */
+  payment_va: string;
+  /** String QRIS (bila metode QRIS) — dirender jadi QR code di halaman ini. */
+  payment_qr: string;
   paid_at: string;
   digiflazz_sn: string;
   error_message: string;
@@ -46,6 +53,17 @@ export default function TopupBayarPage() {
 
   const [order, setOrder] = useState<OrderView | null>(null);
   const [missing, setMissing] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const copy = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard ditolak browser — abaikan, pembeli bisa menyalin manual.
+    }
+  };
 
   const load = useCallback(async () => {
     try {
@@ -137,32 +155,77 @@ export default function TopupBayarPage() {
           )}
 
           {waiting && order.payment_url && (
-            <>
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-                <div>
-                  <p className="flex items-center gap-2 text-sm font-bold text-ink">
-                    <Clock3 className="h-4 w-4 text-amber-500" /> Menunggu Pembayaran
-                  </p>
-                  <p className="mt-1 text-xs text-muted">
-                    Selesaikan pembayaran QRIS / Virtual Account pada halaman Duitku.
-                    Halaman ini otomatis berubah setelah pembayaran terverifikasi.
+            <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="flex items-center gap-2 text-sm font-bold text-ink">
+                  <Clock3 className="h-4 w-4 text-amber-500" /> Menunggu Pembayaran
+                </p>
+                <p className="text-base font-extrabold text-brand">
+                  {formatRupiah(order.amount)}
+                </p>
+              </div>
+
+              {order.payment_qr ? (
+                <div className="mt-4 flex flex-col items-center gap-3">
+                  <div className="rounded-2xl border-2 border-gray-100 bg-white p-4">
+                    <QRCodeSVG
+                      value={order.payment_qr}
+                      size={200}
+                      level="M"
+                      marginSize={2}
+                    />
+                  </div>
+                  <p className="max-w-xs text-center text-xs leading-relaxed text-muted">
+                    Scan kode QRIS di atas dari aplikasi bank / e-wallet (GoPay,
+                    OVO, DANA, ShopeePay, m-Banking, dll) untuk membayar tanpa
+                    pindah halaman.
                   </p>
                 </div>
+              ) : order.payment_va ? (
+                <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50 p-4">
+                  <p className="text-xs font-semibold text-muted-2">
+                    Nomor Virtual Account
+                  </p>
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <p className="break-all font-mono text-lg font-bold tracking-wider text-ink">
+                      {order.payment_va}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => copy(order.payment_va)}
+                      className="flex shrink-0 items-center gap-1.5 rounded-lg bg-brand px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-brand-2"
+                    >
+                      {copied ? (
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                      ) : (
+                        <Copy className="h-3.5 w-3.5" />
+                      )}
+                      {copied ? "Tersalin" : "Salin"}
+                    </button>
+                  </div>
+                  <p className="mt-2 text-xs leading-relaxed text-muted">
+                    Transfer tepat sebesar{" "}
+                    <b>{formatRupiah(order.amount)}</b> ke nomor VA di atas —
+                    pesanan otomatis terverifikasi setelah transfer diterima.
+                  </p>
+                </div>
+              ) : null}
+
+              <div className="mt-4 flex flex-col gap-2 border-t border-gray-100 pt-4">
                 <a
                   href={order.payment_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2 rounded-xl bg-brand px-5 py-3 text-sm font-bold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-brand-2"
+                  className="flex items-center justify-center gap-2 rounded-xl border border-gray-200 px-5 py-2.5 text-xs font-semibold text-muted transition-colors hover:border-brand hover:text-brand"
                 >
-                  Bayar Sekarang <ExternalLink className="h-4 w-4" />
+                  Atau bayar lewat halaman Duitku (semua metode){" "}
+                  <ExternalLink className="h-3.5 w-3.5" />
                 </a>
+                <p className="text-center text-xs text-muted">
+                  Halaman ini otomatis berubah setelah pembayaran terverifikasi.
+                </p>
               </div>
-              <iframe
-                src={order.payment_url}
-                title="Halaman pembayaran Duitku"
-                className="h-[560px] w-full rounded-2xl border border-gray-200 bg-white"
-              />
-            </>
+            </div>
           )}
 
           {waiting && !order.payment_url && (

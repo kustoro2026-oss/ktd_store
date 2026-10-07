@@ -28,6 +28,8 @@ export async function GET(
         payment_status: order.payment_status,
         topup_status: order.topup_status,
         payment_url: order.payment_url,
+        payment_va: order.payment_va,
+        payment_qr: order.payment_qr,
         paid_at: order.paid_at,
         digiflazz_sn: order.digiflazz_sn,
         error_message: order.error_message,

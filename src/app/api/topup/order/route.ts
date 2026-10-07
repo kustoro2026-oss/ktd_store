@@ -106,14 +106,56 @@ export async function POST(req: Request) {
       buyerPhone,
       returnUrl: `${SITE_URL}/topup/bayar/${orderId}`,
       callbackUrl: `${SITE_URL}/api/duitku/callback`,
+      // QRIS (SP) default — inquiry memuat qrString yang dirender jadi QR
+      // di halaman bayar tanpa redirect. Bila ditolak, coba VA.
+      paymentMethod: "SP",
     });
     if (pay.ok && pay.paymentUrl) {
-      await setOrderPaymentSession(orderId, pay.reference ?? "", pay.paymentUrl);
+      await setOrderPaymentSession(
+        orderId,
+        pay.reference ?? "",
+        pay.paymentUrl,
+        pay.vaNumber ?? "",
+        pay.qrString ?? "",
+      );
       return NextResponse.json({
         ok: true,
         orderId,
         mode: "duitku",
         paymentUrl: pay.paymentUrl,
+        qrString: pay.qrString ?? "",
+        vaNumber: pay.vaNumber ?? "",
+        channel: "SP",
+      });
+    }
+    // QRIS ditolak? Coba VA sebagai fallback agar pembeli tetap bisa bayar
+    // tanpa redirect (nomor VA ditampilkan langsung di halaman bayar).
+    const payVa = await createDuitkuPayment({
+      merchantOrderId: `${refId}-VA`,
+      productName: `${product.name} (${orderId})`,
+      amount: product.sellPrice,
+      buyerName,
+      buyerPhone,
+      returnUrl: `${SITE_URL}/topup/bayar/${orderId}`,
+      callbackUrl: `${SITE_URL}/api/duitku/callback`,
+      paymentMethod: "VA",
+    });
+    if (payVa.ok && payVa.paymentUrl) {
+      await setOrderPaymentSession(
+        orderId,
+        payVa.reference ?? "",
+        payVa.paymentUrl,
+        payVa.vaNumber ?? "",
+        payVa.qrString ?? "",
+      );
+      return NextResponse.json({
+        ok: true,
+        orderId,
+        mode: "duitku",
+        paymentUrl: payVa.paymentUrl,
+        qrString: payVa.qrString ?? "",
+        vaNumber: payVa.vaNumber ?? "",
+        channel: "VA",
       });
     }
     // Sesi gagal — pesanan tetap ada; pembeli lanjut via WhatsApp.

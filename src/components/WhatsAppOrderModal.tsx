@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import {
   Banknote,
   CheckCircle2,
   ChevronRight,
+  Copy,
   CreditCard,
   ExternalLink,
   Loader2,
@@ -13,6 +15,7 @@ import {
   MessageCircle,
   Navigation,
   Package,
+  QrCode,
   ShieldCheck,
   ShoppingBag,
   Truck,
@@ -64,6 +67,12 @@ type PayState = {
   step: "paying" | "success" | "failed" | "wa";
   orderId?: string;
   paymentUrl?: string;
+  /** String QRIS — dirender jadi QR code langsung di overlay (tanpa tab baru). */
+  qrString?: string;
+  /** Nomor VA — ditampilkan langsung di overlay (tanpa tab baru). */
+  vaNumber?: string;
+  /** Kode kanal yang dipakai: "SP" (QRIS) atau "VA". */
+  channel?: string;
   total?: number;
   error?: string;
 };
@@ -166,10 +175,14 @@ export default function WhatsAppOrderModal({
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const [payment, setPayment] = useState("");
+  /** Kanal pembayaran Duitku pilihan pembeli: QRIS (QR di overlay) atau VA. */
+  const [payChannel, setPayChannel] = useState<"qris" | "va">("qris");
   /** Overlay pembayaran Duitku aktif (null = form biasa). */
   const [pay, setPay] = useState<PayState | null>(null);
   /** Sedang membuat pesanan / sesi Duitku (tombol busy). */
   const [paying, setPaying] = useState(false);
+  /** Tombol salin nomor VA baru saja diklik (label "Tersalin"). */
+  const [vaCopied, setVaCopied] = useState(false);
 
   const [provinces, setProvinces] = useState<Province[]>(provinceCache);
   const [cities, setCities] = useState<City[]>([]);
@@ -832,6 +845,7 @@ export default function WhatsAppOrderModal({
             };
           }),
           clientTotal: grandTotal,
+          paymentChannel: payChannel,
           pageUrl:
             typeof window !== "undefined" ? window.location.href : undefined,
         };
@@ -854,6 +868,9 @@ export default function WhatsAppOrderModal({
           mode?: string;
           orderId?: string;
           paymentUrl?: string;
+          qrString?: string;
+          vaNumber?: string;
+          channel?: string;
           total?: number;
           gatewayError?: string;
         }>(res, "Gagal membuat pesanan. Silakan coba lagi.");
@@ -872,6 +889,9 @@ export default function WhatsAppOrderModal({
             step: "paying",
             orderId: j.orderId,
             paymentUrl: j.paymentUrl,
+            qrString: j.qrString,
+            vaNumber: j.vaNumber,
+            channel: j.channel,
             total: j.total,
           });
         } else {
@@ -1004,12 +1024,79 @@ export default function WhatsAppOrderModal({
                   <X className="h-4 w-4" />
                 </button>
               </div>
-              <div className="h-[460px] w-full bg-gray-50">
-                <iframe
-                  src={pay.paymentUrl}
-                  title="Pembayaran Duitku"
-                  className="h-full w-full border-0"
-                />
+              <div className="min-h-[360px] flex-1 overflow-y-auto px-6 py-5">
+                {/* Pembayaran langsung di overlay ini tanpa pindah tab: QRIS
+                    dirender dari qrString inquiry (QR code), VA ditampilkan
+                    sebagai nomor + tombol salin. Halaman Duitku sendiri
+                    menolak iframe (X-Frame-Options: sameorigin), jadi
+                    paymentUrl hanya jadi opsi kedua di footer. */}
+                {pay.qrString ? (
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="rounded-2xl border-2 border-gray-100 bg-white p-4">
+                      <QRCodeSVG
+                        value={pay.qrString}
+                        size={200}
+                        level="M"
+                        marginSize={2}
+                      />
+                    </div>
+                    <p className="max-w-xs text-center text-xs leading-relaxed text-muted-2">
+                      Scan kode QRIS di atas dari aplikasi bank / e-wallet
+                      (GoPay, OVO, DANA, ShopeePay, m-Banking, dll). Pembayaran
+                      terverifikasi otomatis.
+                    </p>
+                  </div>
+                ) : pay.vaNumber ? (
+                  <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                    <p className="text-xs font-semibold text-muted-2">
+                      Nomor Virtual Account
+                    </p>
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <p className="break-all font-mono text-lg font-bold tracking-wider text-ink">
+                        {pay.vaNumber}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(
+                              pay.vaNumber ?? "",
+                            );
+                            setVaCopied(true);
+                            setTimeout(() => setVaCopied(false), 2000);
+                          } catch {
+                            // Clipboard ditolak — pembeli bisa menyalin manual.
+                          }
+                        }}
+                        className="flex shrink-0 items-center gap-1.5 rounded-lg bg-brand px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-brand-2"
+                      >
+                        {vaCopied ? (
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5" />
+                        )}
+                        {vaCopied ? "Tersalin" : "Salin"}
+                      </button>
+                    </div>
+                    <p className="mt-2 text-xs leading-relaxed text-muted-2">
+                      Transfer tepat{" "}
+                      <b>
+                        {pay.total ? formatRupiah(pay.total) : "sesuai nominal"}
+                      </b>{" "}
+                      ke nomor VA di atas — pesanan otomatis terverifikasi
+                      setelah transfer diterima.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-3 pt-6 text-center">
+                    <span className="flex h-14 w-14 items-center justify-center rounded-full bg-brand/10">
+                      <QrCode className="h-6 w-6 text-brand" />
+                    </span>
+                    <p className="max-w-xs text-xs leading-relaxed text-muted-2">
+                      Menyiapkan kode pembayaran…
+                    </p>
+                  </div>
+                )}
               </div>
               <div className="flex shrink-0 items-center justify-between gap-3 border-t border-gray-100 px-5 py-3">
                 <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-2">
@@ -1022,7 +1109,7 @@ export default function WhatsAppOrderModal({
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:border-brand hover:text-brand"
                 >
-                  Buka di Tab Baru <ExternalLink className="h-3.5 w-3.5" />
+                  Semua Metode <ExternalLink className="h-3.5 w-3.5" />
                 </a>
               </div>
             </div>
@@ -1706,15 +1793,60 @@ export default function WhatsAppOrderModal({
               )}
 
               {payment === "duitku" && (
-                <div className="mt-3 flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5">
-                  <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
-                  <p className="text-[11px] leading-relaxed text-green-700">
-                    Pembayaran diverifikasi otomatis oleh Duitku — tidak perlu
-                    kirim bukti transfer. Setelah lunas, detail pesanan dan
-                    alamat pengiriman langsung diteruskan ke admin via
-                    WhatsApp.
-                  </p>
-                </div>
+                <>
+                  {/* Pilihan kanal: QRIS dirender jadi QR langsung di overlay,
+                      VA ditampilkan sebagai nomor — keduanya tanpa tab baru. */}
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    {(
+                      [
+                        {
+                          key: "qris",
+                          label: "QRIS",
+                          note: "Scan QR dari bank / e-wallet",
+                        },
+                        {
+                          key: "va",
+                          label: "Virtual Account",
+                          note: "Transfer ke nomor VA",
+                        },
+                      ] as const
+                    ).map((c) => (
+                      <label
+                        key={c.key}
+                        className={`flex cursor-pointer items-start gap-2 rounded-lg border bg-white px-3 py-2.5 transition-all ${
+                          payChannel === c.key
+                            ? "border-brand shadow-sm ring-2 ring-brand/20"
+                            : "border-gray-200 hover:border-gray-300"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="duitku-channel"
+                          checked={payChannel === c.key}
+                          onChange={() => setPayChannel(c.key)}
+                          className="mt-0.5 h-3.5 w-3.5 accent-brand"
+                        />
+                        <span className="min-w-0">
+                          <span className="block text-xs font-semibold text-ink">
+                            {c.label}
+                          </span>
+                          <span className="block text-[10px] leading-snug text-muted-2">
+                            {c.note}
+                          </span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="mt-3 flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5">
+                    <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
+                    <p className="text-[11px] leading-relaxed text-green-700">
+                      Pembayaran diverifikasi otomatis oleh Duitku — tidak perlu
+                      kirim bukti transfer. Setelah lunas, detail pesanan dan
+                      alamat pengiriman langsung diteruskan ke admin via
+                      WhatsApp.
+                    </p>
+                  </div>
+                </>
               )}
             </div>
           </section>
