@@ -682,6 +682,16 @@ export default function WhatsAppOrderModal({
     ? duitkuRows(duitkuMethods).find((r) => r.key === openChannel) ?? null
     : null;
 
+  /** Provider terpilih beserta kategori induknya — untuk kartu "metode terpilih". */
+  const chosenDuitku = (() => {
+    if (!payProvider) return null;
+    for (const row of duitkuRows(duitkuMethods)) {
+      const method = row.methods.find((m) => m.code === payProvider);
+      if (method) return { row, method };
+    }
+    return null;
+  })();
+
   // Batal-kan pilihan COD bila pesanan memuat produk Evermos (mis. modal yang
   // sama dipakai ulang untuk keranjang yang isinya berubah). Hook wajib di
   // atas early return agar jumlah hook antar-render tidak berubah.
@@ -2039,75 +2049,80 @@ export default function WhatsAppOrderModal({
                               })}
                             </div>
                           </div>
+                        ) : chosenDuitku ? (
+                          /* Metode terpilih — kartu tunggal; daftar kategori
+                              disembunyikan karena metode sudah dipilih. Klik
+                              kartu untuk kembali memilih metode lain. */
+                          <button
+                            type="button"
+                            onClick={() => setPayProvider("")}
+                            className="flex w-full items-center gap-3 rounded-xl bg-brand/5 px-3 py-3 text-left ring-2 ring-brand/30 transition-colors hover:bg-brand/10"
+                          >
+                            {chosenDuitku.method.image ? (
+                              <img
+                                src={chosenDuitku.method.image}
+                                alt={chosenDuitku.method.name}
+                                className="h-6 w-auto rounded object-contain"
+                              />
+                            ) : (
+                              <span className="flex h-6 w-6 items-center justify-center rounded bg-gray-100 text-[9px] font-bold text-muted-2">
+                                {chosenDuitku.method.code}
+                              </span>
+                            )}
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-xs font-bold uppercase tracking-wide text-ink">
+                                {chosenDuitku.method.name}
+                              </span>
+                              <span className="block text-[10px] leading-snug text-muted-2">
+                                {chosenDuitku.row.label} — {chosenDuitku.row.note}
+                              </span>
+                            </span>
+                            <span className="shrink-0 text-xs font-semibold text-brand">
+                              Ganti
+                            </span>
+                          </button>
                         ) : (
                           /* Step 1 — baris kategori gaya marketplace: logo kiri,
                               label + note kanan, chevron. Klik membuka tampilan
                               khusus kategori tersebut (step 2). */
                           <div className="space-y-1.5">
-                            {duitkuRows(duitkuMethods).map((row) => {
-                              const selectedProvider = payProvider
-                                ? row.methods.find((m) => m.code === payProvider)
-                                : undefined;
-                              const chosen = selectedProvider !== undefined;
-                              return (
-                                <button
-                                  key={row.key}
-                                  type="button"
-                                  onClick={() => setOpenChannel(row.key)}
-                                  className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-colors ${
-                                    chosen
-                                      ? "bg-brand/5 hover:bg-brand/10"
-                                      : "bg-gray-50 hover:bg-gray-100"
-                                  }`}
-                                >
-                                  {/* Logo kanal (kiri) — setelah provider
-                                      dipilih, tampilkan logo provider itu. */}
-                                  <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-                                    {chosen ? (
-                                      selectedProvider!.image ? (
-                                        <img
-                                          src={selectedProvider!.image}
-                                          alt={selectedProvider!.name}
-                                          className="h-6 w-auto rounded object-contain"
-                                        />
-                                      ) : null
+                            {duitkuRows(duitkuMethods).map((row) => (
+                              <button
+                                key={row.key}
+                                type="button"
+                                onClick={() => setOpenChannel(row.key)}
+                                className="flex w-full items-center gap-3 rounded-xl bg-gray-50 px-3 py-3 text-left transition-colors hover:bg-gray-100"
+                              >
+                                <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+                                  {row.methods.slice(0, 5).map((m) =>
+                                    m.image ? (
+                                      <img
+                                        key={m.code}
+                                        src={m.image}
+                                        alt={m.name}
+                                        className="h-6 w-auto rounded object-contain"
+                                      />
                                     ) : (
-                                      row.methods.slice(0, 5).map((m) =>
-                                        m.image ? (
-                                          <img
-                                            key={m.code}
-                                            src={m.image}
-                                            alt={m.name}
-                                            className="h-6 w-auto rounded object-contain"
-                                          />
-                                        ) : (
-                                          <span
-                                            key={m.code}
-                                            className="text-[10px] font-semibold text-muted-2"
-                                          >
-                                            {m.name}
-                                          </span>
-                                        ),
-                                      )
-                                    )}
+                                      <span
+                                        key={m.code}
+                                        className="text-[10px] font-semibold text-muted-2"
+                                      >
+                                        {m.name}
+                                      </span>
+                                    ),
+                                  )}
+                                </span>
+                                <span className="shrink-0 text-right">
+                                  <span className="block text-xs font-bold uppercase tracking-wide text-ink">
+                                    {row.label}
                                   </span>
-                                  {/* Label + note (kanan) */}
-                                  <span className="shrink-0 text-right">
-                                    <span className="block text-xs font-bold uppercase tracking-wide text-ink">
-                                      {chosen
-                                        ? selectedProvider!.name
-                                        : row.label}
-                                    </span>
-                                    <span className="hidden text-[10px] leading-snug text-muted-2 sm:block">
-                                      {chosen
-                                        ? "Terpilih — klik untuk ganti"
-                                        : row.note}
-                                    </span>
+                                  <span className="hidden text-[10px] leading-snug text-muted-2 sm:block">
+                                    {row.note}
                                   </span>
-                                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-2" />
-                                </button>
-                              );
-                            })}
+                                </span>
+                                <ChevronRight className="h-4 w-4 shrink-0 text-muted-2" />
+                              </button>
+                            ))}
                           </div>
                         )}
                         <div className="flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5">
