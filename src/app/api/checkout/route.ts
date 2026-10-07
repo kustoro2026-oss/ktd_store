@@ -13,7 +13,7 @@
 //         serviceType}], clientTotal, pageUrl,
 //         paymentChannel?: "qris" | "va" }
 // Respons: { ok, mode: "duitku" | "wa", orderId, paymentUrl?, total?,
-//            qrString?, vaNumber?, gatewayError? }
+//            qrString?, vaNumber?, channel?, sandbox?, gatewayError? }
 
 import { NextResponse } from "next/server";
 import { getDetailCached } from "@/lib/detail-cache";
@@ -283,6 +283,7 @@ export async function POST(req: Request) {
       vaNumber: pay.vaNumber ?? "",
       channel: payChannel,
       total,
+      sandbox: process.env.DUITKU_SANDBOX === "true",
     });
   }
 

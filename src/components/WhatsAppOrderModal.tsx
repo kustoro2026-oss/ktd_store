@@ -30,6 +30,7 @@ import {
   whatsappLink,
 } from "@/lib/config";
 import { mapEkspedisiToCourierCodes, matchEkspedisi } from "@/lib/kiriminaja";
+import { getPaymentGuide } from "@/lib/payment-guides";
 import { pixelContact, pixelInitiateCheckout, pixelLead } from "@/lib/meta-pixel";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
 
@@ -73,7 +74,16 @@ type PayState = {
   vaNumber?: string;
   /** Kode kanal yang dipakai: "SP" (QRIS), "VA", atau kanal redirect lain. */
   channel?: string;
+  /** Nama kanal dari daftar metode Duitku (mis. "MAYBANK VA"). */
+  channelName?: string;
+  /** URL logo kanal dari CDN Duitku. */
+  channelImage?: string;
   total?: number;
+  /** Rincian total: subtotal produk & ongkir (untuk breakdown tagihan). */
+  subtotal?: number;
+  shipping?: number;
+  /** Mode uji coba Duitku (sandbox) — tampilkan badge di overlay. */
+  sandbox?: boolean;
   error?: string;
 };
 
@@ -123,6 +133,10 @@ const labelCls = "mb-1 block text-xs font-semibold text-ink";
 const formatRupiah = (n: number) =>
   "Rp " + new Intl.NumberFormat("id-ID").format(n);
 
+/** Kelompokkan digit nomor VA per 4 agar mudah dibaca dan disalin. */
+const formatVaNumber = (n: string) =>
+  n.replace(/\s+/g, "").replace(/(\d{4})(?=\d)/g, "$1 ");
+
 const parseRupiah = (s: string) => {
   const d = s.replace(/\D/g, "");
   return d ? Number(d) : 0;
@@ -137,6 +151,16 @@ const QRIS_CODES = new Set(["SP", "NQ", "SQ"]);
 const EWALLET_CODES = new Set(["OV", "DA", "LA", "SA", "Q1", "MY", "DN", "JP"]);
 /** Kode kanal tunai/ritel & minimarket (Indomaret, Alfamart, dll). */
 const RETAIL_CODES = new Set(["FT", "IR", "A2", "AT"]);
+
+/** Label kategori kanal Duitku untuk tampilan overlay pembayaran. */
+const channelCategory = (code?: string) => {
+  if (!code) return "Pembayaran Online";
+  if (QRIS_CODES.has(code)) return "QRIS";
+  if (EWALLET_CODES.has(code)) return "E-Wallet";
+  if (RETAIL_CODES.has(code)) return "Mini Market";
+  if (code === "VC") return "Kartu Kredit/Debit";
+  return "Transfer Bank (VA)";
+};
 
 /** Susun baris kategori metode pembayaran dari daftar kanal aktif Duitku —
  *  persis gaya marketplace: logo kiri, label kanan, chevron. Kategori tanpa
@@ -1018,6 +1042,7 @@ export default function WhatsAppOrderModal({
           vaNumber?: string;
           channel?: string;
           total?: number;
+          sandbox?: boolean;
           gatewayError?: string;
         }>(res, "Gagal membuat pesanan. Silakan coba lagi.");
         if (!j.ok) {
@@ -1031,6 +1056,9 @@ export default function WhatsAppOrderModal({
           return;
         }
         if (j.mode === "duitku" && j.orderId && j.paymentUrl) {
+          // Nama & logo kanal diambil dari daftar metode Duitku yang sudah
+          // dimuat di picker (j.channel = kode yang benar-benar dipakai).
+          const prov = duitkuMethods.find((m) => m.code === j.channel);
           setPay({
             step: "paying",
             orderId: j.orderId,
@@ -1038,7 +1066,12 @@ export default function WhatsAppOrderModal({
             qrString: j.qrString,
             vaNumber: j.vaNumber,
             channel: j.channel,
+            channelName: prov?.name,
+            channelImage: prov?.image,
             total: j.total,
+            subtotal,
+            shipping: totalOngkir,
+            sandbox: j.sandbox,
           });
         } else {
           // Gateway belum dikonfigurasi / nominal di bawah minimum — jatuh
@@ -1145,19 +1178,18 @@ export default function WhatsAppOrderModal({
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
           {pay.step === "paying" && (
             <div className="flex max-h-[92vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-              <div className="flex shrink-0 items-center justify-between border-b border-gray-100 px-5 py-4">
+              {/* Header brand KTD Store */}
+              <div className="flex shrink-0 items-center justify-between bg-brand px-5 py-3.5">
                 <div className="flex items-center gap-2.5">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand/10">
-                    <CreditCard className="h-4.5 w-4.5 text-brand" />
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/15">
+                    <ShieldCheck className="h-4.5 w-4.5 text-white" />
                   </span>
                   <div>
-                    <h3 className="text-sm font-bold text-ink">
-                      Pembayaran Duitku
+                    <h3 className="text-sm font-bold leading-tight text-white">
+                      Pembayaran Pesanan
                     </h3>
-                    <p className="text-xs text-muted-2">
-                      {pay.total
-                        ? `Total ${formatRupiah(pay.total)} — status dicek otomatis`
-                        : "Status pembayaran dicek otomatis"}
+                    <p className="text-[11px] text-white/80">
+                      KTD Store · pembayaran aman via Duitku
                     </p>
                   </div>
                 </div>
@@ -1165,98 +1197,253 @@ export default function WhatsAppOrderModal({
                   type="button"
                   onClick={() => setPay(null)}
                   aria-label="Tutup"
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-2 transition-colors hover:bg-gray-100 hover:text-ink"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-white/80 transition-colors hover:bg-white/15 hover:text-white"
                 >
                   <X className="h-4 w-4" />
                 </button>
               </div>
-              <div className="min-h-[360px] flex-1 overflow-y-auto px-6 py-5">
-                {/* Pembayaran langsung di overlay ini tanpa pindah tab: QRIS
-                    dirender dari qrString inquiry (QR code), VA ditampilkan
-                    sebagai nomor + tombol salin. Halaman Duitku sendiri
-                    menolak iframe (X-Frame-Options: sameorigin), jadi
-                    paymentUrl hanya jadi opsi kedua di footer. */}
-                {pay.qrString ? (
-                  <div className="flex flex-col items-center gap-3">
-                    <div className="rounded-2xl border-2 border-gray-100 bg-white p-4">
-                      <QRCodeSVG
-                        value={pay.qrString}
-                        size={200}
-                        level="M"
-                        marginSize={2}
-                      />
-                    </div>
-                    <p className="max-w-xs text-center text-xs leading-relaxed text-muted-2">
-                      Scan kode QRIS di atas dari aplikasi bank / e-wallet
-                      (GoPay, OVO, DANA, ShopeePay, m-Banking, dll). Pembayaran
-                      terverifikasi otomatis.
-                    </p>
-                  </div>
-                ) : pay.vaNumber ? (
-                  <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
-                    <p className="text-xs font-semibold text-muted-2">
-                      Nomor Virtual Account
-                    </p>
-                    <div className="mt-2 flex items-center justify-between gap-2">
-                      <p className="break-all font-mono text-lg font-bold tracking-wider text-ink">
-                        {pay.vaNumber}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          try {
-                            await navigator.clipboard.writeText(
-                              pay.vaNumber ?? "",
-                            );
-                            setVaCopied(true);
-                            setTimeout(() => setVaCopied(false), 2000);
-                          } catch {
-                            // Clipboard ditolak — pembeli bisa menyalin manual.
-                          }
-                        }}
-                        className="flex shrink-0 items-center gap-1.5 rounded-lg bg-brand px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-brand-2"
-                      >
-                        {vaCopied ? (
-                          <CheckCircle2 className="h-3.5 w-3.5" />
-                        ) : (
-                          <Copy className="h-3.5 w-3.5" />
-                        )}
-                        {vaCopied ? "Tersalin" : "Salin"}
-                      </button>
-                    </div>
-                    <p className="mt-2 text-xs leading-relaxed text-muted-2">
-                      Transfer tepat{" "}
-                      <b>
-                        {pay.total ? formatRupiah(pay.total) : "sesuai nominal"}
-                      </b>{" "}
-                      ke nomor VA di atas — pesanan otomatis terverifikasi
-                      setelah transfer diterima.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center gap-3 pt-6 text-center">
-                    <span className="flex h-14 w-14 items-center justify-center rounded-full bg-brand/10">
-                      <CreditCard className="h-6 w-6 text-brand" />
+
+              <div className="min-h-[320px] flex-1 overflow-y-auto px-5 py-4">
+                {/* No. pesanan + badge mode uji coba */}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-[11px] text-muted-2">
+                    No. Pesanan{" "}
+                    <span className="font-mono font-semibold text-ink">
+                      {pay.orderId}
                     </span>
-                    <p className="text-sm font-semibold text-ink">
-                      Lanjutkan ke halaman pembayaran
+                  </p>
+                  {pay.sandbox && (
+                    <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700">
+                      Mode Uji Coba
+                    </span>
+                  )}
+                </div>
+
+                {/* Total tagihan + rincian */}
+                <div className="mt-3 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-2">
+                    Total Tagihan
+                  </p>
+                  <p className="mt-0.5 text-2xl font-extrabold tracking-tight text-ink">
+                    {pay.total ? formatRupiah(pay.total) : "—"}
+                  </p>
+                  {(pay.subtotal !== undefined || pay.shipping !== undefined) && (
+                    <p className="mt-0.5 text-[11px] text-muted-2">
+                      {pay.subtotal !== undefined
+                        ? `Subtotal ${formatRupiah(pay.subtotal)}`
+                        : ""}
+                      {pay.subtotal !== undefined && pay.shipping !== undefined
+                        ? " + "
+                        : ""}
+                      {pay.shipping !== undefined
+                        ? `Ongkir ${formatRupiah(pay.shipping)}`
+                        : ""}
                     </p>
-                    <p className="max-w-xs text-xs leading-relaxed text-muted-2">
-                      Metode ini membutuhkan pengalihan ke halaman pembayaran
-                      aman Duitku. Pesanan Anda tersimpan dan statusnya tetap
-                      dicek otomatis.
-                    </p>
-                    <a
-                      href={pay.paymentUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-1 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand px-4 py-3 text-sm font-bold text-white transition-all hover:bg-brand-2 active:scale-[0.98]"
-                    >
-                      Buka Pembayaran <ExternalLink className="h-4 w-4" />
-                    </a>
-                  </div>
-                )}
+                  )}
+                </div>
+
+                {/* Metode pembayaran: QRIS / VA / redirect */}
+                <div className="mt-4">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-2">
+                    Metode Pembayaran
+                  </p>
+                  {pay.qrString ? (
+                    <div className="mt-2 rounded-xl border border-gray-100 p-4">
+                      <div className="flex items-center gap-2.5">
+                        {pay.channelImage ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={pay.channelImage}
+                            alt=""
+                            className="h-7 w-7 rounded object-contain"
+                          />
+                        ) : (
+                          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand/10">
+                            <CreditCard className="h-4 w-4 text-brand" />
+                          </span>
+                        )}
+                        <div>
+                          <p className="text-xs font-bold text-ink">
+                            {pay.channelName ?? "QRIS"}
+                          </p>
+                          <p className="text-[10px] text-muted-2">
+                            {channelCategory(pay.channel)} · semua aplikasi QRIS
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-3 flex flex-col items-center gap-2.5">
+                        <div className="rounded-xl border-2 border-brand/15 bg-white p-3">
+                          <QRCodeSVG
+                            value={pay.qrString}
+                            size={180}
+                            level="M"
+                            marginSize={2}
+                          />
+                        </div>
+                        <p className="text-center text-xs text-muted-2">
+                          Scan QRIS untuk membayar{" "}
+                          <b className="text-ink">
+                            {pay.total ? formatRupiah(pay.total) : ""}
+                          </b>
+                        </p>
+                      </div>
+                    </div>
+                  ) : pay.vaNumber ? (
+                    <div className="mt-2 rounded-xl border border-gray-100 bg-gray-50 p-4">
+                      <div className="flex items-center gap-2.5">
+                        {pay.channelImage ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={pay.channelImage}
+                            alt=""
+                            className="h-7 w-7 rounded object-contain"
+                          />
+                        ) : (
+                          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand/10">
+                            <CreditCard className="h-4 w-4 text-brand" />
+                          </span>
+                        )}
+                        <div>
+                          <p className="text-xs font-bold text-ink">
+                            {pay.channelName ?? "Virtual Account"}
+                          </p>
+                          <p className="text-[10px] text-muted-2">
+                            {channelCategory(pay.channel)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-3 rounded-lg border border-gray-200 bg-white px-3 py-2.5">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-2">
+                          Nomor Virtual Account
+                        </p>
+                        <div className="mt-1 flex items-center justify-between gap-2">
+                          <p className="break-all font-mono text-base font-bold tracking-[0.12em] text-ink sm:text-lg">
+                            {formatVaNumber(pay.vaNumber)}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                await navigator.clipboard.writeText(
+                                  pay.vaNumber ?? "",
+                                );
+                                setVaCopied(true);
+                                setTimeout(() => setVaCopied(false), 2000);
+                              } catch {
+                                // Clipboard ditolak — pembeli bisa menyalin manual.
+                              }
+                            }}
+                            className="flex shrink-0 items-center gap-1.5 rounded-lg bg-brand px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-brand-2"
+                          >
+                            {vaCopied ? (
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                            ) : (
+                              <Copy className="h-3.5 w-3.5" />
+                            )}
+                            {vaCopied ? "Tersalin" : "Salin"}
+                          </button>
+                        </div>
+                      </div>
+                      <p className="mt-2 text-[11px] leading-relaxed text-muted-2">
+                        Transfer tepat{" "}
+                        <b className="text-ink">
+                          {pay.total
+                            ? formatRupiah(pay.total)
+                            : "sesuai nominal"}
+                        </b>{" "}
+                        ke nomor Virtual Account di atas.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="mt-2 flex flex-col items-center gap-2.5 rounded-xl border border-dashed border-gray-200 px-4 py-6 text-center">
+                      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-brand/10">
+                        <CreditCard className="h-5 w-5 text-brand" />
+                      </span>
+                      <p className="text-sm font-bold text-ink">
+                        {pay.channelName ?? "Lanjutkan ke halaman pembayaran"}
+                      </p>
+                      <p className="max-w-xs text-xs leading-relaxed text-muted-2">
+                        Metode ini membutuhkan pengalihan ke halaman pembayaran
+                        aman Duitku. Pesanan Anda tersimpan dan statusnya
+                        dicek otomatis.
+                      </p>
+                      <a
+                        href={pay.paymentUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-1 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand px-4 py-3 text-sm font-bold text-white transition-all hover:bg-brand-2 active:scale-[0.98]"
+                      >
+                        Buka Pembayaran <ExternalLink className="h-4 w-4" />
+                      </a>
+                    </div>
+                  )}
+                </div>
+
+                {/* Status pembayaran */}
+                <div className="mt-3 flex items-center gap-2">
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
+                  </span>
+                  <span className="text-xs font-semibold text-amber-700">
+                    Menunggu Pembayaran
+                  </span>
+                  <span className="text-[11px] text-muted-2">
+                    · status dicek otomatis
+                  </span>
+                </div>
+
+                {/* Cara pembayaran — panduan spesifik per kanal (setiap bank/
+                    aplikasi punya alur berbeda; lihat src/lib/payment-guides.ts) */}
+                <div className="mt-3 rounded-xl border border-gray-100 p-3.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-2">
+                    Cara Pembayaran
+                  </p>
+                  {(() => {
+                    const guide = getPaymentGuide(pay.channel, {
+                      qr: Boolean(pay.qrString),
+                      va: Boolean(pay.vaNumber),
+                    });
+                    return (
+                      <>
+                        <p className="mt-1.5 text-[11px] font-semibold text-ink">
+                          {guide.via}
+                        </p>
+                        <ol className="mt-2 space-y-1.5">
+                          {guide.steps.map((s, i) => (
+                            <li
+                              key={i}
+                              className="flex items-start gap-2 text-xs leading-relaxed text-muted"
+                            >
+                              <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-brand/10 text-[10px] font-bold text-brand">
+                                {i + 1}
+                              </span>
+                              {s}
+                            </li>
+                          ))}
+                        </ol>
+                        {guide.note && (
+                          <p className="mt-2 text-[11px] leading-relaxed text-muted-2">
+                            {guide.note}
+                          </p>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+
+                {/* Catatan keamanan */}
+                <p className="mt-3 flex items-start gap-2 text-[11px] leading-relaxed text-muted-2">
+                  <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand" />
+                  <span>
+                    Pembayaran diverifikasi otomatis — tidak perlu konfirmasi
+                    manual.
+                    {pay.vaNumber ? " Virtual Account berlaku 24 jam." : ""}
+                  </span>
+                </p>
               </div>
+
+              {/* Footer */}
               <div className="flex shrink-0 items-center justify-between gap-3 border-t border-gray-100 px-5 py-3">
                 <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-2">
                   <Loader2 className="h-3.5 w-3.5 animate-spin text-brand" />
@@ -1268,7 +1455,7 @@ export default function WhatsAppOrderModal({
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:border-brand hover:text-brand"
                 >
-                  Semua Metode <ExternalLink className="h-3.5 w-3.5" />
+                  Buka di Tab Baru <ExternalLink className="h-3.5 w-3.5" />
                 </a>
               </div>
             </div>
