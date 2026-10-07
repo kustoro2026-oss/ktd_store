@@ -1484,7 +1484,7 @@ export default function WhatsAppOrderModal({
                   </span>
                 </p>
                 <p className="mt-1.5 text-[10px] leading-relaxed text-muted-2">
-                  Pembayaran diproses secara aman oleh mitra resmi Duitku (PT
+                  Pembayaran diproses secara aman oleh penyelenggara resmi (PT
                   Espay Debit Indonesia Koe).
                 </p>
               </div>

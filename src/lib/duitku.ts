@@ -153,7 +153,7 @@ export async function createDuitkuPayment(i: {
   if (!duitkuConfigured()) {
     return {
       ok: false,
-      error: "Duitku belum dikonfigurasi (DUITKU_MERCHANT_CODE / DUITKU_API_KEY)",
+      error: "Pembayaran online belum dikonfigurasi",
     };
   }
   const merchantCode = process.env.DUITKU_MERCHANT_CODE ?? "";
@@ -188,7 +188,7 @@ export async function createDuitkuPayment(i: {
     try {
       d = JSON.parse(text) as Record<string, unknown>;
     } catch {
-      return { ok: false, error: `respons Duitku tidak terbaca (HTTP ${res.status})` };
+      return { ok: false, error: `respons gateway pembayaran tidak terbaca (HTTP ${res.status})` };
     }
     if (!res.ok || d.statusCode !== "00" || !d.paymentUrl) {
       return {
@@ -243,7 +243,7 @@ export async function checkDuitkuTransaction(
     try {
       d = JSON.parse(text) as Record<string, unknown>;
     } catch {
-      return { ok: false, error: `respons Duitku tidak terbaca (HTTP ${res.status})` };
+      return { ok: false, error: `respons gateway pembayaran tidak terbaca (HTTP ${res.status})` };
     }
     if (!res.ok || typeof d.statusCode !== "string") {
       return { ok: false, error: String(d.Message ?? `HTTP ${res.status}`) };

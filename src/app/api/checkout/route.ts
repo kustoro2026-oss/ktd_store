@@ -230,7 +230,7 @@ export async function POST(req: Request) {
       ok: true,
       orderId,
       mode: "wa",
-      gatewayError: `Nominal di bawah minimum Duitku (Rp ${DUITKU_MIN_AMOUNT.toLocaleString("id-ID")})`,
+      gatewayError: `Nominal di bawah minimum pembayaran online (Rp ${DUITKU_MIN_AMOUNT.toLocaleString("id-ID")})`,
     });
   }
 
@@ -291,6 +291,6 @@ export async function POST(req: Request) {
     ok: true,
     orderId,
     mode: "wa",
-    gatewayError: pay?.error ?? "sesi Duitku gagal dibuat",
+    gatewayError: pay?.error ?? "sesi pembayaran online gagal dibuat",
   });
 }
