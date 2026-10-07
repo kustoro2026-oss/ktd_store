@@ -354,6 +354,14 @@ export default function TopupBayarPage() {
               </dd>
             </div>
           </dl>
+          <p className="mt-4 border-t border-gray-100 pt-3 text-center text-xs">
+            <Link
+              href="/topup/cek-status"
+              className="font-semibold text-brand transition-colors hover:underline"
+            >
+              Cek Status Pesanan
+            </Link>
+          </p>
         </aside>
       </div>
     </div>

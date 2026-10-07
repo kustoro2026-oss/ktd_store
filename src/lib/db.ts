@@ -14,6 +14,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
 import type { Pool } from "@neondatabase/serverless";
+import { normalizePhone } from "./wa";
 
 export type PaymentStatus = "pending" | "paid" | "expired" | "failed";
 
@@ -431,6 +432,23 @@ export async function listTopupOrders(limit = 10): Promise<TopUpOrder[]> {
     "SELECT * FROM topup_orders ORDER BY created_at DESC LIMIT ?",
     [limit],
   );
+}
+
+/** Riwayat pesanan seorang pembeli — cocokkan nomor HP ternormalisasi
+ *  (62xxxxxxxx). buyer_phone disimpan apa adanya, jadi pencocokan dilakukan
+ *  di JS dari baris terbaru yang mengisi nomor HP. */
+export async function listTopupOrdersByPhone(
+  phone: string,
+  limit = 20,
+): Promise<TopUpOrder[]> {
+  const normalized = normalizePhone(phone);
+  if (!normalized) return [];
+  const recent = await queryAll<TopUpOrder>(
+    "SELECT * FROM topup_orders WHERE buyer_phone != '' ORDER BY created_at DESC LIMIT 500",
+  );
+  return recent
+    .filter((o) => normalizePhone(o.buyer_phone) === normalized)
+    .slice(0, limit);
 }
 
 /** Pesanan lunas yang transaksinya masih Pending di Digiflazz — dicek ulang
