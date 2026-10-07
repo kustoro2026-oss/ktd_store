@@ -130,8 +130,11 @@ export async function POST(req: Request) {
     }
     // QRIS ditolak? Coba VA sebagai fallback agar pembeli tetap bisa bayar
     // tanpa redirect (nomor VA ditampilkan langsung di halaman bayar).
+    // merchantOrderId WAJIB = ref_id pesanan — router callback mencocokkan
+    // merchantOrderId ke kolom ref_id; akhiran apa pun akan membuat callback
+    // tidak pernah cocok dan pesanan tidak pernah lunas.
     const payVa = await createDuitkuPayment({
-      merchantOrderId: `${refId}-VA`,
+      merchantOrderId: refId,
       productName: `${product.name} (${orderId})`,
       amount: product.sellPrice,
       buyerName,

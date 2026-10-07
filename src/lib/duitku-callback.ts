@@ -147,8 +147,17 @@ export async function routeDuitkuCallback(rawBody: string): Promise<Response> {
   }
 
   // Pesanan toko dicek dulu, lalu top-up — ref_id unik lintas tabel.
-  if (await handleStoreOrderCallback(cb)) return OK;
-  if (await handleTopupOrderCallback(cb)) return OK;
+  // Fallback kanal sempat memakai akhiran "-VA" pada merchantOrderId
+  // (bug lama); normalisasi ini memastikan callback lama tetap cocok
+  // dengan ref_id asli bila Duitku mengirim ulang.
+  const refs = [
+    ...new Set([cb.merchantOrderId, cb.merchantOrderId.replace(/-VA$/i, "")]),
+  ];
+  for (const ref of refs) {
+    const probe = { ...cb, merchantOrderId: ref };
+    if (await handleStoreOrderCallback(probe)) return OK;
+    if (await handleTopupOrderCallback(probe)) return OK;
+  }
 
   // Ref tidak dikenal (mungkin callback milik fitur lain) — akhiri retry.
   return OK;
