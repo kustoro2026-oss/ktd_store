@@ -239,11 +239,13 @@ export async function POST(req: Request) {
       ? `${items[0].name}${items[0].qty > 1 ? ` (×${items[0].qty})` : ""}`
       : `${items.length} produk KTD Store`;
 
-  // Channel pilihan pembeli: QRIS (SP) atau Virtual Account (VA). Bila
-  // channel pilihan ditolak gateway (mis. belum aktif), coba satunya lagi.
-  const channelWanted = String(body.paymentChannel ?? "").trim();
-  const attempts =
-    channelWanted === "va" ? ["VA", "SP"] : ["SP", "VA"];
+  // Channel spesifik pilihan pembeli (mis. SP = QRIS ShopeePay, VA = Maybank
+  // VA, FT = Indomaret) — kirim apa adanya. Bila ditolak gateway (mis. belum
+  // aktif), jatuh ke QRIS (SP) lalu VA tanpa duplikasi kode.
+  const channelWanted = String(body.paymentChannel ?? "").trim().toUpperCase();
+  const attempts = [
+    ...new Set(channelWanted ? [channelWanted, "SP", "VA"] : ["SP", "VA"]),
+  ];
   let pay: Awaited<ReturnType<typeof createDuitkuPayment>> | null = null;
   let payChannel = "";
   for (const code of attempts) {

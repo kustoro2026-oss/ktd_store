@@ -152,7 +152,7 @@ export const PAYMENT_METHODS: PaymentMethod[] = [
   {
     key: "duitku",
     label: "Bayar Online (QRIS / Virtual Account)",
-    note: "Pembayaran via Duitku — diverifikasi otomatis, tanpa kirim bukti transfer.",
+    note: "Pembayaran via Duitku — diverifikasi otomatis, kirim bukti transfer opsional.",
   },
   {
     key: "cod",

@@ -15,7 +15,6 @@ import {
   MessageCircle,
   Navigation,
   Package,
-  QrCode,
   ShieldCheck,
   ShoppingBag,
   Truck,
@@ -71,7 +70,7 @@ type PayState = {
   qrString?: string;
   /** Nomor VA — ditampilkan langsung di overlay (tanpa tab baru). */
   vaNumber?: string;
-  /** Kode kanal yang dipakai: "SP" (QRIS) atau "VA". */
+  /** Kode kanal yang dipakai: "SP" (QRIS), "VA", atau kanal redirect lain. */
   channel?: string;
   total?: number;
   error?: string;
@@ -138,9 +137,9 @@ const EWALLET_CODES = new Set(["OV", "DA", "LA", "SA", "Q1", "MY"]);
 /** Kode kanal tunai/ritel & minimarket (Indomaret, Alfamart, dll). */
 const RETAIL_CODES = new Set(["FT", "IR", "A2", "AT"]);
 
-/** Susun baris picker kanal pembayaran dari daftar metode aktif Duitku:
- *  QRIS & Transfer Bank (VA) bisa dipilih; e-wallet/kartu kredit tampil
- *  sebagai "Segera Hadir" bila aktif di merchant. */
+/** Susun baris kategori metode pembayaran dari daftar kanal aktif Duitku —
+ *  persis gaya marketplace: logo kiri, label kanan, chevron. Kategori tanpa
+ *  kanal aktif disembunyikan. */
 function duitkuRows(methods: { code: string; name: string; image: string }[]) {
   const qris = methods.filter((m) => QRIS_CODES.has(m.code));
   const va = methods.filter(
@@ -152,6 +151,7 @@ function duitkuRows(methods: { code: string; name: string; image: string }[]) {
   );
   const ewallet = methods.filter((m) => EWALLET_CODES.has(m.code));
   const card = methods.filter((m) => m.code === "VC");
+  const retail = methods.filter((m) => RETAIL_CODES.has(m.code));
   return [
     {
       key: "qris",
@@ -161,31 +161,29 @@ function duitkuRows(methods: { code: string; name: string; image: string }[]) {
     },
     {
       key: "va",
-      label: "Transfer Bank (VA)",
+      label: "TRANSFER BANK (VA)",
       note: "Transfer ke nomor virtual account",
       methods: va,
     },
-    ...(ewallet.length
-      ? [
-          {
-            key: "ewallet",
-            label: "E-Wallet",
-            note: "OVO, DANA, LinkAja",
-            methods: ewallet,
-          },
-        ]
-      : []),
-    ...(card.length
-      ? [
-          {
-            key: "card",
-            label: "Kartu Kredit/Debit",
-            note: "Visa & Mastercard",
-            methods: card,
-          },
-        ]
-      : []),
-  ];
+    {
+      key: "ewallet",
+      label: "E-WALLET",
+      note: "OVO, DANA, LinkAja, ShopeePay",
+      methods: ewallet,
+    },
+    {
+      key: "card",
+      label: "KARTU KREDIT/DEBIT",
+      note: "Visa & Mastercard",
+      methods: card,
+    },
+    {
+      key: "retail",
+      label: "MINI MARKET",
+      note: "Indomaret & Alfamart",
+      methods: retail,
+    },
+  ].filter((r) => r.methods.length > 0);
 }
 
 const ONGKIR_UNAVAILABLE =
@@ -232,8 +230,11 @@ export default function WhatsAppOrderModal({
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const [payment, setPayment] = useState("");
-  /** Kanal pembayaran Duitku pilihan pembeli: QRIS (QR di overlay) atau VA. */
-  const [payChannel, setPayChannel] = useState<"qris" | "va">("qris");
+  /** Kode kanal spesifik Duitku pilihan pembeli (mis. SP = QRIS ShopeePay,
+   *  VA = Maybank VA). Kosong = pakai QRIS pertama yang aktif. */
+  const [payProvider, setPayProvider] = useState("");
+  /** Kategori yang sedang dibuka daftar provider-nya (akordeon step 2). */
+  const [openChannel, setOpenChannel] = useState<string | null>(null);
   /** Overlay pembayaran Duitku aktif (null = form biasa). */
   const [pay, setPay] = useState<PayState | null>(null);
   /** Sedang membuat pesanan / sesi Duitku (tombol busy). */
@@ -278,6 +279,45 @@ export default function WhatsAppOrderModal({
     setCityId(saved.cityId || "");
     setDistrictId(saved.districtId || "");
     setDataLoaded(true);
+    // Opsi kota/kecamatan belum tentu dimuat — ambil ulang agar select
+    // menampilkan nilai tersimpan (bukan "Pilih kota" yang kosong).
+    if (saved.provinceId) {
+      setCitiesLoading(true);
+      fetch(`/api/shipping/cities?provinsi_id=${encodeURIComponent(saved.provinceId)}`)
+        .then((r) =>
+          readJson<{ error?: string; cities?: City[] }>(r, ONGKIR_UNAVAILABLE),
+        )
+        .then((j) => {
+          if (j.error) throw new Error(j.error);
+          setCities(j.cities ?? []);
+        })
+        .catch((e: unknown) =>
+          setLocationError(
+            e instanceof Error ? e.message : "Gagal memuat kota",
+          ),
+        )
+        .finally(() => setCitiesLoading(false));
+    }
+    if (saved.cityId) {
+      setDistrictsLoading(true);
+      fetch(`/api/shipping/districts?kabupaten_id=${encodeURIComponent(saved.cityId)}`)
+        .then((r) =>
+          readJson<{ error?: string; districts?: District[] }>(
+            r,
+            ONGKIR_UNAVAILABLE,
+          ),
+        )
+        .then((j) => {
+          if (j.error) throw new Error(j.error);
+          setDistricts(j.districts ?? []);
+        })
+        .catch((e: unknown) =>
+          setLocationError(
+            e instanceof Error ? e.message : "Gagal memuat kecamatan",
+          ),
+        )
+        .finally(() => setDistrictsLoading(false));
+    }
   };
 
   /**
@@ -628,6 +668,14 @@ export default function WhatsAppOrderModal({
     ? PAYMENT_METHODS.filter((m) => m.key !== "cod")
     : PAYMENT_METHODS;
 
+  /** Kanal Duitku yang akan dipakai saat pesanan dikirim: pilihan pembeli,
+   *  atau QRIS pertama yang aktif bila pembeli belum memilih. */
+  const effectiveProvider =
+    payProvider ||
+    duitkuRows(duitkuMethods).find((r) => r.key === "qris")?.methods[0]?.code ||
+    duitkuRows(duitkuMethods)[0]?.methods[0]?.code ||
+    "SP";
+
   // Batal-kan pilihan COD bila pesanan memuat produk Evermos (mis. modal yang
   // sama dipakai ulang untuk keranjang yang isinya berubah). Hook wajib di
   // atas early return agar jumlah hook antar-render tidak berubah.
@@ -927,7 +975,7 @@ export default function WhatsAppOrderModal({
             };
           }),
           clientTotal: grandTotal,
-          paymentChannel: payChannel,
+          paymentChannel: effectiveProvider,
           pageUrl:
             typeof window !== "undefined" ? window.location.href : undefined,
         };
@@ -1172,11 +1220,24 @@ export default function WhatsAppOrderModal({
                 ) : (
                   <div className="flex flex-col items-center gap-3 pt-6 text-center">
                     <span className="flex h-14 w-14 items-center justify-center rounded-full bg-brand/10">
-                      <QrCode className="h-6 w-6 text-brand" />
+                      <CreditCard className="h-6 w-6 text-brand" />
                     </span>
-                    <p className="max-w-xs text-xs leading-relaxed text-muted-2">
-                      Menyiapkan kode pembayaran…
+                    <p className="text-sm font-semibold text-ink">
+                      Lanjutkan ke halaman pembayaran
                     </p>
+                    <p className="max-w-xs text-xs leading-relaxed text-muted-2">
+                      Metode ini membutuhkan pengalihan ke halaman pembayaran
+                      aman Duitku. Pesanan Anda tersimpan dan statusnya tetap
+                      dicek otomatis.
+                    </p>
+                    <a
+                      href={pay.paymentUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-1 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand px-4 py-3 text-sm font-bold text-white transition-all hover:bg-brand-2 active:scale-[0.98]"
+                    >
+                      Buka Pembayaran <ExternalLink className="h-4 w-4" />
+                    </a>
                   </div>
                 )}
               </div>
@@ -1868,77 +1929,134 @@ export default function WhatsAppOrderModal({
                     {/* Bila Bayar Online dipilih, pilihan kanalnya tampil
                         tepat di bawahnya — baru setelah itu opsi COD. */}
                     {p.key === "duitku" && payment === "duitku" && (
-                      <>
-                        {/* Pilihan kanal gaya marketplace: baris kategori
-                            dengan logo resmi gateway + chevron. QRIS dirender
-                            jadi QR langsung di overlay, VA ditampilkan sebagai
-                            nomor + tombol salin — keduanya tanpa tab baru. */}
-                        <div className="space-y-2">
+                      <div className="space-y-2">
+                        {/* Step 1 — baris kategori gaya marketplace: logo kiri,
+                            label + note kanan, chevron. Klik membuka daftar
+                            provider (step 2), memilih provider menutupnya. */}
+                        <div className="space-y-1.5">
                           {duitkuRows(duitkuMethods).map((row) => {
-                            const disabled =
-                              row.key !== "qris" && row.key !== "va";
-                            const rowCls = `flex items-center gap-3 rounded-xl border bg-white px-3 py-3 transition-all ${
-                              disabled
-                                ? "cursor-not-allowed border-gray-200 opacity-60"
-                                : payChannel === row.key
-                                  ? "cursor-pointer border-brand shadow-sm ring-2 ring-brand/20"
-                                  : "cursor-pointer border-gray-200 hover:border-gray-300"
-                            }`;
-                            const body = (
-                              <>
-                                <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                                  {row.methods.slice(0, 5).map((m) =>
-                                    m.image ? (
-                                      <img
-                                        key={m.code}
-                                        src={m.image}
-                                        alt={m.name}
-                                        className="h-6 w-auto object-contain"
-                                      />
+                            const selectedProvider = payProvider
+                              ? row.methods.find((m) => m.code === payProvider)
+                              : undefined;
+                            const open = openChannel === row.key;
+                            const chosen = selectedProvider !== undefined;
+                            return (
+                              <div key={row.key}>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setOpenChannel(open ? null : row.key)
+                                  }
+                                  className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-colors ${
+                                    open
+                                      ? "bg-brand/5 ring-2 ring-brand/30"
+                                      : chosen
+                                        ? "bg-brand/5 hover:bg-brand/10"
+                                        : "bg-gray-50 hover:bg-gray-100"
+                                  }`}
+                                >
+                                  {/* Logo kanal (kiri) — setelah provider
+                                      dipilih, tampilkan logo provider itu. */}
+                                  <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+                                    {chosen ? (
+                                      selectedProvider!.image ? (
+                                        <img
+                                          src={selectedProvider!.image}
+                                          alt={selectedProvider!.name}
+                                          className="h-6 w-auto rounded object-contain"
+                                        />
+                                      ) : null
                                     ) : (
-                                      <span
-                                        key={m.code}
-                                        className="text-[10px] text-muted-2"
-                                      >
-                                        {m.name}
-                                      </span>
-                                    ),
-                                  )}
-                                </span>
-                                <span className="shrink-0 text-right">
-                                  <span className="block text-xs font-semibold text-ink">
-                                    {row.label}
-                                    {disabled && (
-                                      <span className="ml-1.5 rounded bg-gray-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-muted-2">
-                                        Segera Hadir
-                                      </span>
+                                      row.methods.slice(0, 5).map((m) =>
+                                        m.image ? (
+                                          <img
+                                            key={m.code}
+                                            src={m.image}
+                                            alt={m.name}
+                                            className="h-6 w-auto rounded object-contain"
+                                          />
+                                        ) : (
+                                          <span
+                                            key={m.code}
+                                            className="text-[10px] font-semibold text-muted-2"
+                                          >
+                                            {m.name}
+                                          </span>
+                                        ),
+                                      )
                                     )}
                                   </span>
-                                  <span className="hidden text-[10px] leading-snug text-muted-2 sm:block">
-                                    {row.note}
+                                  {/* Label + note (kanan) */}
+                                  <span className="shrink-0 text-right">
+                                    <span className="block text-xs font-bold uppercase tracking-wide text-ink">
+                                      {chosen
+                                        ? selectedProvider!.name
+                                        : row.label}
+                                    </span>
+                                    <span className="hidden text-[10px] leading-snug text-muted-2 sm:block">
+                                      {chosen
+                                        ? "Terpilih — klik untuk ganti"
+                                        : row.note}
+                                    </span>
                                   </span>
-                                </span>
-                                <ChevronRight className="h-4 w-4 shrink-0 text-muted-2" />
-                              </>
-                            );
-                            return disabled ? (
-                              <div key={row.key} className={rowCls}>
-                                <span className="h-4 w-4 shrink-0" />
-                                {body}
+                                  <ChevronRight
+                                    className={`h-4 w-4 shrink-0 text-muted-2 transition-transform ${
+                                      open ? "rotate-90" : ""
+                                    }`}
+                                  />
+                                </button>
+
+                                {/* Step 2 — pilih provider dalam kategori */}
+                                {open && (
+                                  <div className="mt-1.5 space-y-1 rounded-xl bg-gray-50 p-2">
+                                    <p className="px-2 pb-1 pt-1 text-[10px] font-bold uppercase tracking-wider text-muted-2">
+                                      {row.key === "qris"
+                                        ? "Pilih aplikasi QRIS"
+                                        : row.key === "va"
+                                          ? "Pilih bank tujuan transfer"
+                                          : "Pilih metode"}
+                                    </p>
+                                    {row.methods.map((m) => {
+                                      const selected = payProvider === m.code;
+                                      return (
+                                        <button
+                                          key={m.code}
+                                          type="button"
+                                          onClick={() => {
+                                            setPayProvider(m.code);
+                                            setOpenChannel(null);
+                                          }}
+                                          className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors ${
+                                            selected
+                                              ? "bg-white ring-2 ring-brand/30"
+                                              : "bg-white hover:bg-brand/5"
+                                          }`}
+                                        >
+                                          {m.image ? (
+                                            <img
+                                              src={m.image}
+                                              alt={m.name}
+                                              className="h-6 w-auto rounded object-contain"
+                                            />
+                                          ) : (
+                                            <span className="flex h-6 w-6 items-center justify-center rounded bg-gray-100 text-[9px] font-bold text-muted-2">
+                                              {m.code}
+                                            </span>
+                                          )}
+                                          <span className="min-w-0 flex-1 truncate text-xs font-semibold text-ink">
+                                            {m.name}
+                                          </span>
+                                          {selected ? (
+                                            <CheckCircle2 className="h-4 w-4 shrink-0 text-brand" />
+                                          ) : (
+                                            <ChevronRight className="h-4 w-4 shrink-0 text-muted-2" />
+                                          )}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                )}
                               </div>
-                            ) : (
-                              <label key={row.key} className={rowCls}>
-                                <input
-                                  type="radio"
-                                  name="duitku-channel"
-                                  checked={payChannel === row.key}
-                                  onChange={() =>
-                                    setPayChannel(row.key as "qris" | "va")
-                                  }
-                                  className="h-4 w-4 shrink-0 accent-brand"
-                                />
-                                {body}
-                              </label>
                             );
                           })}
                         </div>
@@ -1952,7 +2070,7 @@ export default function WhatsAppOrderModal({
                             diteruskan ke admin via WhatsApp.
                           </p>
                         </div>
-                      </>
+                      </div>
                     )}
                   </Fragment>
                 ))}
