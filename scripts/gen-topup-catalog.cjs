@@ -104,6 +104,7 @@ const CATEGORY_MAP = {
   "E-Money": "emoney",
   TV: "tv",
   Gas: "tv",
+  Streaming: "tv",
 };
 
 // Meta brand → provider. prefixes: awalan nama produk yang dibuang agar nama
