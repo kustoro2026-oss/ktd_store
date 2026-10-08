@@ -12,8 +12,9 @@ import {
   listPendingTopups,
   type TopUpOrder,
 } from "./db";
-import { checkDigiflazzBalance, digiflazzTopup } from "./digiflazz";
+import { digiflazzTopup } from "./digiflazz";
 import { formatRupiah } from "./topup";
+import { alertLowBalanceIfNeeded, getBalance } from "./topup-balance";
 import { notifyTopupBuyer, notifyTopupOwner } from "./wa";
 import { whatsappDisplay } from "./config";
 
@@ -62,19 +63,42 @@ export async function executeTopupOrder(
 }
 
 async function runExecution(order: TopUpOrder, testing: boolean): Promise<ExecuteOutcome> {
-  // 1. Cek saldo ≥ harga beli.
-  const bal = await checkDigiflazzBalance();
+  // 1. Cek saldo ≥ harga beli (pembacaan segar — gate saat order dibuat
+  //    mungkin sudah beberapa menit lalu).
+  const bal = await getBalance(true);
   if (!bal.ok) {
-    await finishTopup(order.id, "failed", "", `Cek saldo gagal: ${bal.error}`);
+    // Relay/API bermasalah — pertahankan Pending supaya cron mencoba lagi
+    // setelah layanan pulih, bukan langsung gagal permanen.
+    await finishTopup(order.id, "pending", "", `Cek saldo gagal: ${bal.error}`);
     const wa = await notifyTopupOwner(
-      `[Top-up] Pesanan ${order.id} (${order.product_name}) butuh tindakan — cek saldo Digiflazz gagal (${bal.error}). Cek /topup/admin.`,
+      `[Top-up] Pesanan ${order.id} (${order.product_name}) menunggu cek ulang — cek saldo Digiflazz gagal (${bal.error}). Cron akan mencoba lagi.`,
     );
-    return { step: "failed", detail: `cek saldo gagal: ${bal.error}`, wa };
+    await notifyTopupBuyer(
+      order.buyer_phone,
+      [
+        `Halo ${order.buyer_name || "Kak"}, pembayaran top up kamu sudah kami terima dan sedang diproses.`,
+        `Pesanan: ${order.id}`,
+        `Produk: ${order.product_name}`,
+        "",
+        "Kami kabari lagi setelah top up selesai.",
+      ].join("\n"),
+    );
+    return { step: "pending", detail: `cek saldo gagal, ditunda: ${bal.error}`, wa };
   }
   if (bal.balance < order.cost) {
     await finishTopup(order.id, "failed", "", "Saldo Digiflazz kurang");
     const wa = await notifyTopupOwner(
       `[Top-up] Saldo Digiflazz kurang untuk pesanan ${order.id}: tersisa ${formatRupiah(bal.balance)}, butuh ${formatRupiah(order.cost)}. Deposit dulu, lalu eksekusi ulang di /topup/admin.`,
+    );
+    await notifyTopupBuyer(
+      order.buyer_phone,
+      [
+        `Halo ${order.buyer_name || "Kak"}, maaf top up kamu belum berhasil diproses otomatis.`,
+        `Pesanan: ${order.id}`,
+        `Produk: ${order.product_name}`,
+        "",
+        `Hubungi CS kami ${cs} untuk pengembalian dana atau proses manual.`,
+      ].join("\n"),
     );
     return {
       step: "balance_low",
@@ -97,6 +121,16 @@ async function runExecution(order: TopUpOrder, testing: boolean): Promise<Execut
     const wa = await notifyTopupOwner(
       `[Top-up] Pesanan ${order.id} (${order.product_name}) menunggu cek ulang — relay Digiflazz gagal (${res.error}). Cron akan mencoba lagi.`,
     );
+    await notifyTopupBuyer(
+      order.buyer_phone,
+      [
+        `Halo ${order.buyer_name || "Kak"}, pembayaran top up kamu sudah kami terima dan sedang diproses.`,
+        `Pesanan: ${order.id}`,
+        `Produk: ${order.product_name}`,
+        "",
+        "Kami kabari lagi setelah top up selesai.",
+      ].join("\n"),
+    );
     return { step: "pending", detail: `relay gagal, ditunda: ${res.error}`, wa };
   }
 
@@ -115,6 +149,8 @@ async function runExecution(order: TopUpOrder, testing: boolean): Promise<Execut
         "Terima kasih sudah belanja di KTD Store.",
       ].join("\n"),
     );
+    // Pantau saldo setelah transaksi — peringatkan owner bila mendekati limit.
+    await alertAfterTransaction(res.lastBalance);
     return { step: "success", detail: `sukses ${res.sn ? `(SN ${res.sn})` : ""}`, wa };
   }
 
@@ -152,6 +188,20 @@ async function runExecution(order: TopUpOrder, testing: boolean): Promise<Execut
   return { step: "failed", detail: reason, wa };
 }
 
+/** Peringatan saldo rendah setelah transaksi sukses — pakai saldo dari
+ *  respons transaksi bila ada, fallback cek saldo segar. Gagal baca saldo
+ *  tidak mengganggu alur sukses. */
+async function alertAfterTransaction(lastBalance?: number): Promise<void> {
+  let balance = lastBalance;
+  if (balance === undefined) {
+    const rem = await getBalance(true);
+    if (rem.ok) balance = rem.balance;
+  }
+  if (balance !== undefined) {
+    await alertLowBalanceIfNeeded(balance);
+  }
+}
+
 /** Cek ulang pesanan berstatus Pending dengan mengirim ulang ref_id yang
  *  sama ke Digiflazz (idempoten — mengembalikan status terkini). */
 export async function recheckTopupOrder(order: TopUpOrder): Promise<ExecuteOutcome> {
@@ -178,6 +228,7 @@ export async function recheckTopupOrder(order: TopUpOrder): Promise<ExecuteOutco
         "Terima kasih sudah belanja di KTD Store.",
       ].join("\n"),
     );
+    await alertAfterTransaction(res.lastBalance);
     return { step: "success", detail: `sukses ${res.sn ? `(SN ${res.sn})` : ""}`, wa };
   }
   if (res.pending) {

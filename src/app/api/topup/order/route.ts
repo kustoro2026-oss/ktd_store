@@ -8,10 +8,12 @@
 // Body: { sku, id, server?, buyerName, buyerPhone }
 // Respons: { ok, orderId, mode: "duitku" | "wa", paymentUrl?, waLink? }
 
-import { NextResponse } from "next/server";
-import { TOPUP_PRODUCTS, customerNoFor } from "@/lib/topup";
+import { NextResponse, after } from "next/server";
+import { TOPUP_PRODUCTS, customerNoFor, formatRupiah } from "@/lib/topup";
 import { createTopupOrder, newOrderId, newRefId, setOrderPaymentSession } from "@/lib/db";
 import { createDuitkuPayment, duitkuConfigured, DUITKU_MIN_AMOUNT } from "@/lib/duitku";
+import { gateBalanceForCost } from "@/lib/topup-balance";
+import { notifyTopupOwner } from "@/lib/wa";
 import { SITE_URL, whatsappLink } from "@/lib/config";
 
 export const runtime = "nodejs";
@@ -74,6 +76,25 @@ export async function POST(req: Request) {
     );
   }
 
+  // Notifikasi WA ke owner: ada pesanan baru (fire-and-forget — tidak
+  // menunda respons ke pembeli).
+  after(() => {
+    notifyTopupOwner(
+      [
+        "[Top-up] Pesanan baru masuk:",
+        `No. Pesanan: ${orderId}`,
+        `Produk: ${product.name}`,
+        `Tujuan: ${customerNo}`,
+        `Total: ${formatRupiah(product.sellPrice)}`,
+        ...(buyerName ? [`Nama: ${buyerName}`] : []),
+        ...(buyerPhone ? [`No. HP: ${buyerPhone}`] : []),
+        "Status: menunggu pembayaran",
+      ].join("\n"),
+    ).catch(() => {
+      // Notifikasi gagal tidak boleh menggagalkan pesanan.
+    });
+  });
+
   const waLink = whatsappLink(
     [
       "Halo, saya sudah membuat pesanan top up:",
@@ -97,6 +118,16 @@ export async function POST(req: Request) {
         waLink,
         gatewayError: `Nominal di bawah minimum pembayaran online (Rp ${DUITKU_MIN_AMOUNT.toLocaleString("id-ID")})`,
       });
+    }
+    // Gate saldo: jangan buat sesi bayar bila saldo Digiflazz tidak cukup —
+    // mencegah "pembeli bayar tapi tidak dilayani". Fail-open saat saldo
+    // tidak terbaca (relay down): eksekusi tetap punya pengaman sendiri.
+    const gate = await gateBalanceForCost(product.costPrice);
+    if (!gate.ok) {
+      return NextResponse.json(
+        { ok: false, error: "layanan_sibuk" },
+        { status: 503 },
+      );
     }
     const pay = await createDuitkuPayment({
       merchantOrderId: refId,

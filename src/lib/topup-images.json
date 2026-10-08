@@ -1,5 +1,10 @@
 {
   "free-fire": "/images/topup/free-fire.png",
+  "free-fire-max": "/images/topup/free-fire-max.png",
+  "pubg-mobile": "/images/topup/pubg-mobile.png",
+  "valorant": "/images/topup/valorant.png",
+  "genshin-impact": "/images/topup/genshin-impact.png",
+  "honkai-star-rail": "/images/topup/honkai-star-rail.png",
   "tri": "/images/topup/tri.png",
   "telkomsel": "/images/topup/telkomsel.png",
   "indosat": "/images/topup/indosat.png",

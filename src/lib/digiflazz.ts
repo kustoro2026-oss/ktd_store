@@ -98,6 +98,8 @@ export type TopupResult = {
   rc?: string;
   message?: string;
   sn?: string;
+  /** Saldo sisa dari respons transaksi (buyer_last_saldo), bila ada. */
+  lastBalance?: number;
   raw?: unknown;
   error?: string;
 };
@@ -131,6 +133,13 @@ export async function digiflazzTopup(o: {
   const status = String(d?.status ?? "");
   const message = String(d?.message ?? "");
   const sn = String(d?.sn ?? "");
+  const rawBal = d?.buyer_last_saldo;
+  const lastBalance =
+    typeof rawBal === "number"
+      ? rawBal
+      : typeof rawBal === "string" && rawBal !== ""
+        ? Number(rawBal)
+        : undefined;
   // rc "00" = sukses, "39" = pending; sebagian produk hanya memberi status
   // teks — cocokkan keduanya.
   const success = rc === "00" || /sukses|success/i.test(status);
@@ -144,6 +153,7 @@ export async function digiflazzTopup(o: {
     rc,
     message,
     sn,
+    lastBalance,
     raw: r.data,
   };
 }
