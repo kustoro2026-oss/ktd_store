@@ -1,10 +1,11 @@
 "use client";
 
-// Halaman pembayaran top-up: tampilkan pembayaran Duitku langsung di halaman
-// ini — QR code QRIS (dari qrString inquiry) atau nomor VA — + polling status
-// pesanan tiap 5 detik. Status diperbarui server-side oleh webhook Duitku
-// (dibayar → eksekusi otomatis → WA), jadi halaman ini cukup memantau tabel
-// pesanan.
+// Halaman pembayaran top-up: tampilkan pembayaran langsung di halaman ini —
+// QR code QRIS (dari qrString inquiry) atau nomor VA; kanal redirect
+// (e-wallet, kartu, minimarket) memakai tombol buka halaman pembayaran aman.
+// Polling status pesanan tiap 5 detik — status diperbarui server-side oleh
+// webhook Duitku (dibayar → eksekusi otomatis → WA), jadi halaman ini cukup
+// memantau tabel pesanan.
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
@@ -212,18 +213,28 @@ export default function TopupBayarPage() {
               ) : null}
 
               <div className="mt-4 flex flex-col gap-2 border-t border-gray-100 pt-4">
-                <a
-                  href={order.payment_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 rounded-xl border border-gray-200 px-5 py-2.5 text-xs font-semibold text-muted transition-colors hover:border-brand hover:text-brand"
-                >
-                  Atau bayar lewat halaman pembayaran aman (semua metode){" "}
-                  <ExternalLink className="h-3.5 w-3.5" />
-                </a>
-                <p className="text-center text-xs text-muted">
-                  Halaman ini otomatis berubah setelah pembayaran terverifikasi.
-                </p>
+                {order.payment_qr || order.payment_va ? (
+                  <p className="text-center text-xs text-muted">
+                    Halaman ini otomatis berubah setelah pembayaran terverifikasi.
+                  </p>
+                ) : (
+                  <>
+                    <a
+                      href={order.payment_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 rounded-xl bg-brand px-5 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-brand-2"
+                    >
+                      Buka Halaman Pembayaran{" "}
+                      <ExternalLink className="h-4 w-4" />
+                    </a>
+                    <p className="text-center text-xs text-muted">
+                      Anda akan diarahkan ke halaman pembayaran aman (semua
+                      metode). Halaman ini otomatis berubah setelah pembayaran
+                      terverifikasi.
+                    </p>
+                  </>
+                )}
               </div>
             </div>
           )}

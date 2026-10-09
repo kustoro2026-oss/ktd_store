@@ -3,16 +3,20 @@
 // Halaman pilih nominal provider (pola halaman game itemku): header brand,
 // tab kategori tersegmen (bila provider lintas kategori), pencarian nominal,
 // grid kartu nominal bertahap (load more), dan panel beli sticky kanan
-// (bawah di mobile). Alur pesanan sama dengan form lama:
-// POST /api/topup/order → halaman bayar Duitku, atau fallback WhatsApp untuk
+// (bawah di mobile) dengan picker metode pembayaran gaya checkout produk
+// (QRIS / VA / e-wallet / kartu / minimarket). Alur pesanan:
+// POST /api/topup/order → halaman bayar, atau fallback WhatsApp untuk
 // nominal < Rp 10.000.
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  ArrowLeft,
   Check,
   CheckCircle2,
+  ChevronRight,
   Info,
   Loader2,
+  QrCode,
   Search,
   Send,
   ShieldCheck,
@@ -27,6 +31,11 @@ import {
 } from "@/lib/topup";
 import ProviderLogo from "./ProviderLogo";
 import { fieldsForProvider } from "@/lib/topup-fields";
+import {
+  duitkuRows,
+  type DuitkuChannelRow,
+  type DuitkuPaymentMethod,
+} from "@/lib/duitku-channels";
 
 type OrderResponse = {
   ok?: boolean;
@@ -73,6 +82,15 @@ export default function NominalPicker({ provider, initialSku }: Props) {
   const [busy, setBusy] = useState(false);
   const [nomFilter, setNomFilter] = useState("");
   const [visibleCount, setVisibleCount] = useState(BASE_SHOW);
+
+  // Picker metode pembayaran — pola sama dengan checkout produk:
+  // kategori → provider → kartu metode terpilih (klik untuk ganti).
+  /** Kode kanal Duitku pilihan pembeli (mis. SP = QRIS ShopeePay). Kosong = pakai QRIS pertama yang aktif. */
+  const [payProvider, setPayProvider] = useState("");
+  /** Kategori yang sedang dibuka daftar provider-nya (akordeon step 2). */
+  const [openChannel, setOpenChannel] = useState<string | null>(null);
+  /** Daftar metode pembayaran aktif (kode + logo resmi gateway). */
+  const [duitkuMethods, setDuitkuMethods] = useState<DuitkuPaymentMethod[]>([]);
 
   // Skema input provider (field per produk ala itemku) + ikon item nominal.
   const schema = fieldsForProvider(provider.slug);
@@ -127,6 +145,25 @@ export default function NominalPicker({ provider, initialSku }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [provider.slug, tab]);
 
+  // Muat daftar metode pembayaran aktif (logo QRIS / bank) untuk picker
+  // kanal di panel beli — sekali saja; respons ter-cache 10 menit di server.
+  // Nominal praseleksi (bila ada) ikut dikirim agar daftar kanal sesuai
+  // jumlah tagihan.
+  useEffect(() => {
+    if (duitkuMethods.length) return;
+    const amount =
+      nominal && nominal.sellPrice >= WA_MIN ? `?amount=${nominal.sellPrice}` : "";
+    fetch(`/api/duitku/methods${amount}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j: { ok?: boolean; methods?: DuitkuPaymentMethod[] }) => {
+        if (j.ok && Array.isArray(j.methods)) setDuitkuMethods(j.methods);
+      })
+      .catch(() => {
+        // Gateway belum siap — fallback kanal SP/VA ditangani server.
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [duitkuMethods.length]);
+
   const selectTab = (c: TopUpCategory) => {
     setTab(c);
     setNomFilter("");
@@ -143,6 +180,33 @@ export default function NominalPicker({ provider, initialSku }: Props) {
     : gridNominals;
   const visible = filtered.slice(0, visibleCount);
   const isWaOnly = nominal !== null && nominal.sellPrice < WA_MIN;
+
+  // ─── Picker metode pembayaran (pola sama dengan checkout produk) ───────
+  /** Baris kategori dari daftar kanal aktif (urutan tetap). */
+  const rows = duitkuRows(duitkuMethods);
+  /** Kanal yang dipakai saat pesanan dikirim: pilihan pembeli, atau QRIS
+   *  pertama yang aktif bila pembeli belum memilih. */
+  const effectiveProvider =
+    payProvider ||
+    rows.find((r) => r.key === "qris")?.methods[0]?.code ||
+    rows[0]?.methods[0]?.code ||
+    "SP";
+  /** Kategori yang sedang dibuka daftar provider-nya (step 2). */
+  const openDuitkuRow = openChannel
+    ? rows.find((r) => r.key === openChannel) ?? null
+    : null;
+  /** Provider terpilih beserta kategori induknya — kartu "metode terpilih". */
+  const chosenDuitku: {
+    row: DuitkuChannelRow;
+    method: DuitkuPaymentMethod;
+  } | null = (() => {
+    if (!payProvider) return null;
+    for (const row of rows) {
+      const method = row.methods.find((m) => m.code === payProvider);
+      if (method) return { row, method };
+    }
+    return null;
+  })();
 
   const remember = () => {
     try {
@@ -193,6 +257,7 @@ export default function NominalPicker({ provider, initialSku }: Props) {
           nickname: nickname.trim(),
           buyerName: name.trim(),
           buyerPhone: phone.trim(),
+          paymentChannel: effectiveProvider,
         }),
       });
       const j = (await res.json()) as OrderResponse;
@@ -502,6 +567,199 @@ export default function NominalPicker({ provider, initialSku }: Props) {
               </div>
             )}
 
+            {!isWaOnly && (
+              <div>
+                <p className="mb-1.5 text-sm font-semibold text-ink">
+                  Metode Pembayaran
+                </p>
+                {openDuitkuRow ? (
+                  /* Step 2 — tampilan khusus kategori terpilih: tombol kembali
+                     + header kategori + daftar provider. */
+                  <div className="rounded-xl bg-gray-50 p-3">
+                    <button
+                      type="button"
+                      onClick={() => setOpenChannel(null)}
+                      className="mb-2 flex items-center gap-1.5 rounded-lg px-1 py-1 text-xs font-semibold text-brand transition-colors hover:bg-brand/10"
+                    >
+                      <ArrowLeft className="h-4 w-4" />
+                      Kembali
+                      <span className="font-normal text-muted-2">
+                        — pilih metode pembayaran lain
+                      </span>
+                    </button>
+                    <div className="mb-2 flex items-center gap-3 rounded-lg bg-white px-3 py-2.5">
+                      <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+                        {openDuitkuRow.methods.slice(0, 5).map((m) =>
+                          m.image ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              key={m.code}
+                              src={m.image}
+                              alt={m.name}
+                              className="h-6 w-auto rounded object-contain"
+                            />
+                          ) : (
+                            <span
+                              key={m.code}
+                              className="text-[10px] font-semibold text-muted-2"
+                            >
+                              {m.name}
+                            </span>
+                          ),
+                        )}
+                      </span>
+                      <span className="shrink-0 text-right">
+                        <span className="block text-xs font-bold uppercase tracking-wide text-ink">
+                          {openDuitkuRow.label}
+                        </span>
+                        <span className="block text-[10px] leading-snug text-muted-2">
+                          {openDuitkuRow.note}
+                        </span>
+                      </span>
+                    </div>
+                    <p className="px-1 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-2">
+                      {openDuitkuRow.key === "qris"
+                        ? "Pilih aplikasi QRIS"
+                        : openDuitkuRow.key === "va"
+                          ? "Pilih bank tujuan transfer"
+                          : "Pilih metode"}
+                    </p>
+                    <div className="space-y-1">
+                      {openDuitkuRow.methods.map((m) => {
+                        const selected = payProvider === m.code;
+                        return (
+                          <button
+                            key={m.code}
+                            type="button"
+                            onClick={() => {
+                              setPayProvider(m.code);
+                              setOpenChannel(null);
+                            }}
+                            className={`flex w-full items-center gap-2.5 rounded-lg bg-white px-2.5 py-2.5 text-left transition-all ${
+                              selected ? "ring-2 ring-brand/30" : "hover:bg-brand/5"
+                            }`}
+                          >
+                            {m.image ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={m.image}
+                                alt={m.name}
+                                className="h-6 w-auto rounded object-contain"
+                              />
+                            ) : (
+                              <span className="flex h-6 w-6 items-center justify-center rounded bg-gray-100 text-[9px] font-bold text-muted-2">
+                                {m.code}
+                              </span>
+                            )}
+                            <span className="min-w-0 flex-1 truncate text-xs font-semibold text-ink">
+                              {m.name}
+                            </span>
+                            <span
+                              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 ${
+                                selected
+                                  ? "border-brand bg-brand"
+                                  : "border-gray-300 bg-white"
+                              }`}
+                            >
+                              {selected && (
+                                <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                              )}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : chosenDuitku ? (
+                  /* Metode terpilih — kartu tunggal; klik untuk mengganti. */
+                  <button
+                    type="button"
+                    onClick={() => setPayProvider("")}
+                    className="flex w-full items-center gap-3 rounded-xl bg-brand/5 px-3 py-3 text-left ring-2 ring-brand/30 transition-colors hover:bg-brand/10"
+                  >
+                    {chosenDuitku.method.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={chosenDuitku.method.image}
+                        alt={chosenDuitku.method.name}
+                        className="h-6 w-auto rounded object-contain"
+                      />
+                    ) : (
+                      <span className="flex h-6 w-6 items-center justify-center rounded bg-gray-100 text-[9px] font-bold text-muted-2">
+                        {chosenDuitku.method.code}
+                      </span>
+                    )}
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-xs font-bold uppercase tracking-wide text-ink">
+                        {chosenDuitku.method.name}
+                      </span>
+                      <span className="block text-[10px] leading-snug text-muted-2">
+                        {chosenDuitku.row.label} — {chosenDuitku.row.note}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-xs font-semibold text-brand">
+                      Ganti
+                    </span>
+                  </button>
+                ) : rows.length > 0 ? (
+                  /* Step 1 — baris kategori gaya marketplace. */
+                  <div className="space-y-1.5">
+                    {rows.map((row) => (
+                      <button
+                        key={row.key}
+                        type="button"
+                        onClick={() => setOpenChannel(row.key)}
+                        className="flex w-full items-center gap-3 rounded-xl bg-gray-50 px-3 py-3 text-left transition-colors hover:bg-gray-100"
+                      >
+                        <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+                          {row.methods.slice(0, 5).map((m) =>
+                            m.image ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                key={m.code}
+                                src={m.image}
+                                alt={m.name}
+                                className="h-6 w-auto rounded object-contain"
+                              />
+                            ) : (
+                              <span
+                                key={m.code}
+                                className="text-[10px] font-semibold text-muted-2"
+                              >
+                                {m.name}
+                              </span>
+                            ),
+                          )}
+                        </span>
+                        <span className="shrink-0 text-right">
+                          <span className="block text-xs font-bold uppercase tracking-wide text-ink">
+                            {row.label}
+                          </span>
+                          <span className="block text-[10px] leading-snug text-muted-2">
+                            {row.note}
+                          </span>
+                        </span>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-2" />
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  /* Daftar kanal belum termuat — tampilkan default QRIS. */
+                  <div className="flex items-center gap-3 rounded-xl bg-gray-50 px-3 py-3">
+                    <QrCode className="h-6 w-6 shrink-0 text-brand" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-xs font-bold uppercase tracking-wide text-ink">
+                        QRIS
+                      </span>
+                      <span className="block text-[10px] leading-snug text-muted-2">
+                        Scan dari semua e-wallet & m-banking
+                      </span>
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="flex items-center justify-between border-t border-gray-100 pt-3">
               <div>
                 <p className="text-xs text-muted-2">Total Pembayaran</p>
@@ -521,8 +779,9 @@ export default function NominalPicker({ provider, initialSku }: Props) {
 
             <p className="flex items-start gap-2 text-[11px] leading-relaxed text-muted">
               <Zap className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand" />
-              Bayar via QRIS / Virtual Account — pengisian otomatis setelah
-              pembayaran terverifikasi, biasanya dalam beberapa menit.
+              {isWaOnly
+                ? "Nominal ini diproses via WhatsApp — CS kami akan memverifikasi pembayaran Anda."
+                : "Pilih metode pembayaran di atas — pengisian otomatis setelah pembayaran terverifikasi, biasanya dalam beberapa menit."}
             </p>
           </div>
         </form>

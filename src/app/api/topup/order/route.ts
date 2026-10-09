@@ -5,7 +5,7 @@
 // pesanan tetap tersimpan dan pembeli diarahkan ke fallback WhatsApp (CS
 // memverifikasi transfer manual lalu eksekusi dari /topup/admin).
 //
-// Body: { sku, id, server?, nickname?, buyerName, buyerPhone }
+// Body: { sku, id, server?, nickname?, buyerName, buyerPhone, paymentChannel? }
 // Respons: { ok, orderId, mode: "duitku" | "wa", paymentUrl?, waLink? }
 
 import { NextResponse, after } from "next/server";
@@ -27,6 +27,7 @@ export async function POST(req: Request) {
     nickname?: unknown;
     buyerName?: unknown;
     buyerPhone?: unknown;
+    paymentChannel?: unknown;
   } = {};
   try {
     body = await req.json();
@@ -158,19 +159,39 @@ export async function POST(req: Request) {
         { status: 503 },
       );
     }
-    const pay = await createDuitkuPayment({
-      merchantOrderId: refId,
-      productName: `${product.name} (${orderId})`,
-      amount: product.sellPrice,
-      buyerName,
-      buyerPhone,
-      returnUrl: `${SITE_URL}/topup/bayar/${orderId}`,
-      callbackUrl: `${SITE_URL}/api/duitku/callback`,
-      // QRIS (SP) default — inquiry memuat qrString yang dirender jadi QR
-      // di halaman bayar tanpa redirect. Bila ditolak, coba VA.
-      paymentMethod: "SP",
-    });
-    if (pay.ok && pay.paymentUrl) {
+    // Kanal spesifik pilihan pembeli (mis. SP = QRIS ShopeePay, VA = Maybank
+    // VA, FT = Indomaret) — kirim apa adanya. Bila ditolak gateway (mis.
+    // belum aktif), jatuh ke QRIS (SP) lalu VA tanpa duplikasi kode.
+    // merchantOrderId WAJIB = ref_id pesanan — router callback mencocokkan
+    // merchantOrderId ke kolom ref_id; akhiran apa pun akan membuat callback
+    // tidak pernah cocok dan pesanan tidak pernah lunas.
+    const channelWanted = String(body.paymentChannel ?? "")
+      .trim()
+      .toUpperCase();
+    const attempts = [
+      ...new Set(channelWanted ? [channelWanted, "SP", "VA"] : ["SP", "VA"]),
+    ];
+    let pay: Awaited<ReturnType<typeof createDuitkuPayment>> | null = null;
+    let payChannel = "";
+    for (const code of attempts) {
+      const attempt = await createDuitkuPayment({
+        merchantOrderId: refId,
+        productName: `${product.name} (${orderId})`,
+        amount: product.sellPrice,
+        buyerName,
+        buyerPhone,
+        returnUrl: `${SITE_URL}/topup/bayar/${orderId}`,
+        callbackUrl: `${SITE_URL}/api/duitku/callback`,
+        paymentMethod: code,
+      });
+      if (attempt.ok) {
+        pay = attempt;
+        payChannel = code;
+        break;
+      }
+      pay = attempt; // simpan error terakhir untuk gatewayError
+    }
+    if (pay?.ok && pay.paymentUrl) {
       await setOrderPaymentSession(
         orderId,
         pay.reference ?? "",
@@ -185,40 +206,8 @@ export async function POST(req: Request) {
         paymentUrl: pay.paymentUrl,
         qrString: pay.qrString ?? "",
         vaNumber: pay.vaNumber ?? "",
-        channel: "SP",
-      });
-    }
-    // QRIS ditolak? Coba VA sebagai fallback agar pembeli tetap bisa bayar
-    // tanpa redirect (nomor VA ditampilkan langsung di halaman bayar).
-    // merchantOrderId WAJIB = ref_id pesanan — router callback mencocokkan
-    // merchantOrderId ke kolom ref_id; akhiran apa pun akan membuat callback
-    // tidak pernah cocok dan pesanan tidak pernah lunas.
-    const payVa = await createDuitkuPayment({
-      merchantOrderId: refId,
-      productName: `${product.name} (${orderId})`,
-      amount: product.sellPrice,
-      buyerName,
-      buyerPhone,
-      returnUrl: `${SITE_URL}/topup/bayar/${orderId}`,
-      callbackUrl: `${SITE_URL}/api/duitku/callback`,
-      paymentMethod: "VA",
-    });
-    if (payVa.ok && payVa.paymentUrl) {
-      await setOrderPaymentSession(
-        orderId,
-        payVa.reference ?? "",
-        payVa.paymentUrl,
-        payVa.vaNumber ?? "",
-        payVa.qrString ?? "",
-      );
-      return NextResponse.json({
-        ok: true,
-        orderId,
-        mode: "duitku",
-        paymentUrl: payVa.paymentUrl,
-        qrString: payVa.qrString ?? "",
-        vaNumber: payVa.vaNumber ?? "",
-        channel: "VA",
+        channel: payChannel,
+        sandbox: process.env.DUITKU_SANDBOX === "true",
       });
     }
     // Sesi gagal — pesanan tetap ada; pembeli lanjut via WhatsApp.
@@ -227,7 +216,7 @@ export async function POST(req: Request) {
       orderId,
       mode: "wa",
       waLink,
-      gatewayError: pay.error ?? "sesi pembayaran online gagal dibuat",
+      gatewayError: pay?.error ?? "sesi pembayaran online gagal dibuat",
     });
   }
 
