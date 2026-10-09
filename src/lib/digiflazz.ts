@@ -140,10 +140,17 @@ export async function digiflazzTopup(o: {
       : typeof rawBal === "string" && rawBal !== ""
         ? Number(rawBal)
         : undefined;
-  // rc "00" = sukses, "39" = pending; sebagian produk hanya memberi status
-  // teks — cocokkan keduanya.
+  // rc "00" = sukses, "03"/"39" = pending; sebagian produk hanya memberi
+  // status teks — cocokkan keduanya. HATI-HATI: pola regex lama menyamakan
+  // "sedang gangguan" (rc 40/41) dan "tidak dapat diproses" sebagai pending,
+  // sehingga pesanan gangguan menggantung selamanya tanpa jalur refund.
   const success = rc === "00" || /sukses|success/i.test(status);
-  const pending = rc === "39" || /pending|proses|sedang/i.test(`${status} ${message}`);
+  const pending =
+    rc === "03" ||
+    rc === "39" ||
+    /pending|menunggu|dalam proses|sedang diproses|sedang berlangsung/i.test(
+      `${status} ${message}`,
+    );
   return {
     ok: true,
     refId: o.refId,

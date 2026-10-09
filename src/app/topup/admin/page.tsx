@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, Play, RefreshCw, Wallet } from "lucide-react";
-import { TOPUP_CATEGORIES, TOPUP_PRODUCTS, customerNoFor, formatRupiah } from "@/lib/topup";
+import { TOPUP_CATEGORIES, TOPUP_PRODUCTS, formatRupiah, providerForSku } from "@/lib/topup";
+import { fieldsForProvider } from "@/lib/topup-fields";
 
 /**
  * Halaman admin eksekusi top-up (internal CS).
@@ -63,7 +64,14 @@ export default function TopUpAdminPage() {
   }, []);
 
   const product = TOPUP_PRODUCTS.find((p) => p.sku === sku) ?? TOPUP_PRODUCTS[0];
-  const customerNo = customerNoFor(product, gameId, server);
+  // Susun customer_no lewat skema yang sama dengan form pembeli (single
+  // source of truth) — ML = "id zone", Genshin/HSR = "UID|Server", dsb.
+  const provider = providerForSku(product.sku);
+  const schema = provider ? fieldsForProvider(provider.slug) : null;
+  const serverField = schema?.fields.find((f) => f.key === "server");
+  const customerNo = schema
+    ? schema.compose({ target: gameId, server, nickname: "" })
+    : gameId.trim();
   // Nomor pelanggan (K-Vision) dibiarkan teks bebas; lainnya angka saja.
   const targetIsNumeric = product.customerNoLabel !== "Nomor Pelanggan";
 
@@ -246,19 +254,41 @@ export default function TopUpAdminPage() {
               className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20"
             />
           </div>
-          {product.needsServer && (
+          {serverField && (
             <div>
               <label htmlFor="ta-server" className="mb-1.5 block text-sm font-semibold text-ink">
-                Server / Zone
+                {serverField.label}
               </label>
-              <input
-                id="ta-server"
-                type="text"
-                inputMode="numeric"
-                value={server}
-                onChange={(e) => setServer(e.target.value.replace(/\D/g, ""))}
-                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20"
-              />
+              {serverField.options ? (
+                <select
+                  id="ta-server"
+                  value={server}
+                  onChange={(e) => setServer(e.target.value)}
+                  className="w-full appearance-none rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20"
+                >
+                  <option value="" disabled>
+                    {serverField.placeholder}
+                  </option>
+                  {serverField.options.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  id="ta-server"
+                  type="text"
+                  inputMode={serverField.numeric ? "numeric" : "text"}
+                  value={server}
+                  onChange={(e) =>
+                    setServer(
+                      serverField.numeric ? e.target.value.replace(/\D/g, "") : e.target.value,
+                    )
+                  }
+                  className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20"
+                />
+              )}
             </div>
           )}
         </div>
@@ -271,7 +301,7 @@ export default function TopUpAdminPage() {
           <button
             type="button"
             onClick={doExecute}
-            disabled={busy || !customerNo}
+            disabled={busy || !customerNo || (serverField ? !server : false)}
             className="flex items-center gap-2 rounded-xl bg-brand px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-brand-2 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
