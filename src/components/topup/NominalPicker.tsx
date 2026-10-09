@@ -1,13 +1,23 @@
 "use client";
 
 // Halaman pilih nominal provider (pola halaman game itemku): header brand,
-// tab kategori (bila provider lintas kategori), grid kartu nominal, dan panel
-// beli sticky kanan (bawah di mobile). Alur pesanan sama dengan form lama:
+// tab kategori tersegmen (bila provider lintas kategori), pencarian nominal,
+// grid kartu nominal bertahap (load more), dan panel beli sticky kanan
+// (bawah di mobile). Alur pesanan sama dengan form lama:
 // POST /api/topup/order → halaman bayar Duitku, atau fallback WhatsApp untuk
 // nominal < Rp 10.000.
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Info, Loader2, Send, ShieldCheck, Zap } from "lucide-react";
+import {
+  Check,
+  CheckCircle2,
+  Info,
+  Loader2,
+  Search,
+  Send,
+  ShieldCheck,
+  Zap,
+} from "lucide-react";
 import {
   TOPUP_CATEGORIES,
   formatRupiah,
@@ -33,6 +43,9 @@ type Props = {
 };
 
 const WA_MIN = 10000;
+/** Jumlah kartu nominal yang dirender sekali jalan (grid bisa ribuan baris). */
+const BASE_SHOW = 48;
+const SHOW_STEP = 48;
 
 export default function NominalPicker({ provider, initialSku }: Props) {
   const router = useRouter();
@@ -56,6 +69,8 @@ export default function NominalPicker({ provider, initialSku }: Props) {
   const [error, setError] = useState("");
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [nomFilter, setNomFilter] = useState("");
+  const [visibleCount, setVisibleCount] = useState(BASE_SHOW);
 
   useEffect(() => {
     // Muat data pembeli terakhir untuk provider ini (localStorage klien).
@@ -80,8 +95,35 @@ export default function NominalPicker({ provider, initialSku }: Props) {
     }
   }, [provider.slug]);
 
+  useEffect(() => {
+    // Reset pencarian + batas tampil saat ganti provider/tab; pastikan nominal
+    // praseleksi dari ?sku= ikut terlihat di grid.
+    setNomFilter("");
+    if (validInitial) {
+      const list = provider.nominals.filter((n) => n.category === tab);
+      const idx = list.findIndex((n) => n.sku === validInitial);
+      setVisibleCount(idx >= 0 ? Math.max(BASE_SHOW, idx + 1) : BASE_SHOW);
+    } else {
+      setVisibleCount(BASE_SHOW);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [provider.slug, tab]);
+
+  const selectTab = (c: TopUpCategory) => {
+    setTab(c);
+    setNomFilter("");
+    setVisibleCount(BASE_SHOW);
+  };
+
   const nominal = provider.nominals.find((n) => n.sku === sku) ?? null;
   const gridNominals = provider.nominals.filter((n) => n.category === tab);
+  const q = nomFilter.trim().toLowerCase();
+  const filtered = q
+    ? gridNominals.filter(
+        (n) => n.name.toLowerCase().includes(q) || n.sku.toLowerCase().includes(q),
+      )
+    : gridNominals;
+  const visible = filtered.slice(0, visibleCount);
   const isWaOnly = nominal !== null && nominal.sellPrice < WA_MIN;
 
   const remember = () => {
@@ -176,28 +218,43 @@ export default function NominalPicker({ provider, initialSku }: Props) {
   }
 
   return (
-    <div className="pb-24 lg:pb-0">
+    <div className="pb-2 lg:pb-0">
       {/* Header brand */}
-      <div className="flex items-center gap-4">
-        <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-gray-100 bg-white shadow-sm sm:h-20 sm:w-20">
-          <ProviderLogo slug={provider.slug} label={provider.label} className="h-11 w-11 sm:h-14 sm:w-14" />
-        </span>
-        <div className="min-w-0">
-          <h1 className="truncate text-xl font-extrabold text-ink sm:text-2xl">
-            Top Up {provider.label}
-          </h1>
-          <p className="mt-0.5 text-xs text-muted sm:text-sm">
-            Proses otomatis setelah pembayaran terverifikasi
-          </p>
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {cats.map((c) => (
-              <span
-                key={c}
-                className="rounded-full bg-brand/10 px-2.5 py-0.5 text-[10px] font-semibold text-brand sm:text-[11px]"
-              >
-                {TOPUP_CATEGORIES.find((x) => x.id === c)?.label}
+      <div className="relative overflow-hidden rounded-2xl border border-gray-100 bg-gradient-to-br from-brand/[0.07] via-white to-transparent p-4 shadow-sm sm:p-5">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-10 -top-10 h-44 w-44 rounded-full bg-brand/10 blur-2xl"
+        />
+        <div className="relative flex items-center gap-4">
+          <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-gray-100 bg-white p-1.5 shadow-sm sm:h-20 sm:w-20">
+            <ProviderLogo
+              slug={provider.slug}
+              label={provider.label}
+              className="h-10 w-10 sm:h-12 sm:w-12"
+            />
+          </span>
+          <div className="min-w-0">
+            <h1 className="truncate text-xl font-extrabold tracking-tight text-ink sm:text-2xl">
+              Top Up {provider.label}
+            </h1>
+            <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted sm:text-sm">
+              <span className="inline-flex items-center gap-1 font-semibold text-emerald-600">
+                <ShieldCheck className="h-3.5 w-3.5" />
+                Pembayaran terverifikasi
               </span>
-            ))}
+              <span aria-hidden="true" className="hidden h-1 w-1 rounded-full bg-gray-300 sm:inline-block" />
+              <span>Pengisian otomatis</span>
+            </p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {cats.map((c) => (
+                <span
+                  key={c}
+                  className="rounded-full bg-brand/10 px-2.5 py-0.5 text-[10px] font-semibold text-brand sm:text-[11px]"
+                >
+                  {TOPUP_CATEGORIES.find((x) => x.id === c)?.label}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -206,16 +263,14 @@ export default function NominalPicker({ provider, initialSku }: Props) {
         {/* Kiri: tab + grid nominal */}
         <section className="min-w-0">
           {cats.length > 1 && (
-            <div className="flex flex-wrap gap-2">
+            <div className="scrollbar-hide -mx-1 flex gap-1 overflow-x-auto rounded-xl border border-gray-100 bg-gray-100/70 p-1 sm:mx-0">
               {cats.map((c) => (
                 <button
                   key={c}
                   type="button"
-                  onClick={() => setTab(c)}
-                  className={`rounded-xl border px-4 py-2 text-sm font-semibold transition-colors ${
-                    tab === c
-                      ? "border-brand bg-brand text-white"
-                      : "border-gray-200 bg-white text-ink hover:border-brand hover:text-brand"
+                  onClick={() => selectTab(c)}
+                  className={`shrink-0 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
+                    tab === c ? "bg-white text-brand shadow-sm" : "text-muted hover:text-ink"
                   }`}
                 >
                   {TOPUP_CATEGORIES.find((x) => x.id === c)?.label}
@@ -224,16 +279,64 @@ export default function NominalPicker({ provider, initialSku }: Props) {
             </div>
           )}
 
-          <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3">
-            {gridNominals.map((n) => (
-              <NominalCard
-                key={n.sku}
-                n={n}
-                selected={sku === n.sku}
-                onSelect={() => setSku(n.sku)}
+          {/* Pencarian nominal */}
+          {gridNominals.length > 24 && (
+            <div className="relative mt-4">
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-2" />
+              <input
+                type="search"
+                value={nomFilter}
+                onChange={(e) => {
+                  setNomFilter(e.target.value);
+                  setVisibleCount(BASE_SHOW);
+                }}
+                placeholder={`Cari nominal ${provider.label}…`}
+                autoComplete="off"
+                aria-label={`Cari nominal ${provider.label}`}
+                className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm text-ink outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20"
               />
-            ))}
-          </div>
+            </div>
+          )}
+
+          <p className="mt-4 text-xs text-muted-2">
+            Menampilkan{" "}
+            <b className="font-semibold text-muted">{visible.length}</b> dari{" "}
+            <b className="font-semibold text-muted">{filtered.length}</b> nominal
+            {q ? <> untuk &ldquo;{nomFilter.trim()}&rdquo;</> : null}
+          </p>
+
+          {filtered.length === 0 ? (
+            <p className="mt-3 rounded-xl border border-gray-100 bg-gray-50 px-4 py-6 text-center text-sm text-muted">
+              Tidak ada nominal yang cocok dengan &ldquo;{nomFilter.trim()}&rdquo;.
+            </p>
+          ) : (
+            <>
+              <div className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3">
+                {visible.map((n) => (
+                  <NominalCard
+                    key={n.sku}
+                    n={n}
+                    selected={sku === n.sku}
+                    onSelect={() => setSku(n.sku)}
+                  />
+                ))}
+              </div>
+              {filtered.length > visible.length && (
+                <div className="mt-4 text-center">
+                  <button
+                    type="button"
+                    onClick={() => setVisibleCount((v) => v + SHOW_STEP)}
+                    className="rounded-xl border border-gray-200 bg-white px-6 py-2.5 text-sm font-semibold text-brand transition-colors hover:border-brand hover:bg-brand/[0.04]"
+                  >
+                    Tampilkan Lebih Banyak
+                    <span className="ml-1.5 rounded-md bg-gray-100 px-1.5 py-0.5 text-[11px] font-bold text-muted">
+                      +{Math.min(SHOW_STEP, filtered.length - visible.length)}
+                    </span>
+                  </button>
+                </div>
+              )}
+            </>
+          )}
 
           <p className="mt-4 flex items-start gap-2 text-xs leading-relaxed text-muted">
             <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
@@ -247,138 +350,152 @@ export default function NominalPicker({ provider, initialSku }: Props) {
           id="topup-buy-form"
           onSubmit={submit}
           noValidate
-          className="min-w-0 space-y-4 self-start rounded-2xl border border-gray-100 bg-white p-5 shadow-sm lg:sticky lg:top-24"
+          className="min-w-0 self-start overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm lg:sticky lg:top-24"
         >
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-2">
-              Nominal Dipilih
-            </p>
-            {nominal ? (
-              <div className="mt-1.5">
-                <p className="text-base font-bold text-ink">{nominal.name}</p>
-                {nominal.type && (
-                  <span className="mt-1 inline-block rounded-md bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-muted">
-                    {nominal.type}
-                  </span>
-                )}
-              </div>
-            ) : (
-              <p className="mt-1.5 text-sm text-muted">Pilih nominal di samping kiri.</p>
-            )}
+          <div className="flex items-center gap-3 border-b border-gray-100 bg-gray-50/60 px-5 py-4">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-gray-100">
+              <ProviderLogo slug={provider.slug} label={provider.label} className="h-7 w-7" />
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-bold text-ink">{provider.label}</p>
+              <p className="text-[11px] text-muted-2">Pengisian otomatis terverifikasi</p>
+            </div>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-4 p-5">
             <div>
-              <label htmlFor="np-name" className="mb-1.5 block text-sm font-semibold text-ink">
-                Nama Lengkap <span className="text-red-500">*</span>
-              </label>
-              <input
-                id="np-name"
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Nama pemesan"
-                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-base outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20 sm:text-sm"
-              />
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-2">
+                Nominal Dipilih
+              </p>
+              {nominal ? (
+                <div className="mt-1.5">
+                  <p className="text-base font-bold text-ink">{nominal.name}</p>
+                  {nominal.type && (
+                    <span className="mt-1 inline-block rounded-md bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-muted">
+                      {nominal.type}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <p className="mt-1.5 text-sm text-muted">Pilih nominal di samping kiri.</p>
+              )}
             </div>
-            <div>
-              <label htmlFor="np-phone" className="mb-1.5 block text-sm font-semibold text-ink">
-                No. HP Pemesan
-              </label>
-              <input
-                id="np-phone"
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="08xxxxxxxxxx (untuk notifikasi WhatsApp)"
-                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-base outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20 sm:text-sm"
-              />
-            </div>
-            <div>
-              <label htmlFor="np-target" className="mb-1.5 block text-sm font-semibold text-ink">
-                {provider.customerNoLabel} <span className="text-red-500">*</span>
-              </label>
-              <input
-                id="np-target"
-                type="text"
-                inputMode={targetIsNumeric ? "numeric" : "text"}
-                value={target}
-                onChange={(e) =>
-                  setTarget(targetIsNumeric ? e.target.value.replace(/\D/g, "") : e.target.value)
-                }
-                placeholder={
-                  provider.customerNoLabel.toLowerCase().includes("hp")
-                    ? "08xxxxxxxxxx"
-                    : "Contoh: 12345678"
-                }
-                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-base outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20 sm:text-sm"
-              />
-            </div>
-            {provider.needsServer && (
+
+            <div className="space-y-3">
               <div>
-                <label htmlFor="np-server" className="mb-1.5 block text-sm font-semibold text-ink">
-                  Server / Zone <span className="text-red-500">*</span>
+                <label htmlFor="np-name" className="mb-1.5 block text-sm font-semibold text-ink">
+                  Nama Lengkap <span className="text-red-500">*</span>
                 </label>
                 <input
-                  id="np-server"
+                  id="np-name"
                   type="text"
-                  inputMode="numeric"
-                  value={server}
-                  onChange={(e) => setServer(e.target.value.replace(/\D/g, ""))}
-                  placeholder="Contoh: 1234"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Nama pemesan"
                   className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-base outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20 sm:text-sm"
                 />
               </div>
+              <div>
+                <label htmlFor="np-phone" className="mb-1.5 block text-sm font-semibold text-ink">
+                  No. HP Pemesan
+                </label>
+                <input
+                  id="np-phone"
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="08xxxxxxxxxx (untuk notifikasi WhatsApp)"
+                  className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-base outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20 sm:text-sm"
+                />
+              </div>
+              <div>
+                <label htmlFor="np-target" className="mb-1.5 block text-sm font-semibold text-ink">
+                  {provider.customerNoLabel} <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="np-target"
+                  type="text"
+                  inputMode={targetIsNumeric ? "numeric" : "text"}
+                  value={target}
+                  onChange={(e) =>
+                    setTarget(targetIsNumeric ? e.target.value.replace(/\D/g, "") : e.target.value)
+                  }
+                  placeholder={
+                    provider.customerNoLabel.toLowerCase().includes("hp")
+                      ? "08xxxxxxxxxx"
+                      : "Contoh: 12345678"
+                  }
+                  className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-base outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20 sm:text-sm"
+                />
+              </div>
+              {provider.needsServer && (
+                <div>
+                  <label htmlFor="np-server" className="mb-1.5 block text-sm font-semibold text-ink">
+                    Server / Zone <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="np-server"
+                    type="text"
+                    inputMode="numeric"
+                    value={server}
+                    onChange={(e) => setServer(e.target.value.replace(/\D/g, ""))}
+                    placeholder="Contoh: 1234"
+                    className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-base outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20 sm:text-sm"
+                  />
+                </div>
+              )}
+            </div>
+
+            {error && (
+              <p
+                role="alert"
+                className="rounded-xl border border-red-100 bg-red-50 px-4 py-2.5 text-sm font-medium text-red-600"
+              >
+                {error}
+              </p>
             )}
-          </div>
 
-          {error && (
-            <p
-              role="alert"
-              className="rounded-xl border border-red-100 bg-red-50 px-4 py-2.5 text-sm font-medium text-red-600"
-            >
-              {error}
+            {isWaOnly && (
+              <div className="flex items-start gap-2.5 rounded-xl border border-amber-100 bg-amber-50 p-3">
+                <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                <p className="text-xs leading-relaxed text-amber-800">
+                  Nominal di bawah Rp 10.000 (minimum pembayaran online) diproses
+                  via WhatsApp — pesanan tetap tercatat dan CS kami akan
+                  memverifikasi pembayaran Anda.
+                </p>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between border-t border-gray-100 pt-3">
+              <div>
+                <p className="text-xs text-muted-2">Total Pembayaran</p>
+                <p className="text-xl font-extrabold text-brand">
+                  {nominal ? formatRupiah(nominal.sellPrice) : "—"}
+                </p>
+              </div>
+              <button
+                type="submit"
+                disabled={busy || !nominal}
+                className="flex items-center gap-2 rounded-xl bg-brand px-5 py-3 text-sm font-bold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-brand-2 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                {busy ? "Memproses..." : "Beli Sekarang"}
+              </button>
+            </div>
+
+            <p className="flex items-start gap-2 text-[11px] leading-relaxed text-muted">
+              <Zap className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand" />
+              Bayar via QRIS / Virtual Account — pengisian otomatis setelah
+              pembayaran terverifikasi, biasanya dalam beberapa menit.
             </p>
-          )}
-
-          {isWaOnly && (
-            <div className="flex items-start gap-2.5 rounded-xl border border-amber-100 bg-amber-50 p-3">
-              <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-              <p className="text-xs leading-relaxed text-amber-800">
-                Nominal di bawah Rp 10.000 (minimum pembayaran online) diproses
-                via WhatsApp — pesanan tetap tercatat dan CS kami akan
-                memverifikasi pembayaran Anda.
-              </p>
-            </div>
-          )}
-
-          <div className="flex items-center justify-between border-t border-gray-100 pt-3">
-            <div>
-              <p className="text-xs text-muted-2">Total Pembayaran</p>
-              <p className="text-xl font-extrabold text-brand">
-                {nominal ? formatRupiah(nominal.sellPrice) : "—"}
-              </p>
-            </div>
-            <button
-              type="submit"
-              disabled={busy || !nominal}
-              className="flex items-center gap-2 rounded-xl bg-brand px-5 py-3 text-sm font-bold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-brand-2 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              {busy ? "Memproses..." : "Beli Sekarang"}
-            </button>
           </div>
-
-          <p className="flex items-start gap-2 text-[11px] leading-relaxed text-muted">
-            <Zap className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand" />
-            Bayar via QRIS / Virtual Account — pengisian otomatis setelah
-            pembayaran terverifikasi, biasanya dalam beberapa menit.
-          </p>
         </form>
       </div>
 
-      {/* Bar bawah sticky (mobile): ringkasan + tombol submit form panel */}
-      <div className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-3 border-t border-gray-100 bg-white p-3 shadow-[0_-4px_12px_rgba(0,0,0,0.08)] lg:hidden">
+      {/* Bar bawah sticky (mobile): ringkasan + tombol submit form panel.
+          Sticky (bukan fixed) agar menempel saat scroll tapi tidak menutupi
+          footer ketika sudah sampai akhir halaman. */}
+      <div className="sticky bottom-0 z-30 -mx-4 flex items-center justify-between gap-3 rounded-t-2xl border-t border-gray-100 bg-white/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-6px_16px_rgba(0,0,0,0.08)] backdrop-blur lg:hidden">
         <div className="min-w-0">
           <p className="truncate text-xs font-semibold text-ink">
             {nominal ? nominal.name : "Pilih nominal"}
@@ -414,13 +531,18 @@ function NominalCard({
     <button
       type="button"
       onClick={onSelect}
-      className={`min-w-0 rounded-2xl border p-3 text-left transition-colors sm:p-4 ${
+      className={`relative min-w-0 rounded-2xl border p-3 text-left transition-all sm:p-4 ${
         selected
-          ? "border-brand bg-brand/5 ring-2 ring-brand/20"
-          : "border-gray-200 bg-white hover:border-brand/60"
+          ? "border-brand bg-brand/[0.04] shadow-sm"
+          : "border-gray-200 bg-white hover:border-brand/50 hover:shadow-sm"
       }`}
     >
-      <p className="truncate text-sm font-semibold leading-snug text-ink">{n.name}</p>
+      {selected && (
+        <span className="absolute right-2.5 top-2.5 flex h-5 w-5 items-center justify-center rounded-full bg-brand text-white">
+          <Check className="h-3 w-3" strokeWidth={3} />
+        </span>
+      )}
+      <p className="clamp-2 pr-5 text-sm font-semibold leading-snug text-ink">{n.name}</p>
       {n.type && (
         <span className="mt-1.5 inline-block max-w-full truncate rounded-md bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-muted">
           {n.type}

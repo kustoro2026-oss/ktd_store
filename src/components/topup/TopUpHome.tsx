@@ -4,11 +4,12 @@
 // autocomplete, shortcut kategori berikon, lalu section grid provider per
 // kategori. Data seluruhnya dari katalog lokal (src/lib/topup.ts) — tidak
 // ada fetch jaringan, sehingga autocomplete instan.
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowRight,
+  ChevronRight,
   Clock,
   Gamepad2,
   Headphones,
@@ -37,6 +38,33 @@ const MAX_RECENT = 5;
 const MAX_SUGGESTIONS = 8;
 
 const POPULAR = ["Free Fire", "Mobile Legends", "Telkomsel", "PLN", "DANA"];
+
+/** Total SKU di katalog — dipakai strip statistik di hero. */
+const TOTAL_NOMINALS = TOPUP_PROVIDERS.reduce((a, p) => a + p.nominals.length, 0);
+
+const TRUST = [
+  { icon: ShieldCheck, title: "Transaksi Aman", sub: "Pembayaran terverifikasi otomatis" },
+  { icon: Zap, title: "Proses Otomatis", sub: "Saldo masuk dalam hitungan menit" },
+  { icon: Headphones, title: "Bantuan CS", sub: "Siap membantu via WhatsApp" },
+];
+
+const STEPS = [
+  {
+    icon: Gamepad2,
+    title: "Pilih Game & Nominal",
+    desc: "Pilih provider dan nominal, lalu masukkan ID game / nomor tujuan.",
+  },
+  {
+    icon: Wallet,
+    title: "Bayar QRIS / Virtual Account",
+    desc: "Selesaikan pembayaran via QRIS atau VA — verifikasi otomatis.",
+  },
+  {
+    icon: Zap,
+    title: "Saldo Masuk Otomatis",
+    desc: "Pengisian diproses otomatis beberapa menit setelah pembayaran lunas.",
+  },
+];
 
 type Suggestion = {
   slug: string;
@@ -116,17 +144,17 @@ function ProviderCard({ p, cat }: { p: TopUpProvider; cat: TopUpCategory }) {
   return (
     <Link
       href={`/topup/${p.slug}`}
-      className="group flex flex-col items-center gap-2 rounded-2xl border border-gray-100 bg-white p-3 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand/40 hover:shadow-md sm:p-4"
+      className="group flex min-w-0 flex-col items-center gap-2 rounded-2xl border border-gray-100 bg-white p-3 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand/40 hover:shadow-lg sm:p-4"
     >
-      <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-50 sm:h-16 sm:w-16">
+      <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-50 ring-1 ring-gray-100 transition-colors group-hover:bg-brand/[0.04] sm:h-16 sm:w-16">
         <ProviderLogo slug={p.slug} label={p.label} className="h-9 w-9 sm:h-11 sm:w-11" />
       </span>
-      <span className="min-w-0">
+      <span className="w-full min-w-0">
         <span className="block truncate text-xs font-semibold leading-tight text-ink sm:text-sm">
           {p.label}
         </span>
         <span className="mt-1 block text-[11px] font-bold text-brand sm:text-xs">
-          {formatRupiah(categoryMinPrice(p, cat))}
+          Mulai {formatRupiah(categoryMinPrice(p, cat))}
         </span>
         <span className="mt-0.5 block text-[10px] text-muted-2">
           {count} nominal
@@ -216,19 +244,31 @@ export default function TopUpHome() {
   return (
     <div className="pb-8">
       {/* Hero + trust bar */}
-      <section className="border-b border-gray-100 bg-gradient-to-b from-brand/[0.06] to-transparent py-8 sm:py-10">
-        <div className="container-site text-center">
-          <h1 className="text-2xl font-extrabold text-ink sm:text-3xl">
+      <section className="relative overflow-hidden border-b border-gray-100 bg-gradient-to-b from-brand/[0.07] via-brand/[0.03] to-transparent py-10 sm:py-14">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full bg-brand/10 blur-3xl"
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-20 top-8 h-64 w-64 rounded-full bg-amber-400/10 blur-3xl"
+        />
+        <div className="container-site relative text-center">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-brand/20 bg-white/80 px-3 py-1 text-[11px] font-bold text-brand sm:text-xs">
+            <Zap className="h-3.5 w-3.5" />
+            Proses Otomatis — Saldo Masuk dalam Hitungan Menit
+          </span>
+          <h1 className="mt-4 text-2xl font-extrabold tracking-tight text-ink sm:text-4xl">
             Top Up &amp; Isi Saldo
           </h1>
-          <p className="mx-auto mt-2 max-w-xl text-sm text-muted sm:text-base">
+          <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-muted sm:text-base">
             Diamond game, pulsa, paket data, token listrik, dan e-wallet — proses
             otomatis langsung setelah pembayaran terverifikasi.
           </p>
 
           {/* Search bar besar */}
           <form onSubmit={submitSearch} className="relative mx-auto mt-6 max-w-2xl text-left">
-            <div className="flex items-center overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition-all focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20">
+            <div className="flex items-center overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-md transition-all focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20 focus-within:shadow-lg">
               <Search className="ml-4 h-5 w-5 shrink-0 text-muted-2" />
               <input
                 value={query}
@@ -336,35 +376,39 @@ export default function TopUpHome() {
             ))}
           </div>
 
-          {/* Trust bar */}
-          <div className="mt-7 flex flex-col items-center justify-center gap-4 sm:flex-row sm:gap-10">
-            <div className="flex items-center gap-2.5">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand">
-                <ShieldCheck className="h-5 w-5" />
-              </span>
-              <span className="text-left">
-                <span className="block text-sm font-bold text-ink">Transaksi Aman</span>
-                <span className="block text-xs text-muted">Pembayaran terverifikasi otomatis</span>
-              </span>
-            </div>
-            <div className="flex items-center gap-2.5">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand">
-                <Zap className="h-5 w-5" />
-              </span>
-              <span className="text-left">
-                <span className="block text-sm font-bold text-ink">Proses Otomatis</span>
-                <span className="block text-xs text-muted">Saldo masuk beberapa menit</span>
-              </span>
-            </div>
-            <div className="flex items-center gap-2.5">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand">
-                <Headphones className="h-5 w-5" />
-              </span>
-              <span className="text-left">
-                <span className="block text-sm font-bold text-ink">Bantuan CS</span>
-                <span className="block text-xs text-muted">Siap membantu via WhatsApp</span>
-              </span>
-            </div>
+          {/* Trust bar — kartu */}
+          <div className="mx-auto mt-8 grid max-w-3xl gap-3 text-left sm:grid-cols-3">
+            {TRUST.map((t) => (
+              <div
+                key={t.title}
+                className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-white/90 p-3.5 shadow-sm backdrop-blur"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand/10 text-brand">
+                  <t.icon className="h-5 w-5" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-bold text-ink">{t.title}</span>
+                  <span className="block text-xs text-muted">{t.sub}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Strip statistik katalog */}
+          <div className="mx-auto mt-6 flex max-w-xl flex-wrap items-center justify-center gap-x-6 gap-y-1.5 text-xs font-semibold text-muted sm:text-sm">
+            <span>
+              <b className="font-extrabold text-ink">{TOPUP_PROVIDERS.length}</b> Provider
+            </span>
+            <span aria-hidden="true" className="hidden h-1 w-1 rounded-full bg-gray-300 sm:inline-block" />
+            <span>
+              <b className="font-extrabold text-ink">{TOTAL_NOMINALS.toLocaleString("id-ID")}</b>{" "}
+              Pilihan Nominal
+            </span>
+            <span aria-hidden="true" className="hidden h-1 w-1 rounded-full bg-gray-300 sm:inline-block" />
+            <span>
+              Bayar <b className="font-extrabold text-ink">QRIS</b> /{" "}
+              <b className="font-extrabold text-ink">VA</b>
+            </span>
           </div>
         </div>
       </section>
@@ -376,7 +420,7 @@ export default function TopUpHome() {
             <Link
               key={c.id}
               href={`#kategori-${c.id}`}
-              className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm transition-colors hover:border-brand/40 hover:bg-brand/5 sm:flex-col sm:gap-2 sm:p-4 sm:text-center"
+              className="flex min-w-0 items-center gap-3 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand/40 hover:shadow-md sm:flex-col sm:gap-2 sm:p-4 sm:text-center"
             >
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand/10 text-brand sm:h-12 sm:w-12">
                 {categoryIcon(c.id)}
@@ -392,20 +436,19 @@ export default function TopUpHome() {
           if (!providers.length) return null;
           return (
             <section key={cat.id} id={`kategori-${cat.id}`} className="mt-10 scroll-mt-24">
-              <div className="flex items-end justify-between gap-3">
-                <div>
-                  <h2 className="flex items-center gap-2 text-lg font-bold text-ink sm:text-xl">
-                    <span className="text-brand">{categoryIcon(cat.id)}</span>
-                    {cat.label}
-                  </h2>
-                  <p className="mt-0.5 text-xs text-muted sm:text-sm">{cat.desc}</p>
+              <div className="flex items-end justify-between gap-3 border-b-2 border-brand/10 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand/10 text-brand sm:h-10 sm:w-10">
+                    {categoryIcon(cat.id)}
+                  </span>
+                  <div>
+                    <h2 className="text-lg font-bold text-ink sm:text-xl">{cat.label}</h2>
+                    <p className="mt-0.5 text-xs text-muted sm:text-sm">{cat.desc}</p>
+                  </div>
                 </div>
-                <Link
-                  href={`#kategori-${cat.id}`}
-                  className="shrink-0 text-xs font-semibold text-brand transition-colors hover:underline sm:text-sm"
-                >
-                  Lihat Semua
-                </Link>
+                <span className="hidden shrink-0 rounded-full border border-gray-200 bg-white px-3 py-1 text-[11px] font-semibold text-muted-2 sm:inline-block">
+                  {providers.length} provider
+                </span>
               </div>
               <div className="mt-4 grid grid-cols-3 gap-2.5 sm:grid-cols-4 sm:gap-3 lg:grid-cols-6">
                 {providers.map((p) => (
@@ -419,49 +462,28 @@ export default function TopUpHome() {
         {/* Cara top up + cek status */}
         <section className="mt-12 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm sm:p-6">
           <h2 className="text-lg font-bold text-ink">Cara Top Up</h2>
-          <div className="mt-4 grid gap-4 sm:grid-cols-3">
-            <div className="flex gap-3">
-              <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand/5 text-brand">
-                <Gamepad2 className="h-4.5 w-4.5" />
-                <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-brand text-[10px] font-bold text-white">
-                  1
-                </span>
-              </span>
-              <div>
-                <p className="text-sm font-semibold text-ink">Pilih Game &amp; Nominal</p>
-                <p className="mt-0.5 text-xs leading-relaxed text-muted">
-                  Pilih provider dan nominal, lalu masukkan ID game / nomor tujuan.
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand/5 text-brand">
-                <Wallet className="h-4.5 w-4.5" />
-                <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-brand text-[10px] font-bold text-white">
-                  2
-                </span>
-              </span>
-              <div>
-                <p className="text-sm font-semibold text-ink">Bayar QRIS / Virtual Account</p>
-                <p className="mt-0.5 text-xs leading-relaxed text-muted">
-                  Selesaikan pembayaran via QRIS atau VA — verifikasi otomatis.
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand/5 text-brand">
-                <Zap className="h-4.5 w-4.5" />
-                <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-brand text-[10px] font-bold text-white">
-                  3
-                </span>
-              </span>
-              <div>
-                <p className="text-sm font-semibold text-ink">Saldo Masuk Otomatis</p>
-                <p className="mt-0.5 text-xs leading-relaxed text-muted">
-                  Pengisian diproses otomatis beberapa menit setelah pembayaran lunas.
-                </p>
-              </div>
-            </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto_1fr_auto_1fr] sm:items-stretch">
+            {STEPS.map((s, i) => (
+              <Fragment key={s.title}>
+                {i > 0 && (
+                  <div aria-hidden="true" className="hidden items-center justify-center sm:flex">
+                    <ChevronRight className="h-5 w-5 text-gray-300" />
+                  </div>
+                )}
+                <div className="flex gap-3 rounded-2xl border border-gray-100 bg-gray-50/60 p-4">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand/10 text-brand">
+                    <s.icon className="h-4.5 w-4.5" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-ink">
+                      <span className="mr-1.5 text-brand">{i + 1}.</span>
+                      {s.title}
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed text-muted">{s.desc}</p>
+                  </div>
+                </div>
+              </Fragment>
+            ))}
           </div>
           <p className="mt-5 border-t border-gray-100 pt-4 text-center text-xs leading-relaxed text-muted">
             Nominal di bawah Rp 10.000 diproses via WhatsApp (konfirmasi CS). Sudah
