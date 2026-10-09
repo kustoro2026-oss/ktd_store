@@ -15,6 +15,10 @@ import ProviderLogo from "@/components/topup/ProviderLogo";
 const exo = Exo({ subsets: ["latin"], weight: ["700"] });
 const exo2 = Exo_2({ subsets: ["latin"], weight: ["400"] });
 
+/** Biru tautan "Lihat Semua" — inline karena rule global `a { color: inherit }`
+ *  (di luar layer) mengalahkan utility text-* di elemen anchor. */
+const LINK_BLUE = { color: "#3B82F6" } as const;
+
 /** Provider pilihan kartu game (urutan = urutan tampil). 9 brand + tile
  *  "Semua Game" = 10 item persis seperti grid itemku. */
 const GAME_SLUGS = [
@@ -111,7 +115,8 @@ function SectionCard({
         </div>
         <Link
           href={href}
-          className={`${exo.className} flex h-10 items-center gap-1 rounded-lg border border-[#307FE2] bg-[#EAF2FC]/25 px-3 text-sm font-bold text-[#3B82F6] transition-colors hover:bg-[#97BFF1]/30`}
+          style={LINK_BLUE}
+          className={`${exo.className} flex h-10 items-center gap-1 rounded-lg border border-[#307FE2] bg-[#EAF2FC]/25 px-3 text-sm font-bold transition-colors hover:bg-[#97BFF1]/30`}
         >
           Lihat Semua
           <ChevronRight className="h-5 w-5" />
@@ -130,7 +135,8 @@ function SectionCard({
         </div>
         <Link
           href={href}
-          className={`${exo.className} flex items-center gap-1 text-sm font-bold text-[#3B82F6]`}
+          style={LINK_BLUE}
+          className={`${exo.className} flex items-center gap-1 text-sm font-bold`}
         >
           Lihat Semua
           <ChevronRight className="h-5 w-5" />
@@ -147,7 +153,7 @@ function SectionCard({
             href={`/topup/${p.slug}`}
             className="flex w-16 flex-col items-center gap-2 sm:w-[84px]"
           >
-            <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden sm:h-[72px] sm:w-[72px]">
+            <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden max-[340px]:h-14 max-[340px]:w-14 sm:h-[72px] sm:w-[72px]">
               <ProviderLogo slug={p.slug} label={p.label} className="h-full w-full" />
             </span>
             <ItemLabel>{p.label}</ItemLabel>
@@ -158,7 +164,7 @@ function SectionCard({
             href={allTile.href}
             className="flex w-16 flex-col items-center gap-2 sm:w-[84px]"
           >
-            <span className="flex h-16 w-16 shrink-0 items-center justify-center sm:h-[72px] sm:w-[72px]">
+            <span className="flex h-16 w-16 shrink-0 items-center justify-center max-[340px]:h-14 max-[340px]:w-14 sm:h-[72px] sm:w-[72px]">
               <LayoutGrid className="h-8 w-8 text-[#307FE2] sm:h-9 sm:w-9" />
             </span>
             <ItemLabel>{allTile.label}</ItemLabel>
