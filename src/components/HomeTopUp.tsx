@@ -145,31 +145,46 @@ function SectionCard({
 
       <TicketStrip />
 
-      {/* Grid item — latar #EAF2FC, sudut hanya kanan-atas + kiri-bawah. */}
-      <div className="grid h-full grid-cols-4 items-start justify-items-center gap-4 rounded-bl rounded-tr bg-[#EAF2FC] p-4 sm:grid-cols-5 sm:px-6">
-        {items.map((p) => (
-          <Link
-            key={p.slug}
-            href={`/topup/${p.slug}`}
-            className="flex w-16 flex-col items-center gap-2 sm:w-[84px]"
-          >
-            <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden max-[340px]:h-14 max-[340px]:w-14 sm:h-[72px] sm:w-[72px]">
-              <ProviderLogo slug={p.slug} label={p.label} className="h-full w-full" />
-            </span>
-            <ItemLabel>{p.label}</ItemLabel>
-          </Link>
-        ))}
-        {allTile ? (
-          <Link
-            href={allTile.href}
-            className="flex w-16 flex-col items-center gap-2 sm:w-[84px]"
-          >
-            <span className="flex h-16 w-16 shrink-0 items-center justify-center max-[340px]:h-14 max-[340px]:w-14 sm:h-[72px] sm:w-[72px]">
-              <LayoutGrid className="h-8 w-8 text-[#307FE2] sm:h-9 sm:w-9" />
-            </span>
-            <ItemLabel>{allTile.label}</ItemLabel>
-          </Link>
-        ) : null}
+      {/* Kartu item — latar #EAF2FC: sudut kanan-atas + kiri-bawah membulat
+          (gaya itemku), sudut kiri-atas + kanan-bawah dipotong miring 45°
+          ala tiket kupon. Segitiga warna latar halaman ditaruh di atas kedua
+          sudut untuk membentuk potongan. */}
+      <div className="relative h-full">
+        <div className="grid h-full grid-cols-4 items-start justify-items-center gap-4 rounded-bl rounded-tr bg-[#EAF2FC] p-4 sm:grid-cols-5 sm:px-6">
+          {items.map((p) => (
+            <Link
+              key={p.slug}
+              href={`/topup/${p.slug}`}
+              className="flex w-16 flex-col items-center gap-2 sm:w-[84px]"
+            >
+              <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden max-[340px]:h-14 max-[340px]:w-14 sm:h-[72px] sm:w-[72px]">
+                <ProviderLogo slug={p.slug} label={p.label} className="h-full w-full" />
+              </span>
+              <ItemLabel>{p.label}</ItemLabel>
+            </Link>
+          ))}
+          {allTile ? (
+            <Link
+              href={allTile.href}
+              className="flex w-16 flex-col items-center gap-2 sm:w-[84px]"
+            >
+              <span className="flex h-16 w-16 shrink-0 items-center justify-center max-[340px]:h-14 max-[340px]:w-14 sm:h-[72px] sm:w-[72px]">
+                <LayoutGrid className="h-8 w-8 text-[#307FE2] sm:h-9 sm:w-9" />
+              </span>
+              <ItemLabel>{allTile.label}</ItemLabel>
+            </Link>
+          ) : null}
+        </div>
+        {/* Potongan miring kiri-atas */}
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute left-0 top-0 h-4 w-4 bg-white [clip-path:polygon(0_0,100%_0,0_100%)]"
+        />
+        {/* Potongan miring kanan-bawah */}
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute bottom-0 right-0 h-4 w-4 bg-white [clip-path:polygon(100%_100%,0_100%,100%_0)]"
+        />
       </div>
 
       <TicketStrip flipped />
