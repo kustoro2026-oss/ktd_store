@@ -85,6 +85,29 @@ function ItemLabel({ children }: { children: ReactNode }) {
   );
 }
 
+/** Bingkai tile kecil di dalam kartu — kombinasi sudut senada kartu besar:
+ *  kanan-atas + kiri-bawah membulat, kiri-atas + kanan-bawah dipotong miring
+ *  45°. Segitiga warna latar kartu (#EAF2FC) ditaruh di atas kedua sudut. */
+function TileBox({ children }: { children: ReactNode }) {
+  return (
+    <span className="relative h-16 w-16 shrink-0 max-[340px]:h-14 max-[340px]:w-14 sm:h-[72px] sm:w-[72px]">
+      <span className="flex h-full w-full items-center justify-center overflow-hidden rounded-bl-md rounded-tr-md">
+        {children}
+      </span>
+      {/* Potongan miring kiri-atas */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute left-0 top-0 h-2 w-2 bg-[#EAF2FC] [clip-path:polygon(0_0,100%_0,0_100%)]"
+      />
+      {/* Potongan miring kanan-bawah */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute bottom-0 right-0 h-2 w-2 bg-[#EAF2FC] [clip-path:polygon(100%_100%,0_100%,100%_0)]"
+      />
+    </span>
+  );
+}
+
 function SectionCard({
   title,
   href,
@@ -157,9 +180,9 @@ function SectionCard({
               href={`/topup/${p.slug}`}
               className="flex w-16 flex-col items-center gap-2 sm:w-[84px]"
             >
-              <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden max-[340px]:h-14 max-[340px]:w-14 sm:h-[72px] sm:w-[72px]">
+              <TileBox>
                 <ProviderLogo slug={p.slug} label={p.label} className="h-full w-full" />
-              </span>
+              </TileBox>
               <ItemLabel>{p.label}</ItemLabel>
             </Link>
           ))}
@@ -168,9 +191,9 @@ function SectionCard({
               href={allTile.href}
               className="flex w-16 flex-col items-center gap-2 sm:w-[84px]"
             >
-              <span className="flex h-16 w-16 shrink-0 items-center justify-center max-[340px]:h-14 max-[340px]:w-14 sm:h-[72px] sm:w-[72px]">
+              <TileBox>
                 <LayoutGrid className="h-8 w-8 text-[#307FE2] sm:h-9 sm:w-9" />
-              </span>
+              </TileBox>
               <ItemLabel>{allTile.label}</ItemLabel>
             </Link>
           ) : null}
