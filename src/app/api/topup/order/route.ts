@@ -5,11 +5,12 @@
 // pesanan tetap tersimpan dan pembeli diarahkan ke fallback WhatsApp (CS
 // memverifikasi transfer manual lalu eksekusi dari /topup/admin).
 //
-// Body: { sku, id, server?, buyerName, buyerPhone }
+// Body: { sku, id, server?, nickname?, buyerName, buyerPhone }
 // Respons: { ok, orderId, mode: "duitku" | "wa", paymentUrl?, waLink? }
 
 import { NextResponse, after } from "next/server";
-import { TOPUP_PRODUCTS, customerNoFor, formatRupiah } from "@/lib/topup";
+import { TOPUP_PRODUCTS, formatRupiah, providerForSku } from "@/lib/topup";
+import { composeCustomerNo, fieldsForProvider } from "@/lib/topup-fields";
 import { createTopupOrder, newOrderId, newRefId, setOrderPaymentSession } from "@/lib/db";
 import { createDuitkuPayment, duitkuConfigured, DUITKU_MIN_AMOUNT } from "@/lib/duitku";
 import { gateBalanceForCost } from "@/lib/topup-balance";
@@ -23,6 +24,7 @@ export async function POST(req: Request) {
     sku?: unknown;
     id?: unknown;
     server?: unknown;
+    nickname?: unknown;
     buyerName?: unknown;
     buyerPhone?: unknown;
   } = {};
@@ -38,17 +40,41 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "sku_tidak_dikenal" }, { status: 400 });
   }
 
-  const target = String(body.id ?? "").trim();
-  if (!target) {
+  // Skema input per produk (ala itemku) — customer_no disusun sesuai format
+  // Digiflazz (ML = "id zone", Genshin/HSR = "UID|Server", dsb.).
+  const provider = providerForSku(sku);
+  const schema = provider ? fieldsForProvider(provider.slug) : null;
+  const values: Record<string, string> = {
+    target: String(body.id ?? "").trim(),
+    server: String(body.server ?? "").trim(),
+    nickname: String(body.nickname ?? "").trim(),
+  };
+
+  if (!values.target) {
     return NextResponse.json(
       { ok: false, error: `isi ${product.customerNoLabel}` },
       { status: 400 },
     );
   }
-  if (product.needsServer && !String(body.server ?? "").trim()) {
-    return NextResponse.json({ ok: false, error: "server_wajib" }, { status: 400 });
+  // Validasi per skema: field wajib + angka (server juga dibutuhkan untuk
+  // produk yang butuh gabungan, mis. ML & Genshin).
+  for (const f of schema?.fields ?? []) {
+    const v = values[f.key] ?? "";
+    if (!v && !f.optional) {
+      return NextResponse.json({ ok: false, error: `isi ${f.label}` }, { status: 400 });
+    }
+    if (v && f.numeric && !/^\d+$/.test(v)) {
+      return NextResponse.json(
+        { ok: false, error: `${f.label} harus berupa angka` },
+        { status: 400 },
+      );
+    }
   }
-  const customerNo = customerNoFor(product, target, String(body.server ?? ""));
+  const customerNo = provider
+    ? composeCustomerNo(provider.slug, values)
+    : values.target;
+  const nickname = values.nickname;
+  const note = nickname ? `Nickname: ${nickname}` : "";
 
   const buyerName = String(body.buyerName ?? "").trim().slice(0, 100);
   const buyerPhone = String(body.buyerPhone ?? "").trim().slice(0, 20);
@@ -67,6 +93,7 @@ export async function POST(req: Request) {
       cost: product.costPrice,
       buyer_name: buyerName,
       buyer_phone: buyerPhone,
+      note,
     });
   } catch (e) {
     // Duplikat ref_id sangat jarang — cukup kirim error ke klien.
@@ -85,6 +112,7 @@ export async function POST(req: Request) {
         `No. Pesanan: ${orderId}`,
         `Produk: ${product.name}`,
         `Tujuan: ${customerNo}`,
+        ...(nickname ? [`Nickname: ${nickname}`] : []),
         `Total: ${formatRupiah(product.sellPrice)}`,
         ...(buyerName ? [`Nama: ${buyerName}`] : []),
         ...(buyerPhone ? [`No. HP: ${buyerPhone}`] : []),
@@ -102,6 +130,7 @@ export async function POST(req: Request) {
       `No. Pesanan: ${orderId}`,
       `Produk: ${product.name}`,
       `Tujuan: ${customerNo}`,
+      ...(nickname ? [`Nickname: ${nickname}`] : []),
       `Total: Rp ${new Intl.NumberFormat("id-ID").format(product.sellPrice)}`,
       ...(buyerName ? [`Nama: ${buyerName}`] : []),
       ...(buyerPhone ? [`No. HP: ${buyerPhone}`] : []),

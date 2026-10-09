@@ -26,6 +26,7 @@ import {
   type TopUpProvider,
 } from "@/lib/topup";
 import ProviderLogo from "./ProviderLogo";
+import { fieldsForProvider } from "@/lib/topup-fields";
 
 type OrderResponse = {
   ok?: boolean;
@@ -66,11 +67,26 @@ export default function NominalPicker({ provider, initialSku }: Props) {
   const [phone, setPhone] = useState("");
   const [target, setTarget] = useState("");
   const [server, setServer] = useState("");
+  const [nickname, setNickname] = useState("");
   const [error, setError] = useState("");
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [nomFilter, setNomFilter] = useState("");
   const [visibleCount, setVisibleCount] = useState(BASE_SHOW);
+
+  // Skema input provider (field per produk ala itemku) + ikon item nominal.
+  const schema = fieldsForProvider(provider.slug);
+
+  const fieldValue = (key: string): string => {
+    if (key === "server") return server;
+    if (key === "nickname") return nickname;
+    return target;
+  };
+  const setFieldValue = (key: string, v: string) => {
+    if (key === "server") setServer(v);
+    else if (key === "nickname") setNickname(v);
+    else setTarget(v);
+  };
 
   useEffect(() => {
     // Muat data pembeli terakhir untuk provider ini (localStorage klien).
@@ -82,12 +98,14 @@ export default function NominalPicker({ provider, initialSku }: Props) {
           phone?: string;
           target?: string;
           server?: string;
+          nickname?: string;
         };
         /* eslint-disable react-hooks/set-state-in-effect */
         setName(parsed.name ?? "");
         setPhone(parsed.phone ?? "");
         setTarget(parsed.target ?? "");
         setServer(parsed.server ?? "");
+        setNickname(parsed.nickname ?? "");
         /* eslint-enable react-hooks/set-state-in-effect */
       }
     } catch {
@@ -130,7 +148,7 @@ export default function NominalPicker({ provider, initialSku }: Props) {
     try {
       localStorage.setItem(
         "ktd-topup-last:" + provider.slug,
-        JSON.stringify({ name, phone, target, server }),
+        JSON.stringify({ name, phone, target, server, nickname }),
       );
     } catch {
       // private mode / quota
@@ -139,10 +157,19 @@ export default function NominalPicker({ provider, initialSku }: Props) {
 
   const validate = (): string | null => {
     if (!nominal) return "Silakan pilih nominal terlebih dahulu.";
-    if (!name.trim() || !target.trim())
-      return `Mohon lengkapi Nama dan ${provider.customerNoLabel}.`;
-    if (provider.needsServer && !server.trim())
-      return "Mohon isi Server/Zone untuk produk Mobile Legends.";
+    if (!name.trim()) return "Mohon lengkapi Nama pemesan.";
+    for (const f of schema.fields) {
+      const val = fieldValue(f.key).trim();
+      if (!val) {
+        if (!f.optional) return `Mohon isi ${f.label}.`;
+        continue;
+      }
+      if (f.numeric && !/^\d+$/.test(val)) return `${f.label} harus berupa angka.`;
+      if (f.minLength && val.length < f.minLength)
+        return `${f.label} terlalu pendek (min. ${f.minLength} digit).`;
+      if (f.maxLength && val.length > f.maxLength)
+        return `${f.label} terlalu panjang (maks. ${f.maxLength} karakter).`;
+    }
     return null;
   };
 
@@ -163,6 +190,7 @@ export default function NominalPicker({ provider, initialSku }: Props) {
           sku: nominal!.sku,
           id: target.trim(),
           server: server.trim(),
+          nickname: nickname.trim(),
           buyerName: name.trim(),
           buyerPhone: phone.trim(),
         }),
@@ -193,8 +221,6 @@ export default function NominalPicker({ provider, initialSku }: Props) {
       setBusy(false);
     }
   };
-
-  const targetIsNumeric = provider.targetNumeric;
 
   if (sent && nominal) {
     return (
@@ -316,6 +342,7 @@ export default function NominalPicker({ provider, initialSku }: Props) {
                   <NominalCard
                     key={n.sku}
                     n={n}
+                    icon={schema.icon}
                     selected={sku === n.sku}
                     onSelect={() => setSku(n.sku)}
                   />
@@ -340,8 +367,8 @@ export default function NominalPicker({ provider, initialSku }: Props) {
 
           <p className="mt-4 flex items-start gap-2 text-xs leading-relaxed text-muted">
             <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
-            Pastikan {provider.customerNoLabel.toLowerCase()} yang Anda isi benar —
-            pengisian ke nomor/ID yang salah tidak dapat dikembalikan.
+            Pastikan {schema.fields[0]?.label.toLowerCase() ?? "ID tujuan"} yang Anda isi
+            benar — pengisian ke nomor/ID yang salah tidak dapat dikembalikan.
           </p>
         </section>
 
@@ -408,42 +435,51 @@ export default function NominalPicker({ provider, initialSku }: Props) {
                   className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-base outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20 sm:text-sm"
                 />
               </div>
-              <div>
-                <label htmlFor="np-target" className="mb-1.5 block text-sm font-semibold text-ink">
-                  {provider.customerNoLabel} <span className="text-red-500">*</span>
-                </label>
-                <input
-                  id="np-target"
-                  type="text"
-                  inputMode={targetIsNumeric ? "numeric" : "text"}
-                  value={target}
-                  onChange={(e) =>
-                    setTarget(targetIsNumeric ? e.target.value.replace(/\D/g, "") : e.target.value)
-                  }
-                  placeholder={
-                    provider.customerNoLabel.toLowerCase().includes("hp")
-                      ? "08xxxxxxxxxx"
-                      : "Contoh: 12345678"
-                  }
-                  className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-base outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20 sm:text-sm"
-                />
-              </div>
-              {provider.needsServer && (
-                <div>
-                  <label htmlFor="np-server" className="mb-1.5 block text-sm font-semibold text-ink">
-                    Server / Zone <span className="text-red-500">*</span>
+              {schema.fields.map((f) => (
+                <div key={f.key}>
+                  <label htmlFor={`np-${f.key}`} className="mb-1.5 block text-sm font-semibold text-ink">
+                    {f.label} {!f.optional && <span className="text-red-500">*</span>}
                   </label>
-                  <input
-                    id="np-server"
-                    type="text"
-                    inputMode="numeric"
-                    value={server}
-                    onChange={(e) => setServer(e.target.value.replace(/\D/g, ""))}
-                    placeholder="Contoh: 1234"
-                    className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-base outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20 sm:text-sm"
-                  />
+                  {f.options ? (
+                    <select
+                      id={`np-${f.key}`}
+                      value={fieldValue(f.key)}
+                      onChange={(e) => setFieldValue(f.key, e.target.value)}
+                      className="w-full appearance-none rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-base outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20 sm:text-sm"
+                    >
+                      <option value="" disabled>
+                        {f.placeholder}
+                      </option>
+                      {f.options.map((o) => (
+                        <option key={o} value={o}>
+                          {o}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      id={`np-${f.key}`}
+                      type="text"
+                      inputMode={f.numeric ? "numeric" : "text"}
+                      value={fieldValue(f.key)}
+                      onChange={(e) =>
+                        setFieldValue(
+                          f.key,
+                          f.numeric ? e.target.value.replace(/\D/g, "") : e.target.value,
+                        )
+                      }
+                      placeholder={f.placeholder}
+                      className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-base outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20 sm:text-sm"
+                    />
+                  )}
+                  {f.help && (
+                    <p className="mt-1.5 flex items-start gap-1.5 text-[11px] leading-relaxed text-muted-2">
+                      <Info className="mt-0.5 h-3 w-3 shrink-0" />
+                      {f.help}
+                    </p>
+                  )}
                 </div>
-              )}
+              ))}
             </div>
 
             {error && (
@@ -520,10 +556,12 @@ export default function NominalPicker({ provider, initialSku }: Props) {
 
 function NominalCard({
   n,
+  icon,
   selected,
   onSelect,
 }: {
   n: TopUpNominal;
+  icon?: string;
   selected: boolean;
   onSelect: () => void;
 }) {
@@ -540,6 +578,12 @@ function NominalCard({
       {selected && (
         <span className="absolute right-2.5 top-2.5 flex h-5 w-5 items-center justify-center rounded-full bg-brand text-white">
           <Check className="h-3 w-3" strokeWidth={3} />
+        </span>
+      )}
+      {icon && (
+        <span className="mb-2 flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg bg-gray-50">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={icon} alt="" loading="lazy" className="h-8 w-8 object-contain" />
         </span>
       )}
       <p className="clamp-2 pr-5 text-sm font-semibold leading-snug text-ink">{n.name}</p>

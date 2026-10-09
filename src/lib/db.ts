@@ -40,6 +40,8 @@ export type TopUpOrder = {
   cost: number;
   buyer_name: string;
   buyer_phone: string;
+  /** Catatan verifikasi CS (mis. Nickname game) — tidak dikirim ke Digiflazz. */
+  note: string;
   payment_status: PaymentStatus;
   topup_status: TopupStatus;
   /** Referensi transaksi dari payment gateway (Duitku reference). */
@@ -112,6 +114,7 @@ async function pgPool(): Promise<Pool> {
     for (const alter of [
       "ALTER TABLE topup_orders ADD COLUMN IF NOT EXISTS payment_va TEXT NOT NULL DEFAULT ''",
       "ALTER TABLE topup_orders ADD COLUMN IF NOT EXISTS payment_qr TEXT NOT NULL DEFAULT ''",
+      "ALTER TABLE topup_orders ADD COLUMN IF NOT EXISTS note TEXT NOT NULL DEFAULT ''",
       "ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS payment_va TEXT NOT NULL DEFAULT ''",
       "ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS payment_qr TEXT NOT NULL DEFAULT ''",
     ]) {
@@ -182,6 +185,9 @@ function migrateSqliteColumns(db: DatabaseSync): void {
   }
   if (!cols.has("payment_qr")) {
     db.exec("ALTER TABLE topup_orders ADD COLUMN payment_qr TEXT NOT NULL DEFAULT ''");
+  }
+  if (!cols.has("note")) {
+    db.exec("ALTER TABLE topup_orders ADD COLUMN note TEXT NOT NULL DEFAULT ''");
   }
 }
 
@@ -257,6 +263,7 @@ const SCHEMA_SQL = `
     cost INTEGER NOT NULL DEFAULT 0,
     buyer_name TEXT NOT NULL DEFAULT '',
     buyer_phone TEXT NOT NULL DEFAULT '',
+    note TEXT NOT NULL DEFAULT '',
     payment_status TEXT NOT NULL DEFAULT 'pending',
     topup_status TEXT NOT NULL DEFAULT 'waiting_payment',
     gateway_session TEXT NOT NULL DEFAULT '',
@@ -311,13 +318,14 @@ export async function createTopupOrder(o: {
   cost: number;
   buyer_name: string;
   buyer_phone: string;
+  note?: string;
 }): Promise<TopUpOrder> {
   const now = nowUtc();
   const row = await queryOne<TopUpOrder>(
     `INSERT INTO topup_orders
        (id, ref_id, sku, product_name, customer_no, amount, cost,
-        buyer_name, buyer_phone, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        buyer_name, buyer_phone, note, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      RETURNING *`,
     [
       o.id,
@@ -329,6 +337,7 @@ export async function createTopupOrder(o: {
       o.cost,
       o.buyer_name,
       o.buyer_phone,
+      o.note ?? "",
       now,
       now,
     ],
