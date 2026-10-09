@@ -74,11 +74,11 @@ function TicketStrip({ flipped = false }: { flipped?: boolean }) {
 }
 
 /** Label item grid: Exo 2, 11px mobile / 14px desktop, abu #474747,
- *  maksimal 2 baris. */
+ *  maksimal 2 baris; berubah biru saat tile di-hover/focus. */
 function ItemLabel({ children }: { children: ReactNode }) {
   return (
     <span
-      className={`${exo2.className} line-clamp-2 text-center text-[11px] font-normal leading-[16.5px] text-[#474747] sm:text-sm sm:leading-[21px]`}
+      className={`${exo2.className} line-clamp-2 text-center text-[11px] font-normal leading-[16.5px] text-[#474747] transition-colors duration-200 group-hover:text-[#307FE2] group-focus-visible:text-[#307FE2] sm:text-sm sm:leading-[21px]`}
     >
       {children}
     </span>
@@ -87,10 +87,11 @@ function ItemLabel({ children }: { children: ReactNode }) {
 
 /** Bingkai tile kecil di dalam kartu — kombinasi sudut senada kartu besar:
  *  kanan-atas + kiri-bawah membulat, kiri-atas + kanan-bawah dipotong miring
- *  45°. Segitiga warna latar kartu (#EAF2FC) ditaruh di atas kedua sudut. */
+ *  45°. Segitiga warna latar kartu (#EAF2FC) ditaruh di atas kedua sudut.
+ *  Efek hover: tile membesar halus + bayangan biru, mengecil saat diklik. */
 function TileBox({ children }: { children: ReactNode }) {
   return (
-    <span className="relative h-16 w-16 shrink-0 max-[340px]:h-14 max-[340px]:w-14 sm:h-[72px] sm:w-[72px]">
+    <span className="relative h-16 w-16 shrink-0 transition-all duration-200 group-hover:scale-110 group-hover:drop-shadow-[0_4px_8px_rgba(30,64,175,0.25)] group-focus-visible:scale-110 group-focus-visible:drop-shadow-[0_4px_8px_rgba(30,64,175,0.25)] group-active:scale-95 max-[340px]:h-14 max-[340px]:w-14 sm:h-[72px] sm:w-[72px]">
       <span className="flex h-full w-full items-center justify-center overflow-hidden rounded-bl-md rounded-tr-md">
         {children}
       </span>
@@ -178,7 +179,7 @@ function SectionCard({
             <Link
               key={p.slug}
               href={`/topup/${p.slug}`}
-              className="flex w-16 flex-col items-center gap-2 sm:w-[84px]"
+              className="group flex w-16 flex-col items-center gap-2 sm:w-[84px]"
             >
               <TileBox>
                 <ProviderLogo slug={p.slug} label={p.label} className="h-full w-full" />
@@ -189,7 +190,7 @@ function SectionCard({
           {allTile ? (
             <Link
               href={allTile.href}
-              className="flex w-16 flex-col items-center gap-2 sm:w-[84px]"
+              className="group flex w-16 flex-col items-center gap-2 sm:w-[84px]"
             >
               <TileBox>
                 <LayoutGrid className="h-8 w-8 text-[#307FE2] sm:h-9 sm:w-9" />
