@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import dynamic from "next/dynamic";
 import HeroCarousel from "@/components/HeroCarousel";
 import Features from "@/components/Features";
+import HomeTopUp from "@/components/HomeTopUp";
 import { NewProducts, PopularCategories } from "@/components/HomeSections";
 import { getLocalImages } from "@/lib/localImages";
 import {
@@ -108,6 +109,7 @@ export default async function Home() {
         <HeroCarousel />
       </div>
       <Features />
+      <HomeTopUp />
       <FlashSale initialProducts={flashInitial} />
       <PopularCategories initialCategories={staticCats} />
       <NewProducts
