@@ -8,7 +8,7 @@
 // (QRIS / VA / e-wallet / kartu / minimarket). Alur pesanan:
 // POST /api/topup/order → halaman bayar, atau fallback WhatsApp untuk
 // nominal < Rp 10.000.
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -174,6 +174,12 @@ export default function NominalPicker({ provider, initialSku }: Props) {
   const [nomFilter, setNomFilter] = useState("");
   /** Jumlah kartu yang tampil per sub-kelompok nominal (label → jumlah). */
   const [groupVisible, setGroupVisible] = useState<Record<string, number>>({});
+  /** Tinggi header situs (diukur) — offset sticky navigasi cepat. */
+  const [headerH, setHeaderH] = useState(96);
+  /** Sub-kelompok yang sedang terlihat (highlight chip navigasi cepat). */
+  const [activeGroup, setActiveGroup] = useState("");
+  /** Referensi elemen tiap sub-kelompok untuk lompat scroll halus. */
+  const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
 
   // Picker metode pembayaran — pola sama dengan checkout produk:
   // kategori → provider → kartu metode terpilih (klik untuk ganti).
@@ -236,6 +242,18 @@ export default function NominalPicker({ provider, initialSku }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [provider.slug, tab]);
 
+  // Ukur tinggi header situs (sticky, multi-band, beda per breakpoint) untuk
+  // offset navigasi cepat agar tidak tertutup header saat menempel.
+  useEffect(() => {
+    const measure = () => {
+      const el = document.querySelector("header");
+      if (el) setHeaderH(el.getBoundingClientRect().height);
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+
   // Muat daftar metode pembayaran aktif (logo QRIS / bank) untuk picker
   // kanal di panel beli — sekali saja; respons ter-cache 10 menit di server.
   // Nominal praseleksi (bila ada) ikut dikirim agar daftar kanal sesuai
@@ -260,17 +278,56 @@ export default function NominalPicker({ provider, initialSku }: Props) {
     setNomFilter("");
   };
 
+  /** Lompat halus ke sub-kelompok nominal yang dipilih (chip navigasi cepat). */
+  const jumpToGroup = (label: string) => {
+    setActiveGroup(label);
+    sectionRefs.current[label]?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   const nominal = provider.nominals.find((n) => n.sku === sku) ?? null;
   const gridNominals = provider.nominals.filter((n) => n.category === tab);
   const q = nomFilter.trim().toLowerCase();
-  const filtered = q
-    ? gridNominals.filter(
-        (n) => n.name.toLowerCase().includes(q) || n.sku.toLowerCase().includes(q),
-      )
-    : gridNominals;
   // Nominal dikelompokkan per sub-kategori (Pulsa Reguler, Paket Harian, ...)
   // khusus kategori pulsa & data; kategori lain tetap satu daftar datar.
-  const groups = groupNominals(filtered, tab);
+  // Di-memo agar identitas array stabil (dipakai deps observer navigasi cepat).
+  const { groups, filteredCount } = useMemo(() => {
+    const list = provider.nominals.filter((n) => n.category === tab);
+    const filt = q
+      ? list.filter(
+          (n) => n.name.toLowerCase().includes(q) || n.sku.toLowerCase().includes(q),
+        )
+      : list;
+    return { groups: groupNominals(filt, tab), filteredCount: filt.length };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [provider.slug, tab, nomFilter]);
+
+  // Sorot chip sub-kelompok yang sedang terlihat (IntersectionObserver).
+  useEffect(() => {
+    if (groups.length <= 1) return;
+    const els = groups
+      .map(([label]) => sectionRefs.current[label])
+      .filter((el): el is HTMLElement => el !== null && el !== undefined);
+    if (!els.length) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        let best: { top: number; label: string } | null = null;
+        for (const e of entries) {
+          if (!e.isIntersecting) continue;
+          const top = e.boundingClientRect.top;
+          if (!best || top < best.top) {
+            best = { top, label: (e.target as HTMLElement).dataset.group ?? "" };
+          }
+        }
+        if (best) setActiveGroup(best.label);
+      },
+      // Area aktif: tepat di bawah navigasi cepat sampai ±40% tinggi viewport.
+      { rootMargin: `-${headerH + 56}px 0px -60% 0px`, threshold: 0 },
+    );
+    els.forEach((el) => obs.observe(el));
+    return () => obs.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groups, headerH]);
+
   const totalVisible = groups.reduce(
     (sum, [label, items]) =>
       sum + Math.min(items.length, groupVisible[label] ?? BASE_SHOW),
@@ -493,14 +550,50 @@ export default function NominalPicker({ provider, initialSku }: Props) {
             </div>
           )}
 
+          {/* Navigasi cepat antar sub-kelompok — menempel di bawah header
+              saat scroll agar pembeli bisa lompat tanpa mencari manual. */}
+          {groups.length > 1 && (
+            <nav
+              aria-label={`Navigasi cepat kelompok nominal ${provider.label}`}
+              className="scrollbar-hide sticky z-30 -mx-1 mt-4 flex gap-1.5 overflow-x-auto border-b border-gray-100 bg-white/95 px-1 pb-2.5 pt-1 backdrop-blur-sm"
+              style={{ top: headerH }}
+            >
+              {groups.map(([label, items]) => {
+                const active = activeGroup === label;
+                return (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => jumpToGroup(label)}
+                    aria-current={active ? "true" : undefined}
+                    className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      active
+                        ? "bg-brand text-white shadow-sm"
+                        : "border border-gray-200 bg-white text-muted hover:border-brand/50 hover:text-brand"
+                    }`}
+                  >
+                    {label}
+                    <span
+                      className={`ml-1 text-[10px] font-bold ${
+                        active ? "text-white/80" : "text-muted-2"
+                      }`}
+                    >
+                      {items.length}
+                    </span>
+                  </button>
+                );
+              })}
+            </nav>
+          )}
+
           <p className="mt-4 text-xs text-muted-2">
             Menampilkan{" "}
             <b className="font-semibold text-muted">{totalVisible}</b> dari{" "}
-            <b className="font-semibold text-muted">{filtered.length}</b> nominal
+            <b className="font-semibold text-muted">{filteredCount}</b> nominal
             {q ? <> untuk &ldquo;{nomFilter.trim()}&rdquo;</> : null}
           </p>
 
-          {filtered.length === 0 ? (
+          {filteredCount === 0 ? (
             <p className="mt-3 rounded-xl border border-gray-100 bg-gray-50 px-4 py-6 text-center text-sm text-muted">
               Tidak ada nominal yang cocok dengan &ldquo;{nomFilter.trim()}&rdquo;.
             </p>
@@ -510,7 +603,15 @@ export default function NominalPicker({ provider, initialSku }: Props) {
                 const shown = Math.min(items.length, groupVisible[label] ?? BASE_SHOW);
                 const isFlat = label === GROUP_FLAT;
                 return (
-                  <section key={label} aria-label={isFlat ? undefined : label}>
+                  <section
+                    key={label}
+                    aria-label={isFlat ? undefined : label}
+                    data-group={label}
+                    ref={(el) => {
+                      sectionRefs.current[label] = el;
+                    }}
+                    style={isFlat ? undefined : { scrollMarginTop: headerH + 72 }}
+                  >
                     {!isFlat && (
                       <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-ink">
                         <span aria-hidden="true" className="h-4 w-1 rounded-full bg-brand" />
