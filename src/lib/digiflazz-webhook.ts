@@ -9,7 +9,7 @@
 // pending/gagal yang terlambat. Webhook hanyalah lapisan real-time di atas
 // pola sinkron + polling yang sudah ada.
 
-import { createHash, timingSafeEqual } from "crypto";
+import { createHash, createHmac, timingSafeEqual } from "crypto";
 import {
   finishTopup,
   getTopupOrderByRef,
@@ -33,6 +33,20 @@ export function webhookTokenCocok(given: string): boolean {
   if (!env || !given) return false;
   const ha = createHash("sha256").update(given).digest();
   const hb = createHash("sha256").update(env).digest();
+  return timingSafeEqual(ha, hb);
+}
+
+/** Verifikasi X-Hub-Signature Digiflazz: HMAC-SHA1 atas body mentah dengan
+ *  Secret webhook (TOPUP_WEBHOOK_TOKEN), format header "sha1=<hex>" — sama
+ *  dengan contoh resmi dokumentasi developer.digiflazz.com/api/buyer/webhook. */
+export function webhookSignatureCocok(rawBody: string, signature: string): boolean {
+  const secret = process.env.TOPUP_WEBHOOK_TOKEN ?? "";
+  if (!secret || !signature) return false;
+  const hex = signature.replace(/^sha1=/i, "").trim();
+  if (!/^[0-9a-f]{40}$/i.test(hex)) return false;
+  const diharapkan = createHmac("sha1", secret).update(rawBody).digest("hex");
+  const ha = createHash("sha256").update(hex.toLowerCase()).digest();
+  const hb = createHash("sha256").update(diharapkan).digest();
   return timingSafeEqual(ha, hb);
 }
 
@@ -114,6 +128,18 @@ export async function processDigiflazzWebhook(
   body: unknown,
   opts: { simulate: boolean },
 ): Promise<WebhookOutcome> {
+  // Event ping Digiflazz (dikirim saat webhook dikonfigurasi) — tidak berisi
+  // transaksi, hanya konfirmasi bahwa URL aktif dan dapat digunakan.
+  if (body && typeof body === "object") {
+    const b = body as Record<string, unknown>;
+    if (
+      typeof b.hook_id !== "undefined" ||
+      (typeof b.sed !== "undefined" && b.hook && typeof b.hook === "object")
+    ) {
+      return { ok: true, matched: false, detail: "ping webhook diterima (URL aktif)" };
+    }
+  }
+
   const parsed = parseDigiflazzWebhook(body);
   if (!parsed) {
     return { ok: false, matched: false, detail: "payload tidak dikenali — ref_id tidak ditemukan di body" };

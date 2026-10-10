@@ -1,12 +1,14 @@
 // Penerima webhook Digiflazz — endpoint publik yang dipanggil SERVER
 // Digiflazz (bukan browser) saat status transaksi berubah. URL ini yang
-// didaftarkan user di member area Digiflazz (Atur Koneksi → Webhook), atau
-// dikirim per transaksi lewat cb_url.
+// didaftarkan user di member area Digiflazz (Atur Koneksi → Webhook).
 //
-// Token: Digiflazz tidak menjanjikan header khusus, jadi token diterima dari
-// tiga tempat (prioritas): header x-webhook-token, header Authorization
-// Bearer, atau query ?token= (mis. cb_url = .../api/topup/webhook?token=XXX).
-// Nilai wajib sama dengan TOPUP_WEBHOOK_TOKEN di env toko.
+// Autentikasi DUA jalur (salah satu cukup):
+//   1. Token — header x-webhook-token / Authorization Bearer / query ?token=
+//      (mis. cb_url = .../api/topup/webhook?token=XXX).
+//   2. Tanda tangan X-Hub-Signature — bila kolom Secret webhook diisi,
+//      Digiflazz menandatangani body mentah dengan HMAC-SHA1 (header
+//      "sha1=<hex>") dan server memverifikasinya terhadap
+//      TOPUP_WEBHOOK_TOKEN.
 //
 // Balasan SELALU 200 "OK" agar retry Digiflazz berhenti (ref tak dikenal pun
 // tetap OK — pola yang sama dengan router callback Duitku).
@@ -16,12 +18,11 @@ import {
   processDigiflazzWebhook,
   webhookConfigured,
   webhookRefId,
+  webhookSignatureCocok,
   webhookTokenCocok,
 } from "@/lib/digiflazz-webhook";
 
 export const runtime = "nodejs";
-
-const OK = new Response("OK", { status: 200 });
 
 export async function POST(req: Request) {
   if (!webhookConfigured()) {
@@ -37,20 +38,29 @@ export async function POST(req: Request) {
   const header = req.headers.get("x-webhook-token") ?? "";
   const bearer = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
   const query = url.searchParams.get("token") ?? "";
-  if (!webhookTokenCocok(header || bearer || query)) {
-    return new Response("Bad Token", { status: 401 });
-  }
 
-  let body: unknown = null;
+  // Baca body MENTAH sekali — dipakai untuk verifikasi X-Hub-Signature
+  // (HMAC dihitung atas byte persis yang diterima) lalu diparse JSON.
+  let rawText = "";
   try {
-    body = await req.json();
+    rawText = await req.text();
   } catch {
+    rawText = "";
+  }
+  let body: unknown = null;
+  if (rawText) {
     try {
-      const text = await req.text();
-      if (text) body = JSON.parse(text);
+      body = JSON.parse(rawText);
     } catch {
       body = null;
     }
+  }
+
+  const signature = req.headers.get("x-hub-signature") ?? "";
+  const okToken = webhookTokenCocok(header || bearer || query);
+  const okSign = webhookSignatureCocok(rawText, signature);
+  if (!okToken && !okSign) {
+    return new Response("Bad Token", { status: 401 });
   }
 
   const outcome = await processDigiflazzWebhook(body, { simulate: false });
@@ -59,13 +69,14 @@ export async function POST(req: Request) {
   try {
     await logTopupWebhook({
       refId: webhookRefId(body),
-      payload: JSON.stringify(body),
+      payload: rawText || JSON.stringify(body),
       action: outcome.detail,
     });
   } catch (e) {
     console.error("[webhook] gagal mencatat log:", e instanceof Error ? e.message : e);
   }
 
-  console.log(`[webhook] ${outcome.detail}`);
-  return OK;
+  console.log(`[webhook] event=${req.headers.get("x-digiflazz-event") ?? "?"} ${outcome.detail}`);
+  // Response baru tiap request — body sebuah Response hanya bisa dibaca sekali.
+  return new Response("OK", { status: 200 });
 }
