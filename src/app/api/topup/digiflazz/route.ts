@@ -51,22 +51,25 @@ const PASCA_COMMANDS: Record<string, PascaCommand> = {
   "status-pasca": "status-pasca",
 };
 
-/** Hasil relay sukses → data mentah; gagal → 502 dengan detail. 403/404
- *  relay berarti endpoint belum diizinkan di dg_relay.php — pesannya
- *  disertakan supaya konsol hub tahu akar masalahnya. */
+/** Hasil relay sukses → data mentah; gagal → 200 + ok:false (pola
+ *  upstreamError) supaya detail tetap sampai ke hub — Cloudflare di depan
+ *  toko MENGGANTI body respons 5xx dengan halaman teks polos. 403/404 relay
+ *  berarti endpoint belum diizinkan di dg_relay.php — pesannya disertakan
+ *  supaya konsol hub tahu akar masalahnya. */
 function resp(r: DgRawResult, extra?: Record<string, unknown>) {
   if (!r.ok) {
     const blokir =
       r.status === 403 || r.status === 404
         ? " Relay belum mengizinkan endpoint ini — periksa allowlist dg_relay.php."
         : "";
+    const status = process.env.NODE_ENV === "production" ? 200 : 502;
     return NextResponse.json(
       {
         ok: false,
         detail: `${r.error ?? `relay_unreachable (HTTP ${r.status ?? "?"})`}${blokir}`,
         status: r.status,
       },
-      { status: 502 },
+      { status },
     );
   }
   return NextResponse.json({ ok: true, data: r.data, status: r.status, ...extra });
@@ -152,9 +155,11 @@ export async function POST(req: Request) {
         maxPrice,
       });
       if (!r.ok) {
+        // 200 di produksi: Cloudflare menutupi body 5xx dengan halaman teks.
+        const status = process.env.NODE_ENV === "production" ? 200 : 502;
         return NextResponse.json(
           { ok: false, detail: r.error ?? "relay tidak menjawab" },
-          { status: 502 },
+          { status },
         );
       }
       return NextResponse.json({
