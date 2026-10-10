@@ -28,6 +28,15 @@ export async function POST(req: Request) {
   if (!webhookConfigured()) {
     // 503: 5xx membuat Digiflazz retry — konfigurasi kosong memang harus
     // segera diperbaiki owner; retry yang terus berulang bisa menumpuk.
+    try {
+      await logTopupWebhook({
+        refId: "",
+        payload: "",
+        action: "DITOLAK — webhook belum dikonfigurasi (TOPUP_WEBHOOK_TOKEN kosong)",
+      });
+    } catch {
+      // DB ikut bermasalah — tetap balas 503.
+    }
     return Response.json(
       { error: "webhook belum dikonfigurasi (TOPUP_WEBHOOK_TOKEN kosong di toko)" },
       { status: 503 },
@@ -60,6 +69,17 @@ export async function POST(req: Request) {
   const okToken = webhookTokenCocok(header || bearer || query);
   const okSign = webhookSignatureCocok(rawText, signature);
   if (!okToken && !okSign) {
+    // Catat percobaan ditolak — penting untuk audit (mis. ping Digiflazz yang
+    // kena tolak karena Secret kosong/berbeda tidak boleh hilang tanpa jejak).
+    try {
+      await logTopupWebhook({
+        refId: "",
+        payload: rawText,
+        action: "DITOLAK — token & signature tidak cocok",
+      });
+    } catch (e) {
+      console.error("[webhook] gagal mencatat percobaan ditolak:", e instanceof Error ? e.message : e);
+    }
     return new Response("Bad Token", { status: 401 });
   }
 
