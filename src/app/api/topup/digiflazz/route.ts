@@ -139,11 +139,17 @@ export async function POST(req: Request) {
         );
       }
       const testing = p.testing === true;
+      const maxPriceRaw = p.maxPrice;
+      const maxPrice =
+        typeof maxPriceRaw === "number" && Number.isFinite(maxPriceRaw) && maxPriceRaw > 0
+          ? maxPriceRaw
+          : undefined;
       const r = await digiflazzTopup({
         sku: sku as string,
         customerNo: customerNo as string,
         refId: refId as string,
         testing,
+        maxPrice,
       });
       if (!r.ok) {
         return NextResponse.json(

@@ -214,6 +214,8 @@ export async function digiflazzTopup(o: {
   customerNo: string;
   refId: string;
   testing?: boolean;
+  /** Batas harga maksimal (max_price Digiflazz), bila ingin dikunci. */
+  maxPrice?: number;
 }): Promise<TopupResult> {
   if (!digiflazzConfigured()) {
     return { ok: false, refId: o.refId, success: false, pending: false, error: "config_missing" };
@@ -225,6 +227,7 @@ export async function digiflazzTopup(o: {
     ref_id: o.refId,
   };
   if (o.testing === true) payload.testing = true;
+  if (typeof o.maxPrice === "number" && o.maxPrice > 0) payload.max_price = o.maxPrice;
   payload.sign = md5(username() + apiKey() + o.refId);
 
   const r = await relay("transaction", payload);
