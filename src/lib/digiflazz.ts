@@ -65,6 +65,106 @@ async function relay(
   }
 }
 
+// ==== Builder payload konsol API (dipakai /api/topup/digiflazz) ====
+//
+// Rumus sign berbeda per endpoint (dokumen developer.digiflazz.com):
+//   price-list      : md5(username + apiKey + "pricelist")
+//   cek-saldo       : md5(username + apiKey + "depo")
+//   transaction     : md5(username + apiKey + ref_id)
+//   inquiry-pln     : md5(username + apiKey + customer_no)
+//   deposit         : md5(username + apiKey + "deposit")
+
+export type DgRawResult = {
+  ok: boolean;
+  /** Respons Digiflazz mentah (variabel data) bila relay membalas 2xx. */
+  data?: unknown;
+  error?: string;
+  status?: number;
+};
+
+/** Teruskan payload ke relay tanpa interpretasi — respons data mentah
+ *  diteruskan apa adanya supaya konsol bisa menampilkan JSON penuh. */
+export async function relayDigiflazz(
+  ep: string,
+  payload: Record<string, unknown>,
+): Promise<DgRawResult> {
+  if (!digiflazzConfigured()) {
+    return { ok: false, error: "config_missing" };
+  }
+  return relay(ep, payload);
+}
+
+export function buildCekSaldoPayload(): Record<string, unknown> {
+  return {
+    cmd: "deposit",
+    username: username(),
+    sign: md5(username() + apiKey() + "depo"),
+  };
+}
+
+export function buildPriceListPayload(o: {
+  cmd: "prepaid" | "pasca";
+  code?: string;
+  category?: string;
+  brand?: string;
+  type?: string;
+}): Record<string, unknown> {
+  const payload: Record<string, unknown> = { cmd: o.cmd, username: username() };
+  if (o.code) payload.code = o.code;
+  if (o.category) payload.category = o.category;
+  if (o.brand) payload.brand = o.brand;
+  if (o.type) payload.type = o.type;
+  payload.sign = md5(username() + apiKey() + "pricelist");
+  return payload;
+}
+
+export type PascaCommand = "inq-pasca" | "pay-pasca" | "status-pasca";
+
+/** Transaksi pascabayar — satu endpoint /v1/transaction dengan perintah
+ *  commands. pay-pasca WAJIB memakai ref_id yang sama dengan inquiry-nya. */
+export function buildPascaPayload(
+  commands: PascaCommand,
+  o: { sku: string; customerNo: string; refId: string; testing?: boolean },
+): Record<string, unknown> {
+  const payload: Record<string, unknown> = {
+    commands,
+    username: username(),
+    buyer_sku_code: o.sku,
+    customer_no: o.customerNo,
+    ref_id: o.refId,
+  };
+  if (o.testing === true) payload.testing = true;
+  payload.sign = md5(username() + apiKey() + o.refId);
+  return payload;
+}
+
+export function buildInquiryPlnPayload(o: {
+  customerNo: string;
+}): Record<string, unknown> {
+  return {
+    username: username(),
+    customer_no: o.customerNo,
+    sign: md5(username() + apiKey() + o.customerNo),
+  };
+}
+
+export function buildDepositPayload(o: {
+  amount: number;
+  bank: string;
+  ownerName: string;
+}): Record<string, unknown> {
+  // Dokumen menulis parameter "bank" di tabel namun contoh JSON memakai
+  // "Bank" — kirim keduanya supaya cocok dengan versi server mana pun.
+  return {
+    username: username(),
+    amount: o.amount,
+    bank: o.bank,
+    Bank: o.bank,
+    owner_name: o.ownerName,
+    sign: md5(username() + apiKey() + "deposit"),
+  };
+}
+
 export type BalanceResult = {
   ok: boolean;
   balance: number;
@@ -76,11 +176,7 @@ export async function checkDigiflazzBalance(): Promise<BalanceResult> {
   if (!digiflazzConfigured()) {
     return { ok: false, balance: 0, error: "config_missing" };
   }
-  const r = await relay("cek-saldo", {
-    cmd: "deposit",
-    username: username(),
-    sign: md5(username() + apiKey() + "depo"),
-  });
+  const r = await relay("cek-saldo", buildCekSaldoPayload());
   if (!r.ok) {
     return {
       ok: false,
