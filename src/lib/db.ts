@@ -517,17 +517,20 @@ export async function listHealthSnapshot(): Promise<HealthSnapshotRow[]> {
 
 /** Ganti isi snapshot dengan daftar gangguan terkini: baris yang sudah
  *  pulih dihapus, baris baru di-upsert (ON CONFLICT — didukung kedua
- *  backend). */
+ *  backend). Baris karantina otomatis yang masih aktif dipertahankan. */
 export async function replaceHealthSnapshot(
   gangguan: { sku: string; status: string; seller: string }[],
 ): Promise<void> {
   const now = nowUtc();
   const fresh = new Set(gangguan.map((g) => g.sku));
   const existing = await listHealthSnapshot();
+  const staleCutoff = utcAgo(48);
   for (const row of existing) {
-    if (!fresh.has(row.sku)) {
-      await queryRun("DELETE FROM topup_health_snapshot WHERE sku = ?", [row.sku]);
-    }
+    if (fresh.has(row.sku)) continue;
+    // Produk mungkin sehat di price-list tapi seller-nya gagal kirim
+    // berulang — karantina otomatis yang belum kedaluwarsa jangan dihapus.
+    if (row.seller === AUTO_QUARANTINE_MARK && row.updated_at >= staleCutoff) continue;
+    await queryRun("DELETE FROM topup_health_snapshot WHERE sku = ?", [row.sku]);
   }
   for (const g of gangguan) {
     await queryRun(
@@ -538,6 +541,43 @@ export async function replaceHealthSnapshot(
       [g.sku, g.status, g.seller, now],
     );
   }
+}
+
+// ---------- karantina otomatis (pintu pra-bayar) ----------
+
+/** Penanda seller untuk baris karantina otomatis — baris semacam ini tidak
+ *  dihapus refresh snapshot meski price-list melaporkan SKU sehat. */
+const AUTO_QUARANTINE_MARK = "AUTO-QUARANTINE";
+
+/** Stempel waktu UTC "YYYY-MM-DD HH:MM:SS" N jam yang lalu (format sama
+ *  dengan nowUtc supaya bisa dibandingkan string di kedua backend). */
+function utcAgo(hours: number): string {
+  return new Date(Date.now() - hours * 3600_000).toISOString().slice(0, 19).replace("T", " ");
+}
+
+/** Jumlah kegagalan refund (rc 74 "Transaksi Refund") untuk satu SKU dalam
+ *  24 jam terakhir — dipakai memutuskan karantina otomatis. */
+export async function countRecentRefundFailures(sku: string): Promise<number> {
+  const row = await queryOne<{ n: string | number }>(
+    `SELECT COUNT(*) AS n FROM topup_orders
+     WHERE sku = ? AND topup_status = 'failed'
+       AND error_message LIKE '%Refund%' AND updated_at >= ?`,
+    [sku, utcAgo(24)],
+  );
+  return Number(row?.n ?? 0);
+}
+
+/** Karantina otomatis: tulis baris gangguan untuk SKU. updated_at sengaja
+ *  ditulis MUNDUR 24 jam — gate memperlakukan baris valid sampai 48 jam,
+ *  jadi blokir efektif 24 jam dari sekarang lalu fail-open sendiri.
+ *  DO NOTHING: baris gangguan asli (dari price-list) tidak ditimpa. */
+export async function quarantineSku(sku: string): Promise<void> {
+  await queryRun(
+    `INSERT INTO topup_health_snapshot (sku, status, seller, updated_at)
+     VALUES (?, 'Gangguan (otomatis)', ?, ?)
+     ON CONFLICT (sku) DO NOTHING`,
+    [sku, AUTO_QUARANTINE_MARK, utcAgo(24)],
+  );
 }
 
 /** Catat hasil eksekusi Digiflazz: sukses / pending / failed. */

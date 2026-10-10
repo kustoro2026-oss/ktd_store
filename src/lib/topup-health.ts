@@ -16,7 +16,9 @@ import {
   relayDigiflazz,
 } from "./digiflazz";
 import {
+  countRecentRefundFailures,
   getHealthSnapshot,
+  quarantineSku,
   replaceHealthSnapshot,
 } from "./db";
 
@@ -124,5 +126,32 @@ export async function gateProductHealth(sku: string): Promise<ProductHealthGate>
   } catch (e) {
     // Fail-open — kesalahan baca DB tidak boleh menahan pembeli.
     return { ok: true, status: "unknown", detail: `gate gagal: ${String(e)}` };
+  }
+}
+
+/** Ambang karantina: SKU dianggap bermasalah bila gagal refund minimal
+ *  N kali dalam 24 jam. */
+const QUARANTINE_MIN_FAILURES = 2;
+
+/** Karantina otomatis pasca kegagalan final: SKU yang berulang kali
+ *  "Transaksi Refund" (seller gagal kirim padahal price-list melaporkan
+ *  sehat) ditandai gangguan supaya pintu pra-bayar menolaknya sementara
+ *  (24 jam, lalu lepas sendiri). Dipanggil dari jalur kegagalan final
+ *  topup-execute — tidak menahan alur apa pun bila DB bermasalah. */
+export async function autoQuarantineIfRepeated(
+  sku: string,
+  reason: string,
+): Promise<{ quarantined: boolean; failures: number }> {
+  if (!/refund/i.test(reason)) return { quarantined: false, failures: 0 };
+  try {
+    const failures = await countRecentRefundFailures(sku);
+    if (failures < QUARANTINE_MIN_FAILURES) {
+      return { quarantined: false, failures };
+    }
+    await quarantineSku(sku);
+    return { quarantined: true, failures };
+  } catch (e) {
+    console.warn("[topup] karantina otomatis gagal:", e);
+    return { quarantined: false, failures: 0 };
   }
 }

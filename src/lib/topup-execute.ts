@@ -18,6 +18,7 @@ import { formatRupiah } from "./topup";
 import { alertLowBalanceIfNeeded, getBalance, recordBalance } from "./topup-balance";
 import { notifyTopupBuyer, notifyTopupOwner } from "./wa";
 import { whatsappDisplay } from "./config";
+import { autoQuarantineIfRepeated } from "./topup-health";
 
 export type ExecuteStep =
   | "not_found"
@@ -214,6 +215,12 @@ async function runExecution(order: TopUpOrder, testing: boolean): Promise<Execut
   await notifyTopupOwner(
     `[Top-up] Pesanan ${order.id} (${order.product_name}, ${formatRupiah(order.amount)}) GAGAL${percobaan > 1 ? ` setelah ${percobaan} percobaan` : ""}: ${reason}. Tindak lanjut refund via CS.`,
   );
+  const q = await autoQuarantineIfRepeated(order.sku, label);
+  if (q.quarantined) {
+    await notifyTopupOwner(
+      `[Top-up] SKU ${order.sku} dikarantina otomatis — ${q.failures}x gagal refund dalam 24 jam. Pintu pra-bayar menolak produk ini sementara (24 jam).`,
+    );
+  }
   return { step: "failed", detail: label, wa };
 }
 
@@ -295,6 +302,12 @@ export async function recheckTopupOrder(order: TopUpOrder): Promise<ExecuteOutco
   await notifyTopupOwner(
     `[Top-up] Pesanan ${order.id} (${order.product_name}) GAGAL setelah cek ulang: ${reason}.`,
   );
+  const q = await autoQuarantineIfRepeated(order.sku, reason);
+  if (q.quarantined) {
+    await notifyTopupOwner(
+      `[Top-up] SKU ${order.sku} dikarantina otomatis — ${q.failures}x gagal refund dalam 24 jam. Pintu pra-bayar menolak produk ini sementara (24 jam).`,
+    );
+  }
   return { step: "failed", detail: reason, wa };
 }
 
