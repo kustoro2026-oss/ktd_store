@@ -33,6 +33,9 @@ export async function GET(
         paid_at: order.paid_at,
         digiflazz_sn: order.digiflazz_sn,
         error_message: order.error_message,
+        // Jumlah percobaan eksekusi pasca-bayar (visibilitas untuk admin/hub
+        // saat mengecek pesanan yang gagal transien lalu dicoba ulang).
+        exec_attempts: order.exec_attempts,
         created_at: order.created_at,
       },
     });

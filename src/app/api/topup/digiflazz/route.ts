@@ -14,12 +14,13 @@
 //   deposit       — penarikan tiket deposit (BUKAN top-up saldo)
 //   webhook-sim   — simulasi payload webhook Digiflazz (tanpa menulis DB)
 //   webhook-log   — log webhook masuk terbaru (audit)
+//   health-snapshot — daftar SKU gangguan terkini (pintu pra-bayar, read-only)
 //
 // Endpoint mutasi (topup/pay-pasca/deposit) diizinkan di sini karena konsol
 // hub sudah mewajibkan dialog konfirmasi sebelum mengirim. Guard x-topup-secret
 // identik dengan route admin toko lainnya.
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import {
   buildCekSaldoPayload,
   buildDepositPayload,
@@ -31,8 +32,9 @@ import {
   type DgRawResult,
   type PascaCommand,
 } from "@/lib/digiflazz";
-import { listTopupWebhookLogs } from "@/lib/db";
+import { listHealthSnapshot, listTopupWebhookLogs } from "@/lib/db";
 import { processDigiflazzWebhook } from "@/lib/digiflazz-webhook";
+import { refreshHealthSnapshot } from "@/lib/topup-health";
 
 export const runtime = "nodejs";
 
@@ -49,6 +51,7 @@ const ACTIONS = new Set([
   "deposit",
   "webhook-sim",
   "webhook-log",
+  "health-snapshot",
 ]);
 
 const PASCA_COMMANDS: Record<string, PascaCommand> = {
@@ -115,19 +118,29 @@ export async function POST(req: Request) {
   switch (action) {
     case "price-list": {
       const cmd = str("cmd") === "pasca" ? "pasca" : "prepaid";
-      return resp(
-        await relayDigiflazz(
-          "price-list",
-          buildPriceListPayload({
-            cmd,
-            code: str("code") ?? undefined,
-            category: str("category") ?? undefined,
-            brand: str("brand") ?? undefined,
-            type: str("type") ?? undefined,
-          }),
-        ),
-        { cmd },
+      const r = await relayDigiflazz(
+        "price-list",
+        buildPriceListPayload({
+          cmd,
+          code: str("code") ?? undefined,
+          category: str("category") ?? undefined,
+          brand: str("brand") ?? undefined,
+          type: str("type") ?? undefined,
+        }),
       );
+      // Piggyback: data price-list prepaid yang sama dipakai menyegarkan
+      // snapshot kesehatan produk (nol panggilan API tambahan — kuota
+      // price-list Digiflazz terbatas, rc=83).
+      if (cmd === "prepaid" && r.ok) {
+        after(() => {
+          refreshHealthSnapshot(r.data)
+            .then((h) => {
+              if (!h.ok) console.warn("[topup] refresh snapshot kesehatan:", h.detail);
+            })
+            .catch((e) => console.warn("[topup] refresh snapshot kesehatan gagal:", e));
+        });
+      }
+      return resp(r, { cmd });
     }
 
     case "cek-saldo":
@@ -279,6 +292,12 @@ export async function POST(req: Request) {
           : 20;
       const logs = await listTopupWebhookLogs(limit);
       return NextResponse.json({ ok: true, data: logs });
+    }
+
+    // Snapshot kesehatan produk (read-only) — verifikasi pintu pra-bayar.
+    case "health-snapshot": {
+      const rows = await listHealthSnapshot();
+      return NextResponse.json({ ok: true, data: rows });
     }
   }
 

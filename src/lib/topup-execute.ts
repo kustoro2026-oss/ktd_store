@@ -10,9 +10,10 @@ import {
   finishTopup,
   getTopupOrder,
   listPendingTopups,
+  recordExecAttempt,
   type TopUpOrder,
 } from "./db";
-import { digiflazzTopup } from "./digiflazz";
+import { digiflazzTopup, shouldRetryFailure, type TopupResult } from "./digiflazz";
 import { formatRupiah } from "./topup";
 import { alertLowBalanceIfNeeded, getBalance, recordBalance } from "./topup-balance";
 import { notifyTopupBuyer, notifyTopupOwner } from "./wa";
@@ -110,13 +111,37 @@ async function runExecution(order: TopUpOrder, testing: boolean): Promise<Execut
     };
   }
 
-  // 2. Eksekusi transaksi Digiflazz.
-  const res = await digiflazzTopup({
-    sku: order.sku,
-    customerNo: order.customer_no,
-    refId: order.ref_id,
-    testing,
-  });
+  // 2. Eksekusi transaksi Digiflazz — Lapis 1 retry: kegagalan transien
+  //    (mis. rc 74 "Transaksi Refund") yang refund saldonya terkonfirmasi
+  //    dicoba ulang dengan ref BARU, maksimal 3 percobaan. Pending & relay
+  //    TIDAK PERNAH dicoba dengan ref baru (risiko transaksi ganda).
+  const balBefore = bal.ok ? bal.balance : undefined;
+  const MAX_ATTEMPTS = 3;
+  let res: TopupResult | null = null;
+  let percobaan = 0;
+  for (let n = 1; n <= MAX_ATTEMPTS; n++) {
+    const attemptRef = n === 1 ? order.ref_id : `${order.ref_id}-${n}`;
+    res = await digiflazzTopup({
+      sku: order.sku,
+      customerNo: order.customer_no,
+      refId: attemptRef,
+      testing,
+    });
+    if (!res.ok || res.success || res.pending) break;
+    percobaan = n;
+    await recordExecAttempt(order.id, attemptRef);
+    const d = shouldRetryFailure(res, balBefore);
+    if (n < MAX_ATTEMPTS && d.retry) {
+      await new Promise((r) => setTimeout(r, 1500));
+      continue;
+    }
+    break;
+  }
+  if (!res) {
+    // Secara logika tidak tercapai (loop selalu mengisi res) — jaga tipe.
+    await finishTopup(order.id, "pending", "", "loop percobaan tidak menghasilkan respons");
+    return { step: "pending", detail: "loop percobaan tidak menghasilkan respons" };
+  }
   if (!res.ok) {
     // Relay gagal — transaksi mungkin belum sampai Digiflazz; biarkan status
     // "processing" supaya cron mengecek ulang (kirim ulang ref sama).
@@ -172,13 +197,14 @@ async function runExecution(order: TopUpOrder, testing: boolean): Promise<Execut
     return { step: "pending", detail: res.message || "Pending", wa };
   }
 
-  // Gagal (rc lain / status Gagal).
+  // Gagal (rc lain / status Gagal) — jalur final setelah percobaan habis.
   const reason = res.message || res.status || "ditolak Digiflazz";
-  await finishTopup(order.id, "failed", "", reason);
+  const label = percobaan > 1 ? `gagal setelah ${percobaan} percobaan: ${reason}` : reason;
+  await finishTopup(order.id, "failed", "", label);
   const wa = await notifyTopupBuyer(
     order.buyer_phone,
     [
-      `Halo ${order.buyer_name || "Kak"}, maaf top up kamu belum berhasil (${reason}).`,
+      `Halo ${order.buyer_name || "Kak"}, maaf top up kamu belum berhasil${percobaan > 1 ? " setelah beberapa kali percobaan" : ""} (${reason}).`,
       `Pesanan: ${order.id}`,
       `Produk: ${order.product_name}`,
       "",
@@ -186,9 +212,9 @@ async function runExecution(order: TopUpOrder, testing: boolean): Promise<Execut
     ].join("\n"),
   );
   await notifyTopupOwner(
-    `[Top-up] Pesanan ${order.id} (${order.product_name}, ${formatRupiah(order.amount)}) GAGAL: ${reason}. Tindak lanjut refund via CS.`,
+    `[Top-up] Pesanan ${order.id} (${order.product_name}, ${formatRupiah(order.amount)}) GAGAL${percobaan > 1 ? ` setelah ${percobaan} percobaan` : ""}: ${reason}. Tindak lanjut refund via CS.`,
   );
-  return { step: "failed", detail: reason, wa };
+  return { step: "failed", detail: label, wa };
 }
 
 /** Peringatan saldo rendah setelah transaksi sukses — pakai saldo dari

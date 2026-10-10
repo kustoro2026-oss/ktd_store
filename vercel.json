@@ -8,5 +8,10 @@
       "path": "/api/topup/cron/cek-saldo",
       "schedule": "0 0 * * *"
     }
-  ]
+  ],
+  "functions": {
+    "api/duitku/callback/route.ts": {
+      "maxDuration": 30
+    }
+  }
 }

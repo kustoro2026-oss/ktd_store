@@ -293,3 +293,49 @@ export async function digiflazzTopup(o: {
     raw: r.data,
   };
 }
+
+export type RetryDecision = {
+  retry: boolean;
+  reason: string;
+};
+
+/** Kegagalan transien yang layak dicoba ulang dengan ref BARU (Lapis 1
+ *  retry). Syarat mutlak: kegagalan FINAL (bukan sukses/pending — transaksi
+ *  yang masih menggantung TIDAK PERNAH dicoba dengan ref baru karena bisa
+ *  berakhir dobel) DAN refund saldo terkonfirmasi (rc 74 dijamin refund
+ *  oleh dokumen Digiflazz; kode lain butuh bukti buyer_last_saldo sudah
+ *  kembali ke nilai sebelum percobaan).
+ *
+ *  Fungsi murni — aman diuji tanpa jaringan. */
+export function shouldRetryFailure(
+  res: Pick<TopupResult, "success" | "pending" | "rc" | "status" | "message" | "lastBalance">,
+  balanceBefore: number | undefined,
+): RetryDecision {
+  if (res.success || res.pending) {
+    return { retry: false, reason: "bukan kegagalan final (sukses/pending)" };
+  }
+  const gabungan = `${res.status ?? ""} ${res.message ?? ""}`;
+  const transien =
+    res.rc === "74" ||
+    /transaksi refund|sedang gangguan|produk sedang gangguan|produk sedang tidak stabil|timeout|sedang cut off|transaksi tidak ditemukan/i.test(
+      gabungan,
+    );
+  if (!transien) {
+    return {
+      retry: false,
+      reason: `rc ${res.rc || "?"} bukan kegagalan transien`,
+    };
+  }
+  const refundOk =
+    res.rc === "74" ||
+    (balanceBefore !== undefined &&
+      res.lastBalance !== undefined &&
+      res.lastBalance >= balanceBefore);
+  if (!refundOk) {
+    return {
+      retry: false,
+      reason: "refund belum terkonfirmasi — jangan mulai transaksi baru",
+    };
+  }
+  return { retry: true, reason: "kegagalan transien + refund terkonfirmasi" };
+}

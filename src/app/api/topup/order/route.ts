@@ -14,6 +14,7 @@ import { composeCustomerNo, fieldsForProvider } from "@/lib/topup-fields";
 import { createTopupOrder, newOrderId, newRefId, setOrderPaymentSession } from "@/lib/db";
 import { createDuitkuPayment, duitkuConfigured, DUITKU_MIN_AMOUNT } from "@/lib/duitku";
 import { gateBalanceForCost } from "@/lib/topup-balance";
+import { gateProductHealth } from "@/lib/topup-health";
 import { notifyTopupOwner } from "@/lib/wa";
 import { SITE_URL, whatsappLink } from "@/lib/config";
 
@@ -39,6 +40,22 @@ export async function POST(req: Request) {
   const product = TOPUP_PRODUCTS.find((p) => p.sku === sku);
   if (!product) {
     return NextResponse.json({ ok: false, error: "sku_tidak_dikenal" }, { status: 400 });
+  }
+
+  // Pintu kesehatan produk: SKU yang sedang "Gangguan" di Digiflazz ditolak
+  // SEBELUM pesanan / sesi bayar dibuat — pelanggan tidak pernah membayar
+  // produk yang sudah diketahui bermasalah. Fail-open pada keadaan ragu
+  // (relay down, data basi, dsb.).
+  const health = await gateProductHealth(sku);
+  if (!health.ok) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "produk_gangguan",
+        message: "Produk sedang gangguan. Silakan coba beberapa saat lagi.",
+      },
+      { status: 503 },
+    );
   }
 
   // Skema input per produk (ala itemku) — customer_no disusun sesuai format

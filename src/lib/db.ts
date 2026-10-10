@@ -56,6 +56,11 @@ export type TopUpOrder = {
   paid_at: string;
   digiflazz_sn: string;
   error_message: string;
+  /** Jumlah percobaan eksekusi Digiflazz (Lapis 1 retry). */
+  exec_attempts: number;
+  /** Ref Digiflazz tiap percobaan, dipisah koma diapit (",ref,") — dipakai
+   *  mencocokkan webhook percobaan ke-2/3. */
+  attempt_refs: string;
   created_at: string;
   updated_at: string;
 };
@@ -115,6 +120,8 @@ async function pgPool(): Promise<Pool> {
       "ALTER TABLE topup_orders ADD COLUMN IF NOT EXISTS payment_va TEXT NOT NULL DEFAULT ''",
       "ALTER TABLE topup_orders ADD COLUMN IF NOT EXISTS payment_qr TEXT NOT NULL DEFAULT ''",
       "ALTER TABLE topup_orders ADD COLUMN IF NOT EXISTS note TEXT NOT NULL DEFAULT ''",
+      "ALTER TABLE topup_orders ADD COLUMN IF NOT EXISTS exec_attempts INTEGER NOT NULL DEFAULT 0",
+      "ALTER TABLE topup_orders ADD COLUMN IF NOT EXISTS attempt_refs TEXT NOT NULL DEFAULT ''",
       "ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS payment_va TEXT NOT NULL DEFAULT ''",
       "ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS payment_qr TEXT NOT NULL DEFAULT ''",
     ]) {
@@ -188,6 +195,12 @@ function migrateSqliteColumns(db: DatabaseSync): void {
   }
   if (!cols.has("note")) {
     db.exec("ALTER TABLE topup_orders ADD COLUMN note TEXT NOT NULL DEFAULT ''");
+  }
+  if (!cols.has("exec_attempts")) {
+    db.exec("ALTER TABLE topup_orders ADD COLUMN exec_attempts INTEGER NOT NULL DEFAULT 0");
+  }
+  if (!cols.has("attempt_refs")) {
+    db.exec("ALTER TABLE topup_orders ADD COLUMN attempt_refs TEXT NOT NULL DEFAULT ''");
   }
 }
 
@@ -274,6 +287,8 @@ const SCHEMA_SQL = `
     paid_at TEXT NOT NULL DEFAULT '',
     digiflazz_sn TEXT NOT NULL DEFAULT '',
     error_message TEXT NOT NULL DEFAULT '',
+    exec_attempts INTEGER NOT NULL DEFAULT 0,
+    attempt_refs TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT '',
     updated_at TEXT NOT NULL DEFAULT ''
   );
@@ -291,6 +306,15 @@ const SCHEMA_SQL = `
   );
   CREATE INDEX IF NOT EXISTS idx_topup_webhook_log_created
     ON topup_webhook_log (created_at DESC);
+
+  -- Snapshot kesehatan produk (pintu pra-bayar): hanya SKU yang sedang
+  -- Gangguan di Digiflazz — absen dari tabel berarti dianggap sehat.
+  CREATE TABLE IF NOT EXISTS topup_health_snapshot (
+    sku TEXT PRIMARY KEY,
+    status TEXT NOT NULL DEFAULT '',
+    seller TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL DEFAULT ''
+  );
 `;
 
 /** Waktu sekarang sebagai teks UTC "YYYY-MM-DD HH:MM:SS" (format sama di
@@ -365,10 +389,26 @@ export async function getTopupOrder(
 export async function getTopupOrderByRef(
   refId: string,
 ): Promise<TopUpOrder | undefined> {
-  return queryOne<TopUpOrder>(
+  const direct = await queryOne<TopUpOrder>(
     "SELECT * FROM topup_orders WHERE ref_id = ?",
     [refId],
   );
+  if (direct) return direct;
+  // Ref percobaan ulang (Lapis 1) disimpan di kolom attempt_refs (bentuk
+  // ",ref,ref2,") — webhook telat untuk percobaan ke-2/3 tetap menemukan
+  // pesanannya via pencocokan token persis.
+  const viaAttempt = await queryOne<TopUpOrder>(
+    "SELECT * FROM topup_orders WHERE attempt_refs LIKE ?",
+    [`%,${refId},%`],
+  );
+  if (viaAttempt) return viaAttempt;
+  // Cadangan terakhir: ref percobaan berpola "<ref_id>-N" — kembalikan ke
+  // ref dasar bila dua lapis di atas belum cocok.
+  const m = /^(.+)-\d+$/.exec(refId);
+  if (!m) return undefined;
+  return queryOne<TopUpOrder>("SELECT * FROM topup_orders WHERE ref_id = ?", [
+    m[1],
+  ]);
 }
 
 /** Simpan data sesi payment gateway hasil buat pembayaran. */
@@ -430,6 +470,74 @@ export async function claimTopupExecution(
      RETURNING *`,
     [nowUtc(), id],
   );
+}
+
+/** Catat satu percobaan eksekusi Digiflazz (Lapis 1 retry) beserta ref-nya
+ *  — ref percobaan ke-2/3 dipakai mencocokkan webhook telat. */
+export async function recordExecAttempt(
+  id: string,
+  refId: string,
+): Promise<void> {
+  const order = await getTopupOrder(id);
+  const token = `,${refId},`;
+  const prev = order?.attempt_refs ?? "";
+  const base = prev.startsWith(",") ? prev : `,${prev}`;
+  const next = base.includes(token) ? base : `${base}${refId},`;
+  await queryRun(
+    "UPDATE topup_orders SET exec_attempts = exec_attempts + 1, attempt_refs = ?, updated_at = ? WHERE id = ?",
+    [next, nowUtc(), id],
+  );
+}
+
+// ---------- snapshot kesehatan produk (pintu pra-bayar) ----------
+
+export type HealthSnapshotRow = {
+  sku: string;
+  status: string;
+  seller: string;
+  updated_at: string;
+};
+
+/** Baris gangguan untuk satu SKU — kosong berarti sehat (fail-open). */
+export async function getHealthSnapshot(
+  sku: string,
+): Promise<HealthSnapshotRow | undefined> {
+  return queryOne<HealthSnapshotRow>(
+    "SELECT sku, status, seller, updated_at FROM topup_health_snapshot WHERE sku = ?",
+    [sku],
+  );
+}
+
+/** Seluruh baris snapshot gangguan (untuk konsol admin / verifikasi). */
+export async function listHealthSnapshot(): Promise<HealthSnapshotRow[]> {
+  return queryAll<HealthSnapshotRow>(
+    "SELECT sku, status, seller, updated_at FROM topup_health_snapshot ORDER BY updated_at DESC",
+  );
+}
+
+/** Ganti isi snapshot dengan daftar gangguan terkini: baris yang sudah
+ *  pulih dihapus, baris baru di-upsert (ON CONFLICT — didukung kedua
+ *  backend). */
+export async function replaceHealthSnapshot(
+  gangguan: { sku: string; status: string; seller: string }[],
+): Promise<void> {
+  const now = nowUtc();
+  const fresh = new Set(gangguan.map((g) => g.sku));
+  const existing = await listHealthSnapshot();
+  for (const row of existing) {
+    if (!fresh.has(row.sku)) {
+      await queryRun("DELETE FROM topup_health_snapshot WHERE sku = ?", [row.sku]);
+    }
+  }
+  for (const g of gangguan) {
+    await queryRun(
+      `INSERT INTO topup_health_snapshot (sku, status, seller, updated_at)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT (sku) DO UPDATE
+         SET status = excluded.status, seller = excluded.seller, updated_at = excluded.updated_at`,
+      [g.sku, g.status, g.seller, now],
+    );
+  }
 }
 
 /** Catat hasil eksekusi Digiflazz: sukses / pending / failed. */

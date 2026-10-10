@@ -432,6 +432,7 @@ export default function NominalPicker({ provider, initialSku }: Props) {
         gagal_menyimpan_pesanan: "Pesanan gagal disimpan. Silakan coba beberapa saat lagi.",
         bad_json: "Permintaan tidak valid. Silakan coba lagi.",
         layanan_sibuk: "Layanan sedang sibuk, silakan coba lagi beberapa saat lagi.",
+        produk_gangguan: "Produk sedang gangguan. Silakan coba beberapa saat lagi.",
       };
       setError(messages[j.error ?? ""] ?? j.error ?? "Terjadi kesalahan. Silakan coba lagi.");
     } catch {
