@@ -1012,27 +1012,18 @@ export default function NominalPicker({ provider, initialSku }: Props) {
         </form>
       </div>
 
-      {/* Bar bawah sticky (mobile): ringkasan + tombol submit form panel.
+      {/* Bar bawah sticky (mobile): ringkasan pilihan SAJA — tanpa tombol beli.
+          CTA tunggal ada di panel form, persis setelah isian data pembeli,
+          supaya pembeli memperhatikan inputannya sebelum membeli.
           Sticky (bukan fixed) agar menempel saat scroll tapi tidak menutupi
           footer ketika sudah sampai akhir halaman. */}
-      <div className="sticky bottom-0 z-30 -mx-4 flex items-center justify-between gap-3 rounded-t-2xl border-t border-gray-100 bg-white/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-6px_16px_rgba(0,0,0,0.08)] backdrop-blur lg:hidden">
-        <div className="min-w-0">
-          <p className="truncate text-xs font-semibold text-ink">
-            {nominal ? nominal.name : "Pilih nominal"}
-          </p>
-          <p className="text-sm font-extrabold text-brand">
-            {nominal ? formatRupiah(nominal.sellPrice) : "—"}
-          </p>
-        </div>
-        <button
-          type="submit"
-          form="topup-buy-form"
-          disabled={busy || !nominal}
-          className="flex shrink-0 items-center gap-2 rounded-xl bg-brand px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-2 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          {busy ? "Memproses..." : "Beli"}
-        </button>
+      <div className="sticky bottom-0 z-30 -mx-4 rounded-t-2xl border-t border-gray-100 bg-white/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-6px_16px_rgba(0,0,0,0.08)] backdrop-blur lg:hidden">
+        <p className="truncate text-xs font-semibold text-ink">
+          {nominal ? nominal.name : "Pilih nominal"}
+        </p>
+        <p className="text-sm font-extrabold text-brand">
+          {nominal ? formatRupiah(nominal.sellPrice) : "—"}
+        </p>
       </div>
     </div>
   );
