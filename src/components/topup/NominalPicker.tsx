@@ -2,7 +2,8 @@
 
 // Halaman pilih nominal provider (pola halaman game itemku): header brand,
 // tab kategori tersegmen (bila provider lintas kategori), pencarian nominal,
-// grid kartu nominal bertahap (load more), dan panel beli sticky kanan
+// grid kartu nominal bertahap (load more) yang dikelompokkan per
+// sub-kategori (Pulsa Reguler, Paket Harian, ...), dan panel beli sticky kanan
 // (bawah di mobile) dengan picker metode pembayaran gaya checkout produk
 // (QRIS / VA / e-wallet / kartu / minimarket). Alur pesanan:
 // POST /api/topup/order → halaman bayar, atau fallback WhatsApp untuk
@@ -53,9 +54,96 @@ type Props = {
 };
 
 const WA_MIN = 10000;
-/** Jumlah kartu nominal yang dirender sekali jalan (grid bisa ribuan baris). */
-const BASE_SHOW = 48;
-const SHOW_STEP = 48;
+/** Jumlah kartu nominal yang dirender sekali jalan per sub-kelompok
+ *  (grid bisa ribuan baris; tombol load more menambah bertahap). */
+const BASE_SHOW = 24;
+const SHOW_STEP = 24;
+/** Kunci kelompok untuk daftar nominal datar (kategori selain pulsa/data). */
+const GROUP_FLAT = "—";
+
+/** Ekstrak durasi (hari) dari nama nominal, mis. "Data 1 GB 3 Hari" → 3. */
+function parseDurasiHari(name: string): number | null {
+  const m = name.match(/(\d+)\s*Hari/i);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+/** Label sub-kelompok nominal pada kategori pulsa & data; kategori lain
+ *  mengembalikan GROUP_FLAT (daftar datar tanpa header kelompok). */
+function groupLabelFor(n: TopUpNominal, cat: TopUpCategory): string {
+  const t = (n.type || "").toLowerCase();
+  const nama = (n.name || "").toLowerCase();
+  // Gabungan type + nama — beberapa SKU menulis info di nama saja
+  // (mis. type "Semua Operator" dengan nama "Telepon Semua Operator ...").
+  const gabung = `${t} ${nama}`;
+  if (cat === "pulsa") {
+    if (gabung.includes("sms")) return "Paket SMS";
+    if (/(telepon|telpon|nelpon|talkmania|pamasuka|sesama)/.test(gabung)) return "Paket Nelpon";
+    if (gabung.includes("transfer")) return "Pulsa Transfer";
+    if (gabung.includes("masa aktif")) return "Masa Aktif";
+    if (t.includes("data")) return "Paket Data";
+    return "Pulsa Reguler";
+  }
+  if (cat === "data") {
+    if (t.includes("cek") || nama.startsWith("cek ")) return "Cek & Info";
+    if (t.includes("roaming")) return "Paket Roaming";
+    const d = parseDurasiHari(n.name);
+    if (d !== null && d <= 1) return "Paket Harian";
+    if (d !== null && d <= 7) return "Paket Mingguan";
+    if (d !== null) return "Paket Bulanan";
+    if (
+      nama.startsWith("voucher") ||
+      nama.startsWith("aktivasi voucher") ||
+      nama.startsWith("aktivasi perdana")
+    ) {
+      return "Voucher & Aktivasi";
+    }
+    return "Paket Lainnya";
+  }
+  return GROUP_FLAT;
+}
+
+/** Urutan tampil sub-kelompok per kategori (label lain menyusul di belakang). */
+const GROUP_ORDER: Partial<Record<TopUpCategory, string[]>> = {
+  pulsa: [
+    "Pulsa Reguler",
+    "Paket SMS",
+    "Paket Nelpon",
+    "Pulsa Transfer",
+    "Masa Aktif",
+    "Paket Data",
+  ],
+  data: [
+    "Paket Harian",
+    "Paket Mingguan",
+    "Paket Bulanan",
+    "Voucher & Aktivasi",
+    "Paket Roaming",
+    "Paket Lainnya",
+    "Cek & Info",
+  ],
+};
+
+/** Kelompokkan nominal per sub-kategori dengan urutan yang konsisten. */
+function groupNominals(
+  nominals: TopUpNominal[],
+  cat: TopUpCategory,
+): [string, TopUpNominal[]][] {
+  const map = new Map<string, TopUpNominal[]>();
+  for (const n of nominals) {
+    const label = groupLabelFor(n, cat);
+    if (!map.has(label)) map.set(label, []);
+    map.get(label)!.push(n);
+  }
+  const order = GROUP_ORDER[cat] ?? [];
+  return [...map.entries()].sort((a, b) => {
+    const ia = order.indexOf(a[0]);
+    const ib = order.indexOf(b[0]);
+    if (ia === -1 && ib === -1) return a[0].localeCompare(b[0]);
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
+}
 
 export default function NominalPicker({ provider, initialSku }: Props) {
   const router = useRouter();
@@ -67,9 +155,12 @@ export default function NominalPicker({ provider, initialSku }: Props) {
   );
 
   const validInitial = provider.nominals.some((n) => n.sku === initialSku) ? initialSku : undefined;
+  // Tab awal: ikuti ?sku= bila ada; kalau tidak, dahulukan kategori pulsa
+  // (pembeli operator paling sering datang untuk beli pulsa), lalu primaryCategory.
   const [tab, setTab] = useState<TopUpCategory>(
-    provider.nominals.find((n) => n.sku === validInitial)?.category ??
-      provider.primaryCategory,
+    () =>
+      provider.nominals.find((n) => n.sku === validInitial)?.category ??
+      (cats.includes("pulsa") ? "pulsa" : provider.primaryCategory),
   );
   const [sku, setSku] = useState<string | null>(validInitial ?? null);
   const [name, setName] = useState("");
@@ -81,7 +172,8 @@ export default function NominalPicker({ provider, initialSku }: Props) {
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [nomFilter, setNomFilter] = useState("");
-  const [visibleCount, setVisibleCount] = useState(BASE_SHOW);
+  /** Jumlah kartu yang tampil per sub-kelompok nominal (label → jumlah). */
+  const [groupVisible, setGroupVisible] = useState<Record<string, number>>({});
 
   // Picker metode pembayaran — pola sama dengan checkout produk:
   // kategori → provider → kartu metode terpilih (klik untuk ganti).
@@ -133,15 +225,14 @@ export default function NominalPicker({ provider, initialSku }: Props) {
 
   useEffect(() => {
     // Reset pencarian + batas tampil saat ganti provider/tab; pastikan nominal
-    // praseleksi dari ?sku= ikut terlihat di grid.
+    // praseleksi dari ?sku= ikut terlihat di grid kelompoknya.
     setNomFilter("");
-    if (validInitial) {
-      const list = provider.nominals.filter((n) => n.category === tab);
-      const idx = list.findIndex((n) => n.sku === validInitial);
-      setVisibleCount(idx >= 0 ? Math.max(BASE_SHOW, idx + 1) : BASE_SHOW);
-    } else {
-      setVisibleCount(BASE_SHOW);
+    const next: Record<string, number> = {};
+    for (const [label, items] of groupNominals(provider.nominals, tab)) {
+      const idx = validInitial ? items.findIndex((n) => n.sku === validInitial) : -1;
+      next[label] = idx >= 0 ? Math.max(BASE_SHOW, idx + 1) : BASE_SHOW;
     }
+    setGroupVisible(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [provider.slug, tab]);
 
@@ -167,7 +258,6 @@ export default function NominalPicker({ provider, initialSku }: Props) {
   const selectTab = (c: TopUpCategory) => {
     setTab(c);
     setNomFilter("");
-    setVisibleCount(BASE_SHOW);
   };
 
   const nominal = provider.nominals.find((n) => n.sku === sku) ?? null;
@@ -178,7 +268,14 @@ export default function NominalPicker({ provider, initialSku }: Props) {
         (n) => n.name.toLowerCase().includes(q) || n.sku.toLowerCase().includes(q),
       )
     : gridNominals;
-  const visible = filtered.slice(0, visibleCount);
+  // Nominal dikelompokkan per sub-kategori (Pulsa Reguler, Paket Harian, ...)
+  // khusus kategori pulsa & data; kategori lain tetap satu daftar datar.
+  const groups = groupNominals(filtered, tab);
+  const totalVisible = groups.reduce(
+    (sum, [label, items]) =>
+      sum + Math.min(items.length, groupVisible[label] ?? BASE_SHOW),
+    0,
+  );
   const isWaOnly = nominal !== null && nominal.sellPrice < WA_MIN;
 
   // ─── Picker metode pembayaran (pola sama dengan checkout produk) ───────
@@ -355,18 +452,28 @@ export default function NominalPicker({ provider, initialSku }: Props) {
         <section className="min-w-0">
           {cats.length > 1 && (
             <div className="scrollbar-hide -mx-1 flex gap-1 overflow-x-auto rounded-xl border border-gray-100 bg-gray-100/70 p-1 sm:mx-0">
-              {cats.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => selectTab(c)}
-                  className={`shrink-0 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
-                    tab === c ? "bg-white text-brand shadow-sm" : "text-muted hover:text-ink"
-                  }`}
-                >
-                  {TOPUP_CATEGORIES.find((x) => x.id === c)?.label}
-                </button>
-              ))}
+              {cats.map((c) => {
+                const count = provider.nominals.filter((n) => n.category === c).length;
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => selectTab(c)}
+                    className={`shrink-0 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
+                      tab === c ? "bg-white text-brand shadow-sm" : "text-muted hover:text-ink"
+                    }`}
+                  >
+                    {TOPUP_CATEGORIES.find((x) => x.id === c)?.label}
+                    <span
+                      className={`ml-1.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
+                        tab === c ? "bg-brand/10 text-brand" : "bg-white text-muted-2"
+                      }`}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           )}
 
@@ -377,10 +484,7 @@ export default function NominalPicker({ provider, initialSku }: Props) {
               <input
                 type="search"
                 value={nomFilter}
-                onChange={(e) => {
-                  setNomFilter(e.target.value);
-                  setVisibleCount(BASE_SHOW);
-                }}
+                onChange={(e) => setNomFilter(e.target.value)}
                 placeholder={`Cari nominal ${provider.label}…`}
                 autoComplete="off"
                 aria-label={`Cari nominal ${provider.label}`}
@@ -391,7 +495,7 @@ export default function NominalPicker({ provider, initialSku }: Props) {
 
           <p className="mt-4 text-xs text-muted-2">
             Menampilkan{" "}
-            <b className="font-semibold text-muted">{visible.length}</b> dari{" "}
+            <b className="font-semibold text-muted">{totalVisible}</b> dari{" "}
             <b className="font-semibold text-muted">{filtered.length}</b> nominal
             {q ? <> untuk &ldquo;{nomFilter.trim()}&rdquo;</> : null}
           </p>
@@ -401,33 +505,52 @@ export default function NominalPicker({ provider, initialSku }: Props) {
               Tidak ada nominal yang cocok dengan &ldquo;{nomFilter.trim()}&rdquo;.
             </p>
           ) : (
-            <>
-              <div className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3">
-                {visible.map((n) => (
-                  <NominalCard
-                    key={n.sku}
-                    n={n}
-                    icon={schema.icon}
-                    selected={sku === n.sku}
-                    onSelect={() => setSku(n.sku)}
-                  />
-                ))}
-              </div>
-              {filtered.length > visible.length && (
-                <div className="mt-4 text-center">
-                  <button
-                    type="button"
-                    onClick={() => setVisibleCount((v) => v + SHOW_STEP)}
-                    className="rounded-xl border border-gray-200 bg-white px-6 py-2.5 text-sm font-semibold text-brand transition-colors hover:border-brand hover:bg-brand/[0.04]"
-                  >
-                    Tampilkan Lebih Banyak
-                    <span className="ml-1.5 rounded-md bg-gray-100 px-1.5 py-0.5 text-[11px] font-bold text-muted">
-                      +{Math.min(SHOW_STEP, filtered.length - visible.length)}
-                    </span>
-                  </button>
-                </div>
-              )}
-            </>
+            <div className="mt-3 space-y-8">
+              {groups.map(([label, items]) => {
+                const shown = Math.min(items.length, groupVisible[label] ?? BASE_SHOW);
+                const isFlat = label === GROUP_FLAT;
+                return (
+                  <section key={label} aria-label={isFlat ? undefined : label}>
+                    {!isFlat && (
+                      <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-ink">
+                        <span aria-hidden="true" className="h-4 w-1 rounded-full bg-brand" />
+                        {label}
+                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-muted">
+                          {items.length}
+                        </span>
+                      </h3>
+                    )}
+                    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3">
+                      {items.slice(0, shown).map((n) => (
+                        <NominalCard
+                          key={n.sku}
+                          n={n}
+                          icon={schema.icon}
+                          selected={sku === n.sku}
+                          onSelect={() => setSku(n.sku)}
+                        />
+                      ))}
+                    </div>
+                    {items.length > shown && (
+                      <div className="mt-4 text-center">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setGroupVisible((g) => ({ ...g, [label]: shown + SHOW_STEP }))
+                          }
+                          className="rounded-xl border border-gray-200 bg-white px-6 py-2.5 text-sm font-semibold text-brand transition-colors hover:border-brand hover:bg-brand/[0.04]"
+                        >
+                          Tampilkan Lebih Banyak
+                          <span className="ml-1.5 rounded-md bg-gray-100 px-1.5 py-0.5 text-[11px] font-bold text-muted">
+                            +{Math.min(SHOW_STEP, items.length - shown)}
+                          </span>
+                        </button>
+                      </div>
+                    )}
+                  </section>
+                );
+              })}
+            </div>
           )}
 
           <p className="mt-4 flex items-start gap-2 text-xs leading-relaxed text-muted">
