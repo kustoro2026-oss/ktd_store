@@ -216,6 +216,9 @@ export async function digiflazzTopup(o: {
   testing?: boolean;
   /** Batas harga maksimal (max_price Digiflazz), bila ingin dikunci. */
   maxPrice?: number;
+  /** URL callback per transaksi (cb_url) — alternatif pendaftaran webhook
+   *  global di member area. Digiflazz akan POST hasil transaksi ke URL ini. */
+  cbUrl?: string;
 }): Promise<TopupResult> {
   if (!digiflazzConfigured()) {
     return { ok: false, refId: o.refId, success: false, pending: false, error: "config_missing" };
@@ -228,6 +231,7 @@ export async function digiflazzTopup(o: {
   };
   if (o.testing === true) payload.testing = true;
   if (typeof o.maxPrice === "number" && o.maxPrice > 0) payload.max_price = o.maxPrice;
+  if (o.cbUrl) payload.cb_url = o.cbUrl;
   payload.sign = md5(username() + apiKey() + o.refId);
 
   const r = await relay("transaction", payload);

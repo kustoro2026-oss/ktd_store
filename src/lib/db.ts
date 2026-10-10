@@ -281,6 +281,16 @@ const SCHEMA_SQL = `
     ON topup_orders (created_at DESC);
   CREATE INDEX IF NOT EXISTS idx_topup_orders_pending
     ON topup_orders (payment_status, topup_status);
+
+  CREATE TABLE IF NOT EXISTS topup_webhook_log (
+    id TEXT PRIMARY KEY,
+    ref_id TEXT NOT NULL DEFAULT '',
+    payload TEXT NOT NULL DEFAULT '',
+    action TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT ''
+  );
+  CREATE INDEX IF NOT EXISTS idx_topup_webhook_log_created
+    ON topup_webhook_log (created_at DESC);
 `;
 
 /** Waktu sekarang sebagai teks UTC "YYYY-MM-DD HH:MM:SS" (format sama di
@@ -432,6 +442,34 @@ export async function finishTopup(
   await queryRun(
     "UPDATE topup_orders SET topup_status = ?, digiflazz_sn = ?, error_message = ?, updated_at = ? WHERE id = ?",
     [topupStatus, sn, errorMessage, nowUtc(), id],
+  );
+}
+
+// ---------- log webhook Digiflazz ----------
+
+/** Simpan jejak setiap POST webhook Digiflazz (payload mentah + hasil
+ *  prosesnya) untuk audit — dipakai route /api/topup/webhook dan konsol. */
+export async function logTopupWebhook(o: {
+  refId: string;
+  payload: string;
+  action: string;
+}): Promise<void> {
+  const t = Date.now().toString(36).toUpperCase();
+  const r = Math.random().toString(36).slice(2, 6).toUpperCase();
+  const id = `WH-${t}${r}`;
+  await queryRun(
+    "INSERT INTO topup_webhook_log (id, ref_id, payload, action, created_at) VALUES (?, ?, ?, ?, ?)",
+    [id, o.refId, o.payload.slice(0, 8000), o.action, nowUtc()],
+  );
+}
+
+/** Log webhook terbaru (payload dipangkas di penyimpanan, bukan di sini). */
+export async function listTopupWebhookLogs(limit = 20): Promise<
+  { id: string; ref_id: string; payload: string; action: string; created_at: string }[]
+> {
+  return queryAll(
+    "SELECT id, ref_id, payload, action, created_at FROM topup_webhook_log ORDER BY created_at DESC LIMIT ?",
+    [limit],
   );
 }
 

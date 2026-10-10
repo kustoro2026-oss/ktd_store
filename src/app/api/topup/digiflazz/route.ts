@@ -12,6 +12,8 @@
 //   status-pasca  — status transaksi pascabayar
 //   inquiry-pln   — inquiry PLN (endpoint khusus, sign pakai customer_no)
 //   deposit       — penarikan tiket deposit (BUKAN top-up saldo)
+//   webhook-sim   — simulasi payload webhook Digiflazz (tanpa menulis DB)
+//   webhook-log   — log webhook masuk terbaru (audit)
 //
 // Endpoint mutasi (topup/pay-pasca/deposit) diizinkan di sini karena konsol
 // hub sudah mewajibkan dialog konfirmasi sebelum mengirim. Guard x-topup-secret
@@ -29,6 +31,8 @@ import {
   type DgRawResult,
   type PascaCommand,
 } from "@/lib/digiflazz";
+import { listTopupWebhookLogs } from "@/lib/db";
+import { processDigiflazzWebhook } from "@/lib/digiflazz-webhook";
 
 export const runtime = "nodejs";
 
@@ -43,6 +47,8 @@ const ACTIONS = new Set([
   "status-pasca",
   "inquiry-pln",
   "deposit",
+  "webhook-sim",
+  "webhook-log",
 ]);
 
 const PASCA_COMMANDS: Record<string, PascaCommand> = {
@@ -147,12 +153,14 @@ export async function POST(req: Request) {
         typeof maxPriceRaw === "number" && Number.isFinite(maxPriceRaw) && maxPriceRaw > 0
           ? maxPriceRaw
           : undefined;
+      const cbUrl = str("cbUrl");
       const r = await digiflazzTopup({
         sku: sku as string,
         customerNo: customerNo as string,
         refId: refId as string,
         testing,
         maxPrice,
+        cbUrl: cbUrl ?? undefined,
       });
       if (!r.ok) {
         // 200 di produksi: Cloudflare menutupi body 5xx dengan halaman teks.
@@ -238,6 +246,39 @@ export async function POST(req: Request) {
           buildDepositPayload({ amount, bank: bank as string, ownerName: ownerName as string }),
         ),
       );
+    }
+
+    // Simulasi payload webhook Digiflazz — TIDAK menulis DB, hanya melaporkan
+    // apa yang akan terjadi (cocok? status apa? akan ditulis apa?).
+    case "webhook-sim": {
+      const refId = str("refId");
+      const status = str("status");
+      if (!butuh([refId, status])) {
+        return NextResponse.json(
+          { ok: false, error: "field_kurang", detail: "ref_id dan status wajib diisi." },
+          { status: 400 },
+        );
+      }
+      const body = {
+        data: {
+          ref_id: refId,
+          status,
+          ...(str("sn") ? { sn: str("sn") } : {}),
+          ...(str("message") ? { message: str("message") } : {}),
+        },
+      };
+      const outcome = await processDigiflazzWebhook(body, { simulate: true });
+      return NextResponse.json({ ...outcome });
+    }
+
+    case "webhook-log": {
+      const limitRaw = Number(p.limit);
+      const limit =
+        Number.isFinite(limitRaw) && limitRaw > 0 && limitRaw <= 100
+          ? Math.floor(limitRaw)
+          : 20;
+      const logs = await listTopupWebhookLogs(limit);
+      return NextResponse.json({ ok: true, data: logs });
     }
   }
 
