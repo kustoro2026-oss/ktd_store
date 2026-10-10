@@ -10,6 +10,11 @@ import { routeDuitkuCallback } from "@/lib/duitku-callback";
 
 export const runtime = "nodejs";
 
+// Eksekusi top-up berjalan INLINE di callback ini — loop retry Lapis 1 (3x
+// percobaan + jeda) butuh sampai ~10 detik, jadi batas Vercel default 10 dtk
+// dinaikkan (Hobby maksimal 60 dtk).
+export const maxDuration = 30;
+
 export async function POST(req: Request) {
   return routeDuitkuCallback(await req.text());
 }
