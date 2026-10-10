@@ -86,13 +86,27 @@ export default function TopupBayarPage() {
   }, [id]);
 
   useEffect(() => {
-    // Muat awal + polling tiap 5 detik. load() asinkron — setState terjadi
-    // setelah fetch, bukan sinkron di badan efek.
+    // Muat awal (load() asinkron — setState terjadi setelah fetch, bukan
+    // sinkron di badan efek).
     /* eslint-disable react-hooks/set-state-in-effect */
     load();
+  }, [load]);
+
+  useEffect(() => {
+    // Polling 5 detik hanya selama status masih mungkin berubah. Hentikan
+    // saat pesanan tidak ditemukan atau sudah terminal (sukses / gagal /
+    // kedaluwarsa) — menghemat request database dan Duitku tidak mungkin
+    // mengubah status lagi.
+    if (missing) return;
+    const terminal = order
+      ? order.payment_status === "paid"
+        ? order.topup_status === "success" || order.topup_status === "failed"
+        : order.payment_status === "expired" || order.payment_status === "failed"
+      : false;
+    if (terminal) return;
     const t = setInterval(load, POLL_MS);
     return () => clearInterval(t);
-  }, [load]);
+  }, [order, missing, load]);
 
   if (missing) {
     return (

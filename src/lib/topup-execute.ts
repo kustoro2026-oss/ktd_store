@@ -14,7 +14,7 @@ import {
 } from "./db";
 import { digiflazzTopup } from "./digiflazz";
 import { formatRupiah } from "./topup";
-import { alertLowBalanceIfNeeded, getBalance } from "./topup-balance";
+import { alertLowBalanceIfNeeded, getBalance, recordBalance } from "./topup-balance";
 import { notifyTopupBuyer, notifyTopupOwner } from "./wa";
 import { whatsappDisplay } from "./config";
 
@@ -86,23 +86,26 @@ async function runExecution(order: TopUpOrder, testing: boolean): Promise<Execut
     return { step: "pending", detail: `cek saldo gagal, ditunda: ${bal.error}`, wa };
   }
   if (bal.balance < order.cost) {
-    await finishTopup(order.id, "failed", "", "Saldo Digiflazz kurang");
+    // Saldo kurang BUKAN kegagalan permanen — pesanan sudah lunas, jadi
+    // pertahankan Pending supaya setelah owner deposit, cron / tick webhook
+    // mengeksekusi otomatis (recheckTopupOrder memeriksa saldo dulu).
+    await finishTopup(order.id, "pending", "", "Saldo Digiflazz kurang — menunggu deposit");
     const wa = await notifyTopupOwner(
-      `[Top-up] Saldo Digiflazz kurang untuk pesanan ${order.id}: tersisa ${formatRupiah(bal.balance)}, butuh ${formatRupiah(order.cost)}. Deposit dulu, lalu eksekusi ulang di /topup/admin.`,
+      `[Top-up] Saldo Digiflazz kurang untuk pesanan ${order.id}: tersisa ${formatRupiah(bal.balance)}, butuh ${formatRupiah(order.cost)}. Deposit dulu — sistem akan mencoba otomatis setelah saldo cukup.`,
     );
     await notifyTopupBuyer(
       order.buyer_phone,
       [
-        `Halo ${order.buyer_name || "Kak"}, maaf top up kamu belum berhasil diproses otomatis.`,
+        `Halo ${order.buyer_name || "Kak"}, pembayaran top up kamu sudah kami terima dan sedang diproses.`,
         `Pesanan: ${order.id}`,
         `Produk: ${order.product_name}`,
         "",
-        `Hubungi CS kami ${cs} untuk pengembalian dana atau proses manual.`,
+        "Kami kabari lagi setelah top up selesai.",
       ].join("\n"),
     );
     return {
-      step: "balance_low",
-      detail: `saldo ${formatRupiah(bal.balance)} < cost ${formatRupiah(order.cost)}`,
+      step: "pending",
+      detail: `saldo ${formatRupiah(bal.balance)} < cost ${formatRupiah(order.cost)} — menunggu deposit`,
       wa,
     };
   }
@@ -196,6 +199,11 @@ async function alertAfterTransaction(lastBalance?: number): Promise<void> {
   if (balance === undefined) {
     const rem = await getBalance(true);
     if (rem.ok) balance = rem.balance;
+  } else {
+    // Cache saldo di topup-balance masih menyimpan nilai pra-transaksi —
+    // segarkan supaya gate pembayaran pesanan berikutnya membaca saldo
+    // terkini (bukan saldo basi hingga TTL 60 detik habis).
+    recordBalance(balance);
   }
   if (balance !== undefined) {
     await alertLowBalanceIfNeeded(balance);
@@ -203,8 +211,20 @@ async function alertAfterTransaction(lastBalance?: number): Promise<void> {
 }
 
 /** Cek ulang pesanan berstatus Pending dengan mengirim ulang ref_id yang
- *  sama ke Digiflazz (idempoten — mengembalikan status terkini). */
+ *  sama ke Digiflazz (idempoten — mengembalikan status terkini). Saldo dicek
+ *  dulu: bila masih kurang / tak terbaca, pertahankan pending tanpa
+ *  mengirim transaksi yang pasti gagal. */
 export async function recheckTopupOrder(order: TopUpOrder): Promise<ExecuteOutcome> {
+  const bal = await getBalance(true);
+  if (!bal.ok) {
+    return { step: "pending", detail: `cek saldo gagal: ${bal.error}` };
+  }
+  if (bal.balance < order.cost) {
+    return {
+      step: "pending",
+      detail: `saldo ${formatRupiah(bal.balance)} < cost ${formatRupiah(order.cost)} — menunggu deposit`,
+    };
+  }
   const res = await digiflazzTopup({
     sku: order.sku,
     customerNo: order.customer_no,

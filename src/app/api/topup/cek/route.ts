@@ -12,6 +12,39 @@ import { getTopupOrder, listTopupOrdersByPhone, type TopUpOrder } from "@/lib/db
 
 export const runtime = "nodejs";
 
+// ---------- rate limit ringan (in-memory per instance) ----------
+// Endpoint ini publik — tanpa pembatasan, siapa pun bisa men-scan nomor HP
+// untuk memetakan riwayat transaksi. Batasi 30 request/menit per IP (state
+// in-memory; di serverless tiap instance punya counter sendiri — tetap
+// mengurangi scan massal dari satu klien hangat).
+
+const g = globalThis as unknown as { __ktdCekLimit?: Map<string, number[]> };
+const WINDOW_MS = 60_000;
+const MAX_PER_WINDOW = 30;
+
+function clientIp(req: Request): string {
+  return (
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    req.headers.get("x-real-ip") ||
+    "unknown"
+  );
+}
+
+function rateLimited(ip: string): boolean {
+  const now = Date.now();
+  const map = (g.__ktdCekLimit ??= new Map<string, number[]>());
+  const hits = (map.get(ip) ?? []).filter((t) => now - t < WINDOW_MS);
+  hits.push(now);
+  map.set(ip, hits);
+  // Bersihkan entri usang sesekali agar map tidak tumbuh tanpa batas.
+  if (map.size > 500) {
+    for (const [k, v] of map) {
+      if (v.every((t) => now - t >= WINDOW_MS)) map.delete(k);
+    }
+  }
+  return hits.length > MAX_PER_WINDOW;
+}
+
 /** "0812xxxx" → "08••••xx12" — aman untuk ditampilkan ke publik. */
 function maskTarget(s: string): string {
   const t = s.trim();
@@ -47,6 +80,12 @@ function publicOrder(o: TopUpOrder) {
 }
 
 export async function GET(req: Request) {
+  if (rateLimited(clientIp(req))) {
+    return NextResponse.json(
+      { ok: false, error: "terlalu_sering" },
+      { status: 429 },
+    );
+  }
   const url = new URL(req.url);
   const orderId = (url.searchParams.get("order") ?? "").trim();
   const phone = (url.searchParams.get("phone") ?? "").trim();

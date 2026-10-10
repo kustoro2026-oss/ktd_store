@@ -35,6 +35,13 @@ export async function getBalance(force = false): Promise<BalanceInfo> {
   return { ok: true, balance: res.balance };
 }
 
+/** Catat saldo terkini ke cache — dipakai setelah transaksi sukses supaya
+ *  gate pembayaran pesanan berikutnya tidak membaca saldo pra-transaksi
+ *  yang basi (cache TTL 60 detik). */
+export function recordBalance(balance: number): void {
+  cache = { at: Date.now(), balance };
+}
+
 /** Gate sebelum membuat sesi pembayaran online: pastikan saldo cukup untuk
  *  cost produk. Fail-open bila saldo tidak bisa dibaca (relay down) —
  *  eksekusi nanti tetap punya pengaman saldo sendiri. */

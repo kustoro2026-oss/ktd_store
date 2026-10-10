@@ -83,6 +83,20 @@ async function handleStoreOrderCallback(cb: DuitkuCallback): Promise<boolean> {
   const order = await getStoreOrderByRef(cb.merchantOrderId!);
   if (!order) return false;
 
+  // Guard nominal: callback harus senilai total pesanan. Bila berbeda
+  // (pembayaran parsial / data tidak sinkron), jangan tandai lunas — log +
+  // WA owner untuk cek manual. Signature Duitku sudah diverifikasi, jadi
+  // mismatch ini bukan spoofing melainkan indikasi bug alur amount.
+  if (cb.amount !== order.total) {
+    console.error(
+      `[checkout] callback ${order.id} amount ${cb.amount} != total ${order.total} — tidak ditandai lunas`,
+    );
+    await notifyTopupOwner(
+      `[Checkout] Callback Duitku pesanan ${order.id} nominal ${rupiah(cb.amount ?? 0)} TIDAK sama dengan total ${rupiah(order.total)} — cek manual di Duitku.`,
+    );
+    return true;
+  }
+
   if (cb.resultCode === "00") {
     const paid = order.payment_status !== "paid";
     await markStoreOrderPaid(order.id, cb.reference ?? "");
@@ -112,6 +126,18 @@ async function handleStoreOrderCallback(cb: DuitkuCallback): Promise<boolean> {
 async function handleTopupOrderCallback(cb: DuitkuCallback): Promise<boolean> {
   const order = await getTopupOrderByRef(cb.merchantOrderId!);
   if (!order) return false;
+
+  // Guard nominal: callback harus senilai jumlah tagihan. Bila berbeda,
+  // jangan tandai lunas / eksekusi — log + WA owner untuk cek manual.
+  if (cb.amount !== order.amount) {
+    console.error(
+      `[topup] callback ${order.id} amount ${cb.amount} != tagihan ${order.amount} — tidak dieksekusi`,
+    );
+    await notifyTopupOwner(
+      `[Top-up] Callback Duitku pesanan ${order.id} nominal ${rupiah(cb.amount ?? 0)} TIDAK sama dengan tagihan ${rupiah(order.amount)} — cek manual di Duitku.`,
+    );
+    return true;
+  }
 
   if (cb.resultCode === "00") {
     await markOrderPaid(order.id, cb.reference ?? "");

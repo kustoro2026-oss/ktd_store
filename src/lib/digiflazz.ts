@@ -38,7 +38,7 @@ export function digiflazzConfigured(): boolean {
 async function relay(
   ep: string,
   payload: Record<string, unknown>,
-): Promise<{ ok: boolean; data?: unknown; error?: string }> {
+): Promise<{ ok: boolean; data?: unknown; error?: string; status?: number }> {
   try {
     const res = await fetch(`${relayUrl()}?ep=${ep}`, {
       method: "POST",
@@ -56,7 +56,10 @@ async function relay(
       parsed = { raw: text };
     }
     const data = (parsed as { data?: unknown }).data;
-    return { ok: res.status < 500, data };
+    // Hanya 2xx yang dianggap berhasil — 4xx (token relay salah, endpoint
+    // diblokir) berarti request tidak pernah sampai Digiflazz dan harus
+    // diperlakukan retryable (pending), bukan kegagalan transaksi permanen.
+    return { ok: res.ok, data, status: res.status };
   } catch (e) {
     return { ok: false, error: String(e) };
   }
@@ -79,7 +82,11 @@ export async function checkDigiflazzBalance(): Promise<BalanceResult> {
     sign: md5(username() + apiKey() + "depo"),
   });
   if (!r.ok) {
-    return { ok: false, balance: 0, error: r.error ?? "relay_unreachable" };
+    return {
+      ok: false,
+      balance: 0,
+      error: r.error ?? `relay_unreachable (HTTP ${r.status ?? "?"})`,
+    };
   }
   const d = r.data as { deposit?: string | number; message?: string } | undefined;
   if (!d || typeof d.deposit === "undefined") {
@@ -126,9 +133,28 @@ export async function digiflazzTopup(o: {
 
   const r = await relay("transaction", payload);
   if (!r.ok) {
-    return { ok: false, refId: o.refId, success: false, pending: false, error: r.error ?? "relay_unreachable" };
+    return {
+      ok: false,
+      refId: o.refId,
+      success: false,
+      pending: false,
+      error: r.error ?? `relay_unreachable (HTTP ${r.status ?? "?"})`,
+    };
   }
   const d = r.data as Record<string, unknown> | undefined;
+  // Data kosong = relay membalas tanpa hasil Digiflazz (error HTML / body
+  // tidak berbentuk) — perlakukan sebagai kegagalan relay retryable, BUKAN
+  // transaksi gagal. Tanpa guard ini respons kosong turun ke klasifikasi
+  // rc "" dan pesanan di-finishTopup("failed") padahal saldo tidak terpotong.
+  if (!d) {
+    return {
+      ok: false,
+      refId: o.refId,
+      success: false,
+      pending: false,
+      error: "respons relay tidak valid (data kosong)",
+    };
+  }
   const rc = String(d?.rc ?? "");
   const status = String(d?.status ?? "");
   const message = String(d?.message ?? "");

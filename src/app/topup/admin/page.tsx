@@ -40,6 +40,9 @@ const statusBadge = (s: string) =>
         ? "bg-amber-100 text-amber-700"
         : "bg-gray-100 text-gray-600";
 
+/** Ref idempoten bawaan eksekusi manual (dibuat saat klik, bukan render). */
+const defaultRefId = () => `KTD-${Date.now()}`;
+
 export default function TopUpAdminPage() {
   const [secret, setSecret] = useState("");
   const [sku, setSku] = useState(TOPUP_PRODUCTS[0].sku);
@@ -78,7 +81,7 @@ export default function TopUpAdminPage() {
   const doExecute = async () => {
     setBusy(true);
     setResult(null);
-    const ref = refId.trim() || `KTD-${Date.now()}`;
+    const ref = refId.trim() || defaultRefId();
     if (!refId.trim()) setRefId(ref);
     try {
       const res = await fetch("/api/topup/execute", {
@@ -102,8 +105,7 @@ export default function TopUpAdminPage() {
         headers: { "x-topup-secret": secret },
       });
       const j = await res.json();
-      const d = j?.data?.data;
-      setSaldo(typeof d?.deposit === "number" ? formatRupiah(d.deposit) : JSON.stringify(j));
+      setSaldo(typeof j?.balance === "number" ? formatRupiah(j.balance) : JSON.stringify(j));
     } catch (e) {
       setSaldo("Gagal: " + String(e));
     } finally {
