@@ -51,9 +51,11 @@ export default function Footer() {
 
       <div className="bg-gray-50/70">
         <div className="container-site grid gap-8 py-10 md:grid-cols-3">
-          {/* Kiri: brand + layanan pelanggan, lalu badge PSE KOMDIGI di ruang
-              kosong bawah kedua kolom (kolom marketplace lebih tinggi) */}
-          <div className="md:col-span-2">
+          {/* Kiri: brand + layanan pelanggan; badge PSE KOMDIGI menutup dasar
+              area. justify-between + lebar terbatas (max-w-sm, rasio 3:1) membuat
+              dasar badge sejajar dengan dasar kolom marketplace dan tidak
+              menjorok ke bawah. */}
+          <div className="flex flex-col justify-between md:col-span-2">
             <div className="grid gap-8 sm:grid-cols-2">
               {/* Brand + newsletter */}
               <div>
@@ -99,14 +101,14 @@ export default function Footer() {
             </div>
 
             {/* Badge PSE — terdaftar resmi di Kementerian Komunikasi dan Digital */}
-            <div className="mt-8">
+            <div className="mt-8 md:mt-0">
               <Image
                 src="/images/footer/pse-komdigi.jpg"
                 alt="KTD Store terdaftar resmi sebagai Penyelenggara Sistem Elektronik (PSE) Lingkup Privat — Kementerian Komunikasi dan Digital"
                 width={1600}
                 height={534}
                 loading="lazy"
-                className="h-auto w-full max-w-xl rounded-xl"
+                className="h-auto w-full rounded-xl md:max-w-sm"
               />
             </div>
           </div>
