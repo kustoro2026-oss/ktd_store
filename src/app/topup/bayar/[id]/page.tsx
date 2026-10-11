@@ -15,14 +15,17 @@ import {
   AlertTriangle,
   ArrowLeft,
   CheckCircle2,
+  ChevronDown,
   Clock3,
   Copy,
   ExternalLink,
   Loader2,
+  ShieldCheck,
   XCircle,
 } from "lucide-react";
 import { formatRupiah } from "@/lib/topup";
 import { whatsappLink } from "@/lib/config";
+import { getPaymentGuide } from "@/lib/payment-guides";
 
 type OrderView = {
   id: string;
@@ -37,6 +40,12 @@ type OrderView = {
   payment_va: string;
   /** String QRIS (bila metode QRIS) — dirender jadi QR code di halaman ini. */
   payment_qr: string;
+  /** Kode kanal Duitku yang dipakai (mis. BC, BR, SP) — untuk panduan cara bayar. */
+  payment_channel: string;
+  /** Nama kanal resmi dari daftar metode Duitku (mis. "BCA Virtual Account"). */
+  channel_name: string;
+  /** URL logo kanal resmi (mis. logo bank saat VA). */
+  channel_image: string;
   paid_at: string;
   digiflazz_sn: string;
   error_message: string;
@@ -55,6 +64,8 @@ export default function TopupBayarPage() {
   const [order, setOrder] = useState<OrderView | null>(null);
   const [missing, setMissing] = useState(false);
   const [copied, setCopied] = useState(false);
+  /** Indeks sub-kanal akordeon Cara Pembayaran yang sedang terbuka. */
+  const [guideOpen, setGuideOpen] = useState(0);
 
   const copy = async (text: string) => {
     try {
@@ -198,10 +209,22 @@ export default function TopupBayarPage() {
                 </div>
               ) : order.payment_va ? (
                 <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50 p-4">
-                  <p className="text-xs font-semibold text-muted-2">
-                    Nomor Virtual Account
-                  </p>
-                  <div className="mt-2 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    {order.channel_image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={order.channel_image}
+                        alt={order.channel_name}
+                        className="h-8 w-auto rounded object-contain"
+                      />
+                    ) : null}
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-muted-2">
+                        {order.channel_name || "Nomor Virtual Account"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between gap-2">
                     <p className="break-all font-mono text-lg font-bold tracking-wider text-ink">
                       {order.payment_va}
                     </p>
@@ -226,6 +249,73 @@ export default function TopupBayarPage() {
                 </div>
               ) : null}
 
+              {/* Cara pembayaran — panduan spesifik per kanal (sama dengan
+                  checkout produk fisik; lihat src/lib/payment-guides.ts) */}
+              {(() => {
+                const guide = getPaymentGuide(order.payment_channel, {
+                  qr: Boolean(order.payment_qr),
+                  va: Boolean(order.payment_va),
+                });
+                // Akordeon: satu sub-kanal terbuka, sisanya bisa dibuka-tutup.
+                const openIdx = Math.min(guideOpen, guide.groups.length - 1);
+                return (
+                  <div className="mt-4 rounded-xl border border-gray-100 p-4">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-muted-2">
+                      Cara Pembayaran
+                    </p>
+                    {guide.via && (
+                      <p className="mt-1.5 text-sm font-semibold text-ink">
+                        {guide.via}
+                      </p>
+                    )}
+                    <div className="mt-2 divide-y divide-gray-100 overflow-hidden rounded-lg border border-gray-100">
+                      {guide.groups.map((g, i) => {
+                        const open = i === openIdx;
+                        return (
+                          <div key={g.title}>
+                            <button
+                              type="button"
+                              aria-expanded={open}
+                              onClick={() => setGuideOpen(open ? -1 : i)}
+                              className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left transition-colors hover:bg-gray-50"
+                            >
+                              <span className="text-sm font-semibold text-ink">
+                                {g.title}
+                              </span>
+                              <ChevronDown
+                                className={`h-4 w-4 shrink-0 text-muted-2 transition-transform duration-200 ${
+                                  open ? "rotate-180" : ""
+                                }`}
+                              />
+                            </button>
+                            {open && (
+                              <ol className="space-y-1.5 px-3 pb-3">
+                                {g.steps.map((s, si) => (
+                                  <li
+                                    key={si}
+                                    className="flex items-start gap-2 text-sm leading-relaxed text-muted"
+                                  >
+                                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand/10 text-[11px] font-bold text-brand">
+                                      {si + 1}
+                                    </span>
+                                    {s}
+                                  </li>
+                                ))}
+                              </ol>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {guide.note && (
+                      <p className="mt-2 text-xs leading-relaxed text-muted-2">
+                        {guide.note}
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
+
               <div className="mt-4 flex flex-col gap-2 border-t border-gray-100 pt-4">
                 {order.payment_qr || order.payment_va ? (
                   <p className="text-center text-xs text-muted">
@@ -239,7 +329,7 @@ export default function TopupBayarPage() {
                       rel="noopener noreferrer"
                       className="flex items-center justify-center gap-2 rounded-xl bg-brand px-5 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-brand-2"
                     >
-                      Buka Halaman Pembayaran{" "}
+                      Buka Pembayaran{" "}
                       <ExternalLink className="h-4 w-4" />
                     </a>
                     <p className="text-center text-xs text-muted">
@@ -250,6 +340,14 @@ export default function TopupBayarPage() {
                   </>
                 )}
               </div>
+
+              <p className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-muted-2">
+                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
+                <span>
+                  Pembayaran diverifikasi otomatis — tidak perlu konfirmasi manual.
+                  {order.payment_va ? " Virtual Account berlaku 24 jam." : ""}
+                </span>
+              </p>
             </div>
           )}
 

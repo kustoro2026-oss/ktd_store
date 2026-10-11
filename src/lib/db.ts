@@ -53,6 +53,9 @@ export type TopUpOrder = {
   payment_va: string;
   /** String QRIS (bila metode QRIS) — dirender jadi QR di sisi kita. */
   payment_qr: string;
+  /** Kode kanal Duitku yang berhasil dibuat sesinya (mis. BC, BR, SP) —
+   *  dipakai halaman bayar untuk menampilkan panduan Cara Pembayaran. */
+  payment_channel: string;
   paid_at: string;
   digiflazz_sn: string;
   error_message: string;
@@ -119,6 +122,7 @@ async function pgPool(): Promise<Pool> {
     for (const alter of [
       "ALTER TABLE topup_orders ADD COLUMN IF NOT EXISTS payment_va TEXT NOT NULL DEFAULT ''",
       "ALTER TABLE topup_orders ADD COLUMN IF NOT EXISTS payment_qr TEXT NOT NULL DEFAULT ''",
+      "ALTER TABLE topup_orders ADD COLUMN IF NOT EXISTS payment_channel TEXT NOT NULL DEFAULT ''",
       "ALTER TABLE topup_orders ADD COLUMN IF NOT EXISTS note TEXT NOT NULL DEFAULT ''",
       "ALTER TABLE topup_orders ADD COLUMN IF NOT EXISTS exec_attempts INTEGER NOT NULL DEFAULT 0",
       "ALTER TABLE topup_orders ADD COLUMN IF NOT EXISTS attempt_refs TEXT NOT NULL DEFAULT ''",
@@ -192,6 +196,9 @@ function migrateSqliteColumns(db: DatabaseSync): void {
   }
   if (!cols.has("payment_qr")) {
     db.exec("ALTER TABLE topup_orders ADD COLUMN payment_qr TEXT NOT NULL DEFAULT ''");
+  }
+  if (!cols.has("payment_channel")) {
+    db.exec("ALTER TABLE topup_orders ADD COLUMN payment_channel TEXT NOT NULL DEFAULT ''");
   }
   if (!cols.has("note")) {
     db.exec("ALTER TABLE topup_orders ADD COLUMN note TEXT NOT NULL DEFAULT ''");
@@ -284,6 +291,7 @@ const SCHEMA_SQL = `
     payment_url TEXT NOT NULL DEFAULT '',
     payment_va TEXT NOT NULL DEFAULT '',
     payment_qr TEXT NOT NULL DEFAULT '',
+    payment_channel TEXT NOT NULL DEFAULT '',
     paid_at TEXT NOT NULL DEFAULT '',
     digiflazz_sn TEXT NOT NULL DEFAULT '',
     error_message TEXT NOT NULL DEFAULT '',
@@ -411,20 +419,23 @@ export async function getTopupOrderByRef(
   ]);
 }
 
-/** Simpan data sesi payment gateway hasil buat pembayaran. */
+/** Simpan data sesi payment gateway hasil buat pembayaran — termasuk kode
+ *  kanal yang benar-benar dipakai (untuk panduan Cara Pembayaran di halaman
+ *  bayar). */
 export async function setOrderPaymentSession(
   id: string,
   sessionId: string,
   paymentUrl: string,
   vaNumber = "",
   qrString = "",
+  channel = "",
 ): Promise<void> {
   await queryRun(
     `UPDATE topup_orders
      SET gateway_session = ?, payment_url = ?, payment_va = ?, payment_qr = ?,
-         updated_at = ?
+         payment_channel = ?, updated_at = ?
      WHERE id = ?`,
-    [sessionId, paymentUrl, vaNumber, qrString, nowUtc(), id],
+    [sessionId, paymentUrl, vaNumber, qrString, channel, nowUtc(), id],
   );
 }
 

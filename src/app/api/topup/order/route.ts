@@ -215,6 +215,7 @@ export async function POST(req: Request) {
         pay.paymentUrl,
         pay.vaNumber ?? "",
         pay.qrString ?? "",
+        payChannel,
       );
       return NextResponse.json({
         ok: true,

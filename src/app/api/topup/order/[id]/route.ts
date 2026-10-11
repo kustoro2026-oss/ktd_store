@@ -4,6 +4,7 @@
 
 import { NextResponse } from "next/server";
 import { getTopupOrder } from "@/lib/db";
+import { getDuitkuPaymentMethods } from "@/lib/duitku";
 
 export const runtime = "nodejs";
 
@@ -16,6 +17,19 @@ export async function GET(
     const order = await getTopupOrder(id);
     if (!order) {
       return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
+    }
+    // Nama & logo kanal yang benar-benar dipakai — dari daftar metode Duitku
+    // (di-cache 10 menit per nominal) agar halaman bayar bisa menampilkan
+    // logo bank saat VA tanpa memanggil gateway setiap polling.
+    let channelName = "";
+    let channelImage = "";
+    if (order.payment_channel) {
+      const methods = await getDuitkuPaymentMethods(order.amount);
+      const method = methods.find((m) => m.code === order.payment_channel);
+      if (method) {
+        channelName = method.name;
+        channelImage = method.image;
+      }
     }
     return NextResponse.json({
       ok: true,
@@ -30,6 +44,9 @@ export async function GET(
         payment_url: order.payment_url,
         payment_va: order.payment_va,
         payment_qr: order.payment_qr,
+        payment_channel: order.payment_channel,
+        channel_name: channelName,
+        channel_image: channelImage,
         paid_at: order.paid_at,
         digiflazz_sn: order.digiflazz_sn,
         error_message: order.error_message,
