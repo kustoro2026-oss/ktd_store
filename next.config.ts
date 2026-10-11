@@ -1,8 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Enable image optimization (uses sharp)
   images: {
+    // Optimizer /_next/image Vercel menabrak kuota akun Hobby (respons 402
+    // Payment Required) sehingga gambar gagal dimuat di produksi — terutama
+    // gambar baru yang belum pernah di-cache edge. Semua file gambar di repo
+    // sudah dioptimasi ukurannya, jadi sajikan langsung dari file asli.
+    unoptimized: true,
+
     formats: ["image/webp", "image/avif"],
     deviceSizes: [640, 768, 1024, 1280, 1536],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
