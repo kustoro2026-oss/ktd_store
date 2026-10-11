@@ -51,46 +51,64 @@ export default function Footer() {
 
       <div className="bg-gray-50/70">
         <div className="container-site grid gap-8 py-10 md:grid-cols-3">
-          {/* Brand + newsletter */}
-          <div>
-            <Link href="/" className="flex items-center gap-2">
-              <Image
-                src="/images/logo.png"
-                alt="KTD Store"
-                width={36}
-                height={36}
-                className="rounded-xl bg-brand object-contain"
-              />
-              <span className="text-xl font-extrabold tracking-tight text-ink">
-                KTD Store
-              </span>
-            </Link>
-            <p className="mt-3 text-sm leading-6 text-muted">
-              Toko online terpercaya untuk kebutuhan rumah tangga, kecantikan,
-              dan gaya hidup. Belanja mudah dengan harga terbaik.
-            </p>
-          </div>
+          {/* Kiri: brand + layanan pelanggan, lalu badge PSE KOMDIGI di ruang
+              kosong bawah kedua kolom (kolom marketplace lebih tinggi) */}
+          <div className="md:col-span-2">
+            <div className="grid gap-8 sm:grid-cols-2">
+              {/* Brand + newsletter */}
+              <div>
+                <Link href="/" className="flex items-center gap-2">
+                  <Image
+                    src="/images/logo.png"
+                    alt="KTD Store"
+                    width={36}
+                    height={36}
+                    className="rounded-xl bg-brand object-contain"
+                  />
+                  <span className="text-xl font-extrabold tracking-tight text-ink">
+                    KTD Store
+                  </span>
+                </Link>
+                <p className="mt-3 text-sm leading-6 text-muted">
+                  Toko online terpercaya untuk kebutuhan rumah tangga, kecantikan,
+                  dan gaya hidup. Belanja mudah dengan harga terbaik.
+                </p>
+              </div>
 
-          {/* Customer service */}
-          <div>
-            <h3 className="text-base font-bold text-ink">Layanan Pelanggan</h3>
-            <p className="mt-3 text-sm text-muted">
-              Setiap hari 09:00 – 18:00 WIB
-              <br />
-              (kecuali hari libur nasional)
-            </p>
-            <p className="mt-3 text-sm">
-              <span className="text-muted">Email: </span>
-              <a href="mailto:info@kustoro2026.com" className="font-medium transition-colors hover:text-brand">
-                info@kustoro2026.com
-              </a>
-            </p>
-            <p className="mt-1.5 text-sm">
-              <span className="text-muted">WhatsApp: </span>
-              <a href={`https://wa.me/${WHATSAPP_NUMBER}`} className="font-medium transition-colors hover:text-brand" target="_blank" rel="noopener noreferrer">
-                {whatsappDisplay()}
-              </a>
-            </p>
+              {/* Customer service */}
+              <div>
+                <h3 className="text-base font-bold text-ink">Layanan Pelanggan</h3>
+                <p className="mt-3 text-sm text-muted">
+                  Setiap hari 09:00 – 18:00 WIB
+                  <br />
+                  (kecuali hari libur nasional)
+                </p>
+                <p className="mt-3 text-sm">
+                  <span className="text-muted">Email: </span>
+                  <a href="mailto:info@kustoro2026.com" className="font-medium transition-colors hover:text-brand">
+                    info@kustoro2026.com
+                  </a>
+                </p>
+                <p className="mt-1.5 text-sm">
+                  <span className="text-muted">WhatsApp: </span>
+                  <a href={`https://wa.me/${WHATSAPP_NUMBER}`} className="font-medium transition-colors hover:text-brand" target="_blank" rel="noopener noreferrer">
+                    {whatsappDisplay()}
+                  </a>
+                </p>
+              </div>
+            </div>
+
+            {/* Badge PSE — terdaftar resmi di Kementerian Komunikasi dan Digital */}
+            <div className="mt-8">
+              <Image
+                src="/images/footer/pse-komdigi.jpg"
+                alt="KTD Store terdaftar resmi sebagai Penyelenggara Sistem Elektronik (PSE) Lingkup Privat — Kementerian Komunikasi dan Digital"
+                width={1600}
+                height={534}
+                loading="lazy"
+                className="h-auto w-full max-w-xl rounded-xl"
+              />
+            </div>
           </div>
 
           {/* Marketplace — client component for interactivity */}

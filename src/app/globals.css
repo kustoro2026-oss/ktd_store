@@ -289,3 +289,25 @@ html {
 .animate-fade-in {
   animation: fadeIn 0.25s ease-out both;
 }
+
+/* Gelombang sonar (ripple) tombol WhatsApp melayang — cincin memuai dan
+   memudar keluar dari lingkaran tombol, diulang terus-menerus. */
+@keyframes waWave {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+
+  70% {
+    opacity: 0.12;
+  }
+
+  100% {
+    transform: scale(1.9);
+    opacity: 0;
+  }
+}
+
+.animate-wa-wave {
+  animation: waWave 2.4s ease-out infinite;
+}
