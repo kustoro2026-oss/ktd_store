@@ -303,6 +303,14 @@ const BRANDS = {
     targetNumeric: false,
     customerNoLabel: "ID Game / Email",
   },
+  Undawn: {
+    slug: "undawn",
+    label: "Undawn",
+    prefixes: ["Garena Undawn"],
+    category: "game",
+    targetNumeric: true,
+    customerNoLabel: "ID Player",
+  },
   Minecraft: {
     slug: "minecraft",
     label: "Minecraft",
