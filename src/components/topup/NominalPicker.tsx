@@ -1009,8 +1009,8 @@ export default function NominalPicker({ provider, initialSku }: Props) {
                       {vaEnabled
                         ? `Pembayaran online tersedia untuk nominal mulai ${formatRupiah(
                             vaMinSell ?? 50000,
-                          )}. Nominal yang Anda pilih diproses via WhatsApp — CS kami siap memandu pembayaran hingga selesai.`
-                        : "Pembayaran online (QRIS) sedang dalam proses pengajuan aktivasi. Untuk sementara, pesanan Anda akan diproses via WhatsApp — CS kami siap memandu pembayaran hingga selesai."}
+                          )} — nominal yang Anda pilih diproses via WhatsApp, CS kami siap memandu pembayaran hingga selesai.`
+                        : "Pembayaran online (QRIS) sedang dalam proses pengajuan aktivasi — pesanan Anda diproses via WhatsApp, CS kami siap memandu pembayaran hingga selesai."}
                     </p>
                   </div>
                 ) : (
