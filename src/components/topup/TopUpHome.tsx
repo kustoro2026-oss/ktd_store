@@ -44,10 +44,10 @@ const POPULAR = ["Free Fire", "Mobile Legends", "Telkomsel", "PLN", "DANA"];
 const TOTAL_NOMINALS = TOPUP_PROVIDERS.reduce((a, p) => a + p.nominals.length, 0);
 
 const TRUST = [
-  { icon: ShieldCheck, title: "Transaksi Aman", sub: "Pembayaran terverifikasi otomatis" },
-  { icon: Zap, title: "Proses Otomatis", sub: "Saldo masuk dalam hitungan menit" },
-  { icon: HandCoins, title: "Jaminan Uang Kembali", sub: "Dijamin dikembalikan 100% tanpa potongan" },
-  { icon: Headphones, title: "Bantuan CS", sub: "Siap membantu via WhatsApp" },
+  { icon: ShieldCheck, title: "Transaksi Aman", sub: "Pembayaran terverifikasi otomatis", tint: "bg-sky-100 text-sky-600" },
+  { icon: Zap, title: "Proses Otomatis", sub: "Saldo masuk dalam hitungan menit", tint: "bg-amber-100 text-amber-600" },
+  { icon: HandCoins, title: "Jaminan Uang Kembali", sub: "Dijamin dikembalikan 100% tanpa potongan", tint: "bg-emerald-100 text-emerald-600" },
+  { icon: Headphones, title: "Bantuan CS", sub: "Siap membantu via WhatsApp", tint: "bg-violet-100 text-violet-600" },
 ];
 
 const STEPS = [
@@ -378,24 +378,6 @@ export default function TopUpHome() {
             ))}
           </div>
 
-          {/* Trust bar — kartu */}
-          <div className="mx-auto mt-8 grid max-w-4xl gap-3 text-left sm:grid-cols-2 lg:grid-cols-4">
-            {TRUST.map((t) => (
-              <div
-                key={t.title}
-                className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-white/90 p-3.5 shadow-sm backdrop-blur"
-              >
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand/10 text-brand">
-                  <t.icon className="h-5 w-5" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-bold text-ink">{t.title}</span>
-                  <span className="block text-xs text-muted">{t.sub}</span>
-                </span>
-              </div>
-            ))}
-          </div>
-
           {/* Strip statistik katalog */}
           <div className="mx-auto mt-6 flex max-w-xl flex-wrap items-center justify-center gap-x-6 gap-y-1.5 text-xs font-semibold text-muted sm:text-sm">
             <span>
@@ -414,6 +396,21 @@ export default function TopUpHome() {
           </div>
         </div>
       </section>
+
+      {/* Strip kepercayaan — area putih bersih tepat di bawah hero */}
+      <div className="border-b border-gray-100 bg-white">
+        <div className="container-site grid grid-cols-2 gap-x-4 gap-y-5 py-6 lg:grid-cols-4">
+          {TRUST.map((t) => (
+            <div key={t.title} className="flex flex-col items-center gap-2 text-center">
+              <span className={`flex h-11 w-11 items-center justify-center rounded-2xl ${t.tint}`}>
+                <t.icon className="h-5 w-5" />
+              </span>
+              <span className="text-sm font-bold text-ink">{t.title}</span>
+              <span className="-mt-1.5 text-xs leading-snug text-muted">{t.sub}</span>
+            </div>
+          ))}
+        </div>
+      </div>
 
       <div className="container-site">
         {/* Shortcut kategori */}
