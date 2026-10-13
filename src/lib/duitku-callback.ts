@@ -20,7 +20,7 @@ import {
 } from "@/lib/db";
 import { verifyDuitkuCallback, type DuitkuCallback } from "@/lib/duitku";
 import { executeTopupOrder, recheckPendingTopups } from "@/lib/topup-execute";
-import { notifyTopupBuyer, notifyTopupOwner } from "@/lib/wa";
+import { notifyTopupOwner } from "@/lib/wa";
 
 const OK = new Response("OK", { status: 200 });
 
@@ -39,7 +39,7 @@ function orderLines(o: {
   shipping_label: string;
   total: number;
   gateway_trx: string;
-}): { owner: string; buyer: string } {
+}): { owner: string } {
   let items: StoreOrderItem[] = [];
   try {
     items = JSON.parse(o.items) as StoreOrderItem[];
@@ -65,17 +65,7 @@ function orderLines(o: {
     `Ref Duitku: ${o.gateway_trx || "-"}`,
   ].join("\n");
 
-  const buyer = [
-    "Halo, pembayaran pesanan Anda di KTD Store sudah kami terima ✅",
-    "",
-    `No. Pesanan: ${o.id}`,
-    `Total: ${rupiah(o.total)}`,
-    "",
-    "Pesanan sedang kami proses dan akan dikirim ke alamat yang Anda isi.",
-    "Terima kasih sudah belanja di KTD Store!",
-  ].join("\n");
-
-  return { owner, buyer };
+  return { owner };
 }
 
 /** Handler pesanan toko — mengembalikan true bila ref cocok dengan tabel. */
@@ -100,18 +90,13 @@ async function handleStoreOrderCallback(cb: DuitkuCallback): Promise<boolean> {
   if (cb.resultCode === "00") {
     const paid = order.payment_status !== "paid";
     await markStoreOrderPaid(order.id, cb.reference ?? "");
-    // Notifikasi otomatis ke WA bot menggantikan kirim-bukti-manual: detail
-    // pesanan + alamat ke owner, konfirmasi ke pembeli (bila nomor ada).
+    // Notifikasi otomatis hanya ke owner — pembeli mendapat info saat buat
+    // pesanan (langkah pembayaran) dan bisa chat bot untuk status lanjutan.
     if (paid) {
       const lines = orderLines({ ...order, gateway_trx: cb.reference ?? "" });
-      const results = await Promise.allSettled([
-        notifyTopupOwner(lines.owner),
-        order.buyer_phone ? notifyTopupBuyer(order.buyer_phone, lines.buyer) : Promise.resolve("dilewati"),
-      ]);
+      const result = await notifyTopupOwner(lines.owner);
       // Log hasil untuk pemantauan — tidak mengubah respons ke Duitku.
-      console.log(
-        `[checkout] ${order.id} lunas — notif owner=${String(results[0].status)}, buyer=${String(results[1].status)}`,
-      );
+      console.log(`[checkout] ${order.id} lunas — notif owner=${result}`);
     }
   } else if (cb.resultCode === "01") {
     await markStoreOrderFailed(order.id, "Pembayaran gagal");

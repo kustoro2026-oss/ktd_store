@@ -111,28 +111,6 @@ export async function sendWaTemplateParam(
   return { ok: true, waId: data.messages?.[0]?.id };
 }
 
-/** Kirim status transaksi ke pembeli: template utility dulu (bebas window
- *  24 jam), fallback teks biasa bila template belum disetujui Meta.
- *  Mengembalikan keterangan hasil untuk log ("ok (template)" / "ok" /
- *  "gagal: ..."). */
-export async function notifyTopupBuyer(
-  to: string,
-  text: string,
-): Promise<string> {
-  const phone = normalizePhone(to);
-  if (!phone) return "gagal: nomor pembeli tidak valid";
-  if (!waConfigured()) return "gagal: WA_TOKEN / WA_PHONE_NUMBER_ID belum diatur";
-  const param = text.length > 900 ? `${text.slice(0, 900)}...` : text;
-  const tpl = await sendWaTemplateParam(phone, TOPUP_TEMPLATE, param);
-  if (tpl.ok) return "ok (template)";
-  // Catatan: HTTP 200 dari template tidak menjamin terkirim bila WABA tanpa
-  // metode pembayaran — tetap dicatat sebagai "ok (template)" sesuai respons
-  // API; pemantauan nyata via admin /topup/admin.
-  const txt = await sendWaText(phone, text);
-  if (txt.ok) return "ok";
-  return `gagal: ${txt.error ?? tpl.error ?? "ditolak Meta"}`;
-}
-
 /** Notifikasi ke owner (nomor CS toko) — teks dulu (window 24 jam), fallback
  *  template utility. */
 export async function notifyTopupOwner(text: string): Promise<string> {
