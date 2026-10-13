@@ -1,9 +1,9 @@
 // Eksekusi otomatis top-up setelah pembayaran terverifikasi.
 //
 // Alur: cek saldo Digiflazz ≥ cost → transaksi via relay → update status
-// pesanan → notifikasi WA ke pembeli (dan owner bila gagal). Transaksi yang
-// masuk status Pending dicek ulang lewat cron / klik admin dengan ref_id
-// yang sama (idempoten — tidak ada transaksi ganda).
+// pesanan → notifikasi WA ke admin (owner). Transaksi yang masuk status
+// Pending dicek ulang lewat cron / klik admin dengan ref_id yang sama
+// (idempoten — tidak ada transaksi ganda).
 
 import {
   claimTopupExecution,
@@ -16,8 +16,7 @@ import {
 import { digiflazzTopup, shouldRetryFailure, type TopupResult } from "./digiflazz";
 import { formatRupiah } from "./topup";
 import { alertLowBalanceIfNeeded, getBalance, recordBalance } from "./topup-balance";
-import { notifyTopupBuyer, notifyTopupOwner } from "./wa";
-import { whatsappDisplay } from "./config";
+import { notifyTopupOwner } from "./wa";
 import { autoQuarantineIfRepeated } from "./topup-health";
 
 export type ExecuteStep =
@@ -32,11 +31,9 @@ export type ExecuteStep =
 export type ExecuteOutcome = {
   step: ExecuteStep;
   detail: string;
-  /** Keterangan hasil kirim WA (untuk log admin), bila ada. */
+  /** Keterangan hasil kirim WA ke admin (untuk log), bila ada. */
   wa?: string;
 };
-
-const cs = whatsappDisplay();
 
 /** Jalankan eksekusi otomatis satu pesanan (diklaim atomik — aman dipanggil
  *  berulang oleh webhook retry / cron / admin tanpa transaksi ganda). */
@@ -60,16 +57,6 @@ export async function executeTopupOrder(
     await notifyTopupOwner(
       `[Top-up] Pesanan ${order.id} GAGAL dieksekusi (error tak terduga). Cek /topup/admin.`,
     );
-    await notifyTopupBuyer(
-      order.buyer_phone,
-      [
-        `Halo ${order.buyer_name || "Kak"}, maaf top up kamu belum berhasil (kendala teknis).`,
-        `Pesanan: ${order.id}`,
-        `Produk: ${order.product_name}`,
-        "",
-        `Hubungi CS kami ${cs} untuk cek ulang atau pengembalian dana.`,
-      ].join("\n"),
-    );
     return { step: "failed", detail: String(e) };
   }
 }
@@ -85,16 +72,6 @@ async function runExecution(order: TopUpOrder, testing: boolean): Promise<Execut
     const wa = await notifyTopupOwner(
       `[Top-up] Pesanan ${order.id} (${order.product_name}) menunggu cek ulang — cek saldo Digiflazz gagal (${bal.error}). Cron akan mencoba lagi.`,
     );
-    await notifyTopupBuyer(
-      order.buyer_phone,
-      [
-        `Halo ${order.buyer_name || "Kak"}, pembayaran top up kamu sudah kami terima dan sedang diproses.`,
-        `Pesanan: ${order.id}`,
-        `Produk: ${order.product_name}`,
-        "",
-        "Kami kabari lagi setelah top up selesai.",
-      ].join("\n"),
-    );
     return { step: "pending", detail: `cek saldo gagal, ditunda: ${bal.error}`, wa };
   }
   if (bal.balance < order.cost) {
@@ -104,16 +81,6 @@ async function runExecution(order: TopUpOrder, testing: boolean): Promise<Execut
     await finishTopup(order.id, "pending", "", "Saldo Digiflazz kurang — menunggu deposit");
     const wa = await notifyTopupOwner(
       `[Top-up] Saldo Digiflazz kurang untuk pesanan ${order.id}: tersisa ${formatRupiah(bal.balance)}, butuh ${formatRupiah(order.cost)}. Deposit dulu — sistem akan mencoba otomatis setelah saldo cukup.`,
-    );
-    await notifyTopupBuyer(
-      order.buyer_phone,
-      [
-        `Halo ${order.buyer_name || "Kak"}, pembayaran top up kamu sudah kami terima dan sedang diproses.`,
-        `Pesanan: ${order.id}`,
-        `Produk: ${order.product_name}`,
-        "",
-        "Kami kabari lagi setelah top up selesai.",
-      ].join("\n"),
     );
     return {
       step: "pending",
@@ -160,36 +127,14 @@ async function runExecution(order: TopUpOrder, testing: boolean): Promise<Execut
     const wa = await notifyTopupOwner(
       `[Top-up] Pesanan ${order.id} (${order.product_name}) menunggu cek ulang — relay Digiflazz gagal (${res.error}). Cron akan mencoba lagi.`,
     );
-    await notifyTopupBuyer(
-      order.buyer_phone,
-      [
-        `Halo ${order.buyer_name || "Kak"}, pembayaran top up kamu sudah kami terima dan sedang diproses.`,
-        `Pesanan: ${order.id}`,
-        `Produk: ${order.product_name}`,
-        "",
-        "Kami kabari lagi setelah top up selesai.",
-      ].join("\n"),
-    );
     return { step: "pending", detail: `relay gagal, ditunda: ${res.error}`, wa };
   }
 
   // 3. Petakan status Digiflazz.
   if (res.success) {
     await finishTopup(order.id, "success", res.sn);
-    await notifyTopupOwner(
+    const wa = await notifyTopupOwner(
       `[Top-up] Pesanan ${order.id} (${order.product_name}, ${formatRupiah(order.amount)}) LUNAS — top-up SUKSES${res.sn ? ` (SN ${res.sn})` : ""} ke ${order.customer_no}.`,
-    );
-    const wa = await notifyTopupBuyer(
-      order.buyer_phone,
-      [
-        `Halo ${order.buyer_name || "Kak"}, top up kamu berhasil!`,
-        `Pesanan: ${order.id}`,
-        `Produk: ${order.product_name}`,
-        `Tujuan: ${order.customer_no}`,
-        ...(res.sn ? [`SN: ${res.sn}`] : []),
-        "",
-        "Terima kasih sudah belanja di KTD Store.",
-      ].join("\n"),
     );
     // Pantau saldo setelah transaksi — peringatkan owner bila mendekati limit.
     await alertAfterTransaction(res.lastBalance);
@@ -198,18 +143,8 @@ async function runExecution(order: TopUpOrder, testing: boolean): Promise<Execut
 
   if (res.pending) {
     await finishTopup(order.id, "pending", "", res.message || "status Pending Digiflazz");
-    await notifyTopupOwner(
+    const wa = await notifyTopupOwner(
       `[Top-up] Pesanan ${order.id} (${order.product_name}, ${formatRupiah(order.amount)}) LUNAS tetapi status Pending di Digiflazz${res.message ? ` (${res.message})` : ""}. Pantau /topup/admin — sistem cek ulang otomatis.`,
-    );
-    const wa = await notifyTopupBuyer(
-      order.buyer_phone,
-      [
-        `Halo ${order.buyer_name || "Kak"}, pembayaran top up kamu sudah kami terima dan sedang diproses.`,
-        `Pesanan: ${order.id}`,
-        `Produk: ${order.product_name}`,
-        "",
-        "Kami kabari lagi setelah top up selesai.",
-      ].join("\n"),
     );
     return { step: "pending", detail: res.message || "Pending", wa };
   }
@@ -218,17 +153,7 @@ async function runExecution(order: TopUpOrder, testing: boolean): Promise<Execut
   const reason = res.message || res.status || "ditolak Digiflazz";
   const label = percobaan > 1 ? `gagal setelah ${percobaan} percobaan: ${reason}` : reason;
   await finishTopup(order.id, "failed", "", label);
-  const wa = await notifyTopupBuyer(
-    order.buyer_phone,
-    [
-      `Halo ${order.buyer_name || "Kak"}, maaf top up kamu belum berhasil${percobaan > 1 ? " setelah beberapa kali percobaan" : ""} (${reason}).`,
-      `Pesanan: ${order.id}`,
-      `Produk: ${order.product_name}`,
-      "",
-      `Hubungi CS kami ${cs} untuk cek ulang atau pengembalian dana.`,
-    ].join("\n"),
-  );
-  await notifyTopupOwner(
+  const wa = await notifyTopupOwner(
     `[Top-up] Pesanan ${order.id} (${order.product_name}, ${formatRupiah(order.amount)}) GAGAL${percobaan > 1 ? ` setelah ${percobaan} percobaan` : ""}: ${reason}. Tindak lanjut refund via CS.`,
   );
   const q = await autoQuarantineIfRepeated(order.sku, label);
@@ -285,20 +210,8 @@ export async function recheckTopupOrder(order: TopUpOrder): Promise<ExecuteOutco
   }
   if (res.success) {
     await finishTopup(order.id, "success", res.sn);
-    await notifyTopupOwner(
+    const wa = await notifyTopupOwner(
       `[Top-up] Pesanan ${order.id} (${order.product_name}, ${formatRupiah(order.amount)}) SELESAI setelah cek ulang — top-up SUKSES${res.sn ? ` (SN ${res.sn})` : ""} ke ${order.customer_no}.`,
-    );
-    const wa = await notifyTopupBuyer(
-      order.buyer_phone,
-      [
-        `Halo ${order.buyer_name || "Kak"}, kabar baik — top up kamu sudah selesai diproses!`,
-        `Pesanan: ${order.id}`,
-        `Produk: ${order.product_name}`,
-        `Tujuan: ${order.customer_no}`,
-        ...(res.sn ? [`SN: ${res.sn}`] : []),
-        "",
-        "Terima kasih sudah belanja di KTD Store.",
-      ].join("\n"),
     );
     await alertAfterTransaction(res.lastBalance);
     return { step: "success", detail: `sukses ${res.sn ? `(SN ${res.sn})` : ""}`, wa };
@@ -308,17 +221,7 @@ export async function recheckTopupOrder(order: TopUpOrder): Promise<ExecuteOutco
   }
   const reason = res.message || res.status || "ditolak Digiflazz";
   await finishTopup(order.id, "failed", "", reason);
-  const wa = await notifyTopupBuyer(
-    order.buyer_phone,
-    [
-      `Halo ${order.buyer_name || "Kak"}, maaf top up kamu belum berhasil (${reason}).`,
-      `Pesanan: ${order.id}`,
-      `Produk: ${order.product_name}`,
-      "",
-      `Hubungi CS kami ${cs} untuk cek ulang atau pengembalian dana.`,
-    ].join("\n"),
-  );
-  await notifyTopupOwner(
+  const wa = await notifyTopupOwner(
     `[Top-up] Pesanan ${order.id} (${order.product_name}) GAGAL setelah cek ulang: ${reason}.`,
   );
   const q = await autoQuarantineIfRepeated(order.sku, reason);

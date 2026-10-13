@@ -4,8 +4,10 @@
 // QR code QRIS (dari qrString inquiry) atau nomor VA; kanal redirect
 // (e-wallet, kartu, minimarket) memakai tombol buka halaman pembayaran aman.
 // Polling status pesanan tiap 5 detik — status diperbarui server-side oleh
-// webhook Duitku (dibayar → eksekusi otomatis → WA), jadi halaman ini cukup
-// memantau tabel pesanan.
+// webhook Duitku (dibayar → eksekusi otomatis → notifikasi WA admin), jadi
+// halaman ini cukup memantau tabel pesanan. Pembeli tidak dikirimi notifikasi
+// WA (hemat biaya template): konfirmasi & info status lewat chat WhatsApp —
+// pembeli chat duluan, bot membalas gratis dalam window 24 jam.
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
@@ -318,9 +320,28 @@ export default function TopupBayarPage() {
 
               <div className="mt-4 flex flex-col gap-2 border-t border-gray-100 pt-4">
                 {order.payment_qr || order.payment_va ? (
-                  <p className="text-center text-xs text-muted">
-                    Halaman ini otomatis berubah setelah pembayaran terverifikasi.
-                  </p>
+                  <>
+                    <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
+                      <p className="text-sm font-bold text-emerald-800">Sudah Transfer?</p>
+                      <p className="mt-1 text-xs leading-relaxed text-emerald-700">
+                        Kirim konfirmasi melalui WhatsApp — CS kami segera
+                        memproses pesanan Anda.
+                      </p>
+                      <a
+                        href={whatsappLink(
+                          `Min, saya sudah transfer untuk pesanan ${order.id} (${order.product_name}) total ${formatRupiah(order.amount)}. Mohon dicek.`,
+                        )}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-3 inline-flex items-center gap-2 rounded-xl bg-[#25D366] px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-[#1eb85a]"
+                      >
+                        Konfirmasi via WhatsApp <ExternalLink className="h-4 w-4" />
+                      </a>
+                    </div>
+                    <p className="text-center text-xs text-muted">
+                      Halaman ini otomatis berubah setelah pembayaran terverifikasi.
+                    </p>
+                  </>
                 ) : (
                   <>
                     <a
@@ -392,8 +413,8 @@ export default function TopupBayarPage() {
               <p className="mt-2 text-sm leading-relaxed text-emerald-700">
                 Top up {order.product_name} ke {order.customer_no} sudah berhasil
                 dikirim.
-                {order.digiflazz_sn ? ` Nomor SN: ${order.digiflazz_sn}.` : ""} Detail
-                status juga kami kirimkan ke WhatsApp Anda.
+                {order.digiflazz_sn ? ` Nomor SN: ${order.digiflazz_sn}.` : ""} Terima
+                kasih sudah berbelanja di KTD Store.
               </p>
             </div>
           )}

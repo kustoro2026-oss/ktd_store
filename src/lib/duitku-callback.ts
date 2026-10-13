@@ -148,17 +148,9 @@ async function handleTopupOrderCallback(cb: DuitkuCallback): Promise<boolean> {
       `[topup] ${order.id} lunas — eksekusi ${outcome.step}: ${outcome.detail}${outcome.wa ? ` | WA: ${outcome.wa}` : ""}`,
     );
   } else if (cb.resultCode === "01") {
-    const wasPending = order.payment_status === "pending";
     await markOrderPaymentEnded(order.id, "failed", "Pembayaran gagal");
-    if (wasPending && order.buyer_phone) {
-      await notifyTopupBuyer(
-        order.buyer_phone,
-        [
-          `Halo ${order.buyer_name || "Kak"}, pembayaran pesanan ${order.id} (${order.product_name}) gagal atau kedaluwarsa.`,
-          "Silakan buat pesanan baru bila ingin mencoba lagi.",
-        ].join("\n"),
-      );
-    }
+    // Pembeli tidak diberi notifikasi WA (biaya template) — status terlihat
+    // di halaman bayar, dan bot membalas bila pembeli chat duluan.
   }
   // resultCode lain dibiarkan — Duitku akan mengirim callback lagi saat
   // status berubah.

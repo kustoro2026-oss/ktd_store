@@ -376,7 +376,7 @@ export default function NominalPicker({ provider, initialSku }: Props) {
   const validate = (): string | null => {
     if (!nominal) return "Silakan pilih nominal terlebih dahulu.";
     if (!name.trim()) return "Mohon lengkapi Nama pemesan.";
-    if (!phone.trim()) return "Mohon isi No. HP Pemesan (untuk notifikasi WhatsApp).";
+    if (!phone.trim()) return "Mohon isi No. HP Pemesan (untuk konfirmasi pesanan).";
     if (!/^\+?[0-9][0-9\s-]{7,17}$/.test(phone.trim()))
       return "No. HP Pemesan tidak valid.";
     for (const f of schema.fields) {
@@ -724,7 +724,7 @@ export default function NominalPicker({ provider, initialSku }: Props) {
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="08xxxxxxxxxx (untuk notifikasi WhatsApp)"
+                  placeholder="08xxxxxxxxxx (untuk konfirmasi pesanan)"
                   className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-base outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20 sm:text-sm"
                 />
               </div>

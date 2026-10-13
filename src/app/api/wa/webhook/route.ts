@@ -12,6 +12,12 @@
 const GRAPH_VERSION = "v24.0";
 const CATALOG_URL = "https://toko.kustoro2026.com/";
 
+// Endpoint ini hanya cadangan — callback Meta produksi menunjuk ke bot KTD
+// Hub (admin.kustoro2026.com/api/wa/webhook). Bila pesan masuk tetap sampai
+// di sini, cabang top-up di bawah memberi jawaban yang sama seperti bot Hub.
+import { getTopupOrder } from "@/lib/db";
+import { normalizePhone } from "@/lib/wa";
+
 /**
  * Pemetaan ID iklan CTWA (Meta Ads) → URL produk yang diiklankan.
  * Isi tabel ini setiap kali iklan CTWA baru dibuat, contoh:
@@ -107,6 +113,74 @@ function pickReply(m: WaMessage): string {
   return REPLY_GENERAL;
 }
 
+const rupiah = (n: number) => `Rp ${new Intl.NumberFormat("id-ID").format(n)}`;
+
+/** Balasan status pesanan top-up untuk pembeli yang chat duluan (gratis,
+ *  window 24 jam). Pembeli tidak dikirimi notifikasi WA proaktif — balasan
+ *  ini menggantikannya. */
+function topupStatusText(o: {
+  id: string;
+  product_name: string;
+  sku: string;
+  amount: number;
+  payment_status: string;
+  topup_status: string;
+  payment_va: string;
+  payment_qr: string;
+  digiflazz_sn: string;
+}): string {
+  const produk = o.product_name || o.sku;
+  const jumlah = rupiah(o.amount);
+  const garis: string[] = [];
+  if (o.payment_status === "paid") {
+    if (o.topup_status === "success") {
+      garis.push(
+        `Terima kasih atas konfirmasi Anda. Kabar baik — top up ${produk} pada pesanan ${o.id} sudah berhasil diproses.`,
+      );
+      if (o.digiflazz_sn) garis.push(`Nomor SN: ${o.digiflazz_sn}`);
+      garis.push("", "Terima kasih sudah berbelanja di KTD Store.");
+    } else if (o.topup_status === "failed") {
+      garis.push(
+        `Terima kasih atas konfirmasi Anda. Maaf, top up ${produk} pada pesanan ${o.id} belum berhasil diproses.`,
+        "Tim kami sedang menindaklanjuti. Untuk cek ulang atau pengembalian dana, silakan hubungi CS kami.",
+      );
+    } else {
+      garis.push(
+        `Terima kasih atas konfirmasi Anda. Pembayaran pesanan ${o.id} (${produk}) sebesar ${jumlah} sudah kami terima dan top up sedang diproses.`,
+        "Silakan cek kembali statusnya beberapa saat lagi di halaman pembayaran.",
+      );
+    }
+  } else if (o.payment_status === "expired" || o.payment_status === "failed") {
+    garis.push(
+      `Terima kasih atas konfirmasi Anda. Pembayaran pesanan ${o.id} (${produk}) gagal atau telah kedaluwarsa.`,
+      "Silakan buat pesanan baru bila ingin mencoba lagi.",
+    );
+  } else if (o.payment_va) {
+    garis.push(
+      `Terima kasih atas konfirmasi Anda. Pembayaran pesanan ${o.id} (${produk}) sebesar ${jumlah} belum kami terima.`,
+      `Silakan transfer tepat sebesar ${jumlah} ke nomor Virtual Account berikut:`,
+      o.payment_va,
+      "",
+      "Pesanan akan terverifikasi otomatis setelah transfer diterima.",
+    );
+  } else if (o.payment_qr) {
+    garis.push(
+      `Terima kasih atas konfirmasi Anda. Pembayaran pesanan ${o.id} (${produk}) sebesar ${jumlah} belum kami terima.`,
+      "Silakan buka halaman pembayaran untuk memindai kode QRIS:",
+      `https://toko.kustoro2026.com/topup/bayar/${o.id}`,
+      "",
+      "Pesanan akan terverifikasi otomatis setelah pembayaran diterima.",
+    );
+  } else {
+    garis.push(
+      `Terima kasih atas konfirmasi Anda. Pesanan ${o.id} (${produk}) sebesar ${jumlah} masih menunggu pembayaran.`,
+      "Silakan selesaikan pembayaran di halaman pembayaran, atau hubungi CS kami untuk bantuan.",
+    );
+  }
+  garis.push("", "Hormat kami,", "KTD Store");
+  return garis.join("\n");
+}
+
 async function sendText(to: string, body: string): Promise<void> {
   const token = process.env.WA_TOKEN;
   const phoneNumberId = process.env.WA_PHONE_NUMBER_ID;
@@ -165,6 +239,18 @@ export async function POST(request: Request) {
           if (m.type !== "text" || !m.from || !m.text?.body) continue;
           if (!m.id || seenMessageIds.has(m.id)) continue;
           seenMessageIds.add(m.id);
+          // Pesan menyebut No. Pesanan top-up (KTD-xxx) → balas status
+          // pesanan GRATIS dalam window 24 jam dari pesan masuk ini.
+          const tid = m.text.body.match(/\b(KTD-[A-Z0-9]{6,})\b/i)?.[1]?.toUpperCase();
+          if (tid) {
+            const o = await getTopupOrder(tid);
+            const from = normalizePhone(m.from);
+            const buyer = normalizePhone(o?.buyer_phone ?? "");
+            if (o && from && buyer && from === buyer) {
+              await sendText(m.from, topupStatusText(o));
+              continue;
+            }
+          }
           await sendText(m.from, pickReply(m));
         }
       }

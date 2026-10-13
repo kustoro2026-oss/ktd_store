@@ -15,8 +15,8 @@ import { createTopupOrder, newOrderId, newRefId, setOrderPaymentSession } from "
 import { createDuitkuPayment, duitkuConfigured, DUITKU_MIN_AMOUNT } from "@/lib/duitku";
 import { gateBalanceForCost } from "@/lib/topup-balance";
 import { gateProductHealth } from "@/lib/topup-health";
-import { notifyTopupBuyer, notifyTopupOwner } from "@/lib/wa";
-import { SITE_URL, whatsappDisplay, whatsappLink } from "@/lib/config";
+import { notifyTopupOwner } from "@/lib/wa";
+import { SITE_URL, whatsappLink } from "@/lib/config";
 
 export const runtime = "nodejs";
 
@@ -157,55 +157,9 @@ export async function POST(req: Request) {
     ].join("\n"),
   );
 
-  // Kabari pembeli saat pesanan baru dibuat — ajakan untuk segera membayar.
-  // Fire-and-forget; kegagalan WA tidak boleh menggagalkan pesanan.
-  function notifyBuyerOrderCreated(args: {
-    buyerPhone: string;
-    buyerName: string;
-    orderId: string;
-    productName: string;
-    customerNo: string;
-    amount: number;
-    paymentHint: string;
-  }) {
-    after(() => {
-      notifyTopupBuyer(
-        args.buyerPhone,
-        [
-          `Halo ${args.buyerName || "Kak"}, pesanan top up kamu sudah kami terima.`,
-          `No. Pesanan: ${args.orderId}`,
-          `Produk: ${args.productName}`,
-          `Tujuan: ${args.customerNo}`,
-          `Total: ${formatRupiah(args.amount)}`,
-          "",
-          args.paymentHint,
-          "",
-          "Silakan selesaikan pembayaran segera agar pesanan cepat diproses.",
-        ].join("\n"),
-      )
-        .then((r) =>
-          console.log(
-            `[topup] ${args.orderId} WA pembeli saat dibuat (${args.buyerPhone}): ${r}`,
-          ),
-        )
-        .catch(() => {
-          // Notifikasi gagal tidak boleh menggagalkan pesanan.
-        });
-    });
-  }
-
   if (duitkuConfigured()) {
     if (product.sellPrice < DUITKU_MIN_AMOUNT) {
       // Duitku menolak transaksi di bawah Rp 10.000 — arahkan ke WhatsApp.
-      notifyBuyerOrderCreated({
-        buyerPhone,
-        buyerName,
-        orderId,
-        productName: product.name,
-        customerNo,
-        amount: product.sellPrice,
-        paymentHint: `Pembayaran online belum tersedia untuk nominal ini. Silakan hubungi CS kami ${whatsappDisplay()} untuk menyelesaikan pembayaran.`,
-      });
       return NextResponse.json({
         ok: true,
         orderId,
@@ -265,18 +219,6 @@ export async function POST(req: Request) {
         pay.qrString ?? "",
         payChannel,
       );
-      const payPage = `${SITE_URL}/topup/bayar/${orderId}`;
-      notifyBuyerOrderCreated({
-        buyerPhone,
-        buyerName,
-        orderId,
-        productName: product.name,
-        customerNo,
-        amount: product.sellPrice,
-        paymentHint: pay.vaNumber
-          ? `Nomor VA: ${pay.vaNumber}\nBuka halaman bayar: ${payPage}`
-          : `Pindai QRIS di halaman bayar: ${payPage}`,
-      });
       return NextResponse.json({
         ok: true,
         orderId,
@@ -289,15 +231,6 @@ export async function POST(req: Request) {
       });
     }
     // Sesi gagal — pesanan tetap ada; pembeli lanjut via WhatsApp.
-    notifyBuyerOrderCreated({
-      buyerPhone,
-      buyerName,
-      orderId,
-      productName: product.name,
-      customerNo,
-      amount: product.sellPrice,
-      paymentHint: `Pembayaran online sedang bermasalah. Silakan hubungi CS kami ${whatsappDisplay()} untuk menyelesaikan pembayaran.`,
-    });
     return NextResponse.json({
       ok: true,
       orderId,
@@ -307,14 +240,5 @@ export async function POST(req: Request) {
     });
   }
 
-  notifyBuyerOrderCreated({
-    buyerPhone,
-    buyerName,
-    orderId,
-    productName: product.name,
-    customerNo,
-    amount: product.sellPrice,
-    paymentHint: `Pembayaran online belum tersedia. Silakan hubungi CS kami ${whatsappDisplay()} untuk menyelesaikan pembayaran.`,
-  });
   return NextResponse.json({ ok: true, orderId, mode: "wa", waLink });
 }

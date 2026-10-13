@@ -14,10 +14,7 @@ import {
   finishTopup,
   getTopupOrderByRef,
 } from "./db";
-import { notifyTopupBuyer, notifyTopupOwner } from "./wa";
-import { whatsappDisplay } from "./config";
-
-const cs = whatsappDisplay();
+import { notifyTopupOwner } from "./wa";
 
 // ---------- token ----------
 
@@ -209,17 +206,8 @@ export async function processDigiflazzWebhook(
 
   if (mapped === "success") {
     await finishTopup(o.id, "success", parsed.sn, "");
-    const wa = await notifyTopupBuyer(
-      o.buyer_phone,
-      [
-        `Halo ${o.buyer_name || "Kak"}, kabar baik — top up kamu sudah selesai diproses!`,
-        `Pesanan: ${o.id}`,
-        `Produk: ${o.product_name}`,
-        `Tujuan: ${o.customer_no}`,
-        ...(parsed.sn ? [`SN: ${parsed.sn}`] : []),
-        "",
-        "Terima kasih sudah belanja di KTD Store.",
-      ].join("\n"),
+    await notifyTopupOwner(
+      `[Top-up] Webhook Digiflazz: pesanan ${o.id} (${o.product_name}) SUKSES${parsed.sn ? ` (SN ${parsed.sn})` : ""} ke ${o.customer_no}.`,
     );
     return {
       ok: true,
@@ -228,23 +216,13 @@ export async function processDigiflazzWebhook(
       orderStatusSekarang: sekarang,
       mapped,
       ditulis: true,
-      detail: `${detail} (WA: ${wa ? "terkirim" : "tanpa nomor"})`,
+      detail: `${detail} (owner diberi tahu)`,
     };
   }
 
   if (mapped === "failed") {
     const reason = parsed.message || parsed.status || "ditolak Digiflazz";
     await finishTopup(o.id, "failed", "", reason);
-    await notifyTopupBuyer(
-      o.buyer_phone,
-      [
-        `Halo ${o.buyer_name || "Kak"}, maaf top up kamu belum berhasil (${reason}).`,
-        `Pesanan: ${o.id}`,
-        `Produk: ${o.product_name}`,
-        "",
-        `Hubungi CS kami ${cs} untuk cek ulang atau pengembalian dana.`,
-      ].join("\n"),
-    );
     await notifyTopupOwner(
       `[Top-up] Webhook Digiflazz: pesanan ${o.id} (${o.product_name}) GAGAL: ${reason}. Tindak lanjut refund via CS.`,
     );
@@ -255,7 +233,7 @@ export async function processDigiflazzWebhook(
       orderStatusSekarang: sekarang,
       mapped,
       ditulis: true,
-      detail: `${detail} (pembeli + owner diberi tahu)`,
+      detail: `${detail} (owner diberi tahu)`,
     };
   }
 
