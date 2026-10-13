@@ -18,7 +18,14 @@ export async function GET(req: Request) {
   const amount = Number(url.searchParams.get("amount")) || DUITKU_MIN_AMOUNT;
   try {
     const methods = await getDuitkuPaymentMethods(amount);
-    return NextResponse.json({ ok: true, methods });
+    // Penanda untuk picker top-up: false = kanal VA disembunyikan (hanya
+    // QRIS) karena fee flat VA memakan margin nominal kecil. Checkout produk
+    // fisik tidak membaca penanda ini — hanya NominalPicker top-up.
+    return NextResponse.json({
+      ok: true,
+      methods,
+      vaEnabled: process.env.TOPUP_VA_ENABLED === "true",
+    });
   } catch (e) {
     console.error("GET /api/duitku/methods error:", e);
     return NextResponse.json({ ok: false, methods: [] });

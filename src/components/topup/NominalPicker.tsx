@@ -189,6 +189,9 @@ export default function NominalPicker({ provider, initialSku }: Props) {
   const [openChannel, setOpenChannel] = useState<string | null>(null);
   /** Daftar metode pembayaran aktif (kode + logo resmi gateway). */
   const [duitkuMethods, setDuitkuMethods] = useState<DuitkuPaymentMethod[]>([]);
+  /** Kanal VA diizinkan untuk top-up? Dikendalikan env TOPUP_VA_ENABLED di
+   *  server (false = hanya QRIS — fee flat VA memakan margin nominal kecil). */
+  const [vaEnabled, setVaEnabled] = useState(true);
 
   // Skema input provider (field per produk ala itemku) + ikon item nominal.
   const schema = fieldsForProvider(provider.slug);
@@ -264,9 +267,14 @@ export default function NominalPicker({ provider, initialSku }: Props) {
       nominal && nominal.sellPrice >= WA_MIN ? `?amount=${nominal.sellPrice}` : "";
     fetch(`/api/duitku/methods${amount}`, { cache: "no-store" })
       .then((r) => r.json())
-      .then((j: { ok?: boolean; methods?: DuitkuPaymentMethod[] }) => {
-        if (j.ok && Array.isArray(j.methods)) setDuitkuMethods(j.methods);
-      })
+      .then(
+        (j: { ok?: boolean; methods?: DuitkuPaymentMethod[]; vaEnabled?: boolean }) => {
+          if (j.ok && Array.isArray(j.methods)) {
+            setDuitkuMethods(j.methods);
+            if (j.vaEnabled === false) setVaEnabled(false);
+          }
+        },
+      )
       .catch(() => {
         // Gateway belum siap — fallback kanal SP/VA ditangani server.
       });
@@ -336,8 +344,11 @@ export default function NominalPicker({ provider, initialSku }: Props) {
   const isWaOnly = nominal !== null && nominal.sellPrice < WA_MIN;
 
   // ─── Picker metode pembayaran (pola sama dengan checkout produk) ───────
-  /** Baris kategori dari daftar kanal aktif (urutan tetap). */
-  const rows = duitkuRows(duitkuMethods);
+  /** Baris kategori dari daftar kanal aktif (urutan tetap). Saat VA nonaktif
+   *  (env TOPUP_VA_ENABLED=false) hanya QRIS yang ditawarkan. */
+  const rows = vaEnabled
+    ? duitkuRows(duitkuMethods)
+    : duitkuRows(duitkuMethods).filter((r) => r.key === "qris");
   /** Kanal yang dipakai saat pesanan dikirim: pilihan pembeli, atau QRIS
    *  pertama yang aktif bila pembeli belum memilih. */
   const effectiveProvider =
@@ -970,6 +981,17 @@ export default function NominalPicker({ provider, initialSku }: Props) {
                         <ChevronRight className="h-4 w-4 shrink-0 text-muted-2" />
                       </button>
                     ))}
+                  </div>
+                ) : !vaEnabled ? (
+                  /* VA nonaktif & QRIS belum aktif — info pengajuan, pesanan
+                     tetap bisa lewat WhatsApp. */
+                  <div className="flex items-start gap-2.5 rounded-xl border border-amber-100 bg-amber-50 p-3">
+                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                    <p className="text-xs leading-relaxed text-amber-800">
+                      Pembayaran online (QRIS) sedang dalam proses pengajuan
+                      aktivasi. Untuk sementara, pesanan Anda akan diproses via
+                      WhatsApp — CS kami siap memandu pembayaran hingga selesai.
+                    </p>
                   </div>
                 ) : (
                   /* Daftar kanal belum termuat — tampilkan default QRIS. */

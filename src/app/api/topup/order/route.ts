@@ -13,6 +13,7 @@ import { TOPUP_PRODUCTS, formatRupiah, providerForSku } from "@/lib/topup";
 import { composeCustomerNo, fieldsForProvider } from "@/lib/topup-fields";
 import { createTopupOrder, newOrderId, newRefId, setOrderPaymentSession } from "@/lib/db";
 import { createDuitkuPayment, duitkuConfigured, DUITKU_MIN_AMOUNT } from "@/lib/duitku";
+import { QRIS_CODES } from "@/lib/duitku-channels";
 import { gateBalanceForCost } from "@/lib/topup-balance";
 import { gateProductHealth } from "@/lib/topup-health";
 import { notifyTopupOwner } from "@/lib/wa";
@@ -187,9 +188,15 @@ export async function POST(req: Request) {
     const channelWanted = String(body.paymentChannel ?? "")
       .trim()
       .toUpperCase();
+    // Kanal VA untuk top-up dikendalikan env TOPUP_VA_ENABLED — nominal kecil
+    // (margin 5-10%) terbukti RUGI lewat VA: fee flat Rp 4.000 per transaksi
+    // dipotong dari settlement (bukti transaksi nyata dana10000, 13 Okt 2026).
+    // Saat nonaktif hanya kanal QRIS yang dicoba; bila QRIS belum aktif,
+    // pesanan jatuh ke mode WhatsApp dengan info pengajuan.
+    const VA_ENABLED = process.env.TOPUP_VA_ENABLED === "true";
     const attempts = [
       ...new Set(channelWanted ? [channelWanted, "SP", "VA"] : ["SP", "VA"]),
-    ];
+    ].filter((code) => VA_ENABLED || QRIS_CODES.has(code));
     let pay: Awaited<ReturnType<typeof createDuitkuPayment>> | null = null;
     let payChannel = "";
     for (const code of attempts) {
@@ -236,7 +243,9 @@ export async function POST(req: Request) {
       orderId,
       mode: "wa",
       waLink,
-      gatewayError: pay?.error ?? "sesi pembayaran online gagal dibuat",
+      gatewayError: VA_ENABLED
+        ? pay?.error ?? "sesi pembayaran online gagal dibuat"
+        : "Pembayaran online (QRIS) sedang dalam proses pengajuan aktivasi — pesanan diproses via WhatsApp.",
     });
   }
 
