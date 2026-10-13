@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Clock,
   Gamepad2,
+  HandCoins,
   Headphones,
   Search,
   ShieldCheck,
@@ -45,6 +46,7 @@ const TOTAL_NOMINALS = TOPUP_PROVIDERS.reduce((a, p) => a + p.nominals.length, 0
 const TRUST = [
   { icon: ShieldCheck, title: "Transaksi Aman", sub: "Pembayaran terverifikasi otomatis" },
   { icon: Zap, title: "Proses Otomatis", sub: "Saldo masuk dalam hitungan menit" },
+  { icon: HandCoins, title: "Jaminan Uang Kembali", sub: "Dijamin dikembalikan 100% tanpa potongan" },
   { icon: Headphones, title: "Bantuan CS", sub: "Siap membantu via WhatsApp" },
 ];
 
@@ -377,7 +379,7 @@ export default function TopUpHome() {
           </div>
 
           {/* Trust bar — kartu */}
-          <div className="mx-auto mt-8 grid max-w-3xl gap-3 text-left sm:grid-cols-3">
+          <div className="mx-auto mt-8 grid max-w-4xl gap-3 text-left sm:grid-cols-2 lg:grid-cols-4">
             {TRUST.map((t) => (
               <div
                 key={t.title}
