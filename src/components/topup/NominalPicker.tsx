@@ -195,8 +195,9 @@ export default function NominalPicker({ provider, initialSku }: Props) {
   const [vaAllowed, setVaAllowed] = useState<boolean | null>(null);
   /** Saklar global VA dari server (true = VA aktif untuk nominal besar). */
   const [vaEnabled, setVaEnabled] = useState(true);
-  /** Harga jual minimal untuk pembayaran online (pesan info ke pembeli). */
-  const [vaMinSell, setVaMinSell] = useState<number | null>(null);
+  /** Harga jual minimal pembayaran online per kategori (pesan info). */
+  const [vaMinGame, setVaMinGame] = useState<number>(49500);
+  const [vaMinOther, setVaMinOther] = useState<number>(94500);
 
   // Skema input provider (field per produk ala itemku) + ikon item nominal.
   const schema = fieldsForProvider(provider.slug);
@@ -281,13 +282,15 @@ export default function NominalPicker({ provider, initialSku }: Props) {
           methods?: DuitkuPaymentMethod[];
           vaEnabled?: boolean;
           vaAllowed?: boolean;
-          vaMinSell?: number;
+          vaMinGame?: number;
+          vaMinOther?: number;
         }) => {
           if (j.ok && Array.isArray(j.methods)) {
             setDuitkuMethods(j.methods);
             setVaEnabled(j.vaEnabled !== false);
             setVaAllowed(j.vaAllowed === true);
-            setVaMinSell(typeof j.vaMinSell === "number" ? j.vaMinSell : null);
+            if (typeof j.vaMinGame === "number") setVaMinGame(j.vaMinGame);
+            if (typeof j.vaMinOther === "number") setVaMinOther(j.vaMinOther);
           }
         },
       )
@@ -1007,9 +1010,11 @@ export default function NominalPicker({ provider, initialSku }: Props) {
                     <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
                     <p className="text-xs leading-relaxed text-amber-800">
                       {vaEnabled
-                        ? `Pembayaran online tersedia untuk nominal mulai ${formatRupiah(
-                            vaMinSell ?? 50000,
-                          )} — nominal yang Anda pilih diproses via WhatsApp, CS kami siap memandu pembayaran hingga selesai.`
+                        ? `Untuk sementara, transaksi isi saldo di bawah ${formatRupiah(
+                            vaMinOther,
+                          )} dan top up game di bawah ${formatRupiah(
+                            vaMinGame,
+                          )} belum dapat menggunakan pembayaran online karena sedang pengajuan aktivasi QRIS. Pesanan Anda diproses via WhatsApp — CS kami siap memandu pembayaran hingga selesai.`
                         : "Pembayaran online (QRIS) sedang dalam proses pengajuan aktivasi — pesanan Anda diproses via WhatsApp, CS kami siap memandu pembayaran hingga selesai."}
                     </p>
                   </div>

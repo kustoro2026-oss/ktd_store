@@ -249,10 +249,12 @@ export async function POST(req: Request) {
       gatewayError: VA_SAFE
         ? pay?.error ?? "sesi pembayaran online gagal dibuat"
         : VA_ENABLED
-          ? `Pembayaran online tersedia untuk nominal mulai ${formatRupiah(
-              vaMinSellForCategory(product.category),
-            )} — pesanan Anda diproses via WhatsApp.`
-          : "Pembayaran online (QRIS) sedang dalam proses pengajuan aktivasi — pesanan diproses via WhatsApp.",
+          ? `Untuk sementara, transaksi isi saldo di bawah ${formatRupiah(
+              vaMinSellForCategory("pulsa"),
+            )} dan top up game di bawah ${formatRupiah(
+              vaMinSellForCategory("game"),
+            )} belum dapat menggunakan pembayaran online karena sedang pengajuan aktivasi QRIS. Pesanan Anda diproses via WhatsApp — CS kami siap memandu pembayaran hingga selesai.`
+          : "Pembayaran online (QRIS) sedang dalam proses pengajuan aktivasi — pesanan Anda diproses via WhatsApp, CS kami siap memandu pembayaran hingga selesai.",
     });
   }
 
