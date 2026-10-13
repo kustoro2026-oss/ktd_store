@@ -12,7 +12,7 @@ import { NextResponse } from "next/server";
 import { TOPUP_PRODUCTS, formatRupiah, providerForSku } from "@/lib/topup";
 import { composeCustomerNo, fieldsForProvider } from "@/lib/topup-fields";
 import { createTopupOrder, newOrderId, newRefId, setOrderPaymentSession } from "@/lib/db";
-import { createDuitkuPayment, duitkuConfigured, DUITKU_MIN_AMOUNT } from "@/lib/duitku";
+import { createDuitkuPayment, duitkuConfigured, DUITKU_MIN_AMOUNT, vaSafeForGross } from "@/lib/duitku";
 import { QRIS_CODES } from "@/lib/duitku-channels";
 import { gateBalanceForCost } from "@/lib/topup-balance";
 import { gateProductHealth } from "@/lib/topup-health";
@@ -188,15 +188,18 @@ export async function POST(req: Request) {
     const channelWanted = String(body.paymentChannel ?? "")
       .trim()
       .toUpperCase();
-    // Kanal VA untuk top-up dikendalikan env TOPUP_VA_ENABLED — nominal kecil
-    // (margin 5-10%) terbukti RUGI lewat VA: fee flat Rp 4.000 per transaksi
-    // dipotong dari settlement (bukti transaksi nyata dana10000, 13 Okt 2026).
-    // Saat nonaktif hanya kanal QRIS yang dicoba; bila QRIS belum aktif,
-    // pesanan jatuh ke mode WhatsApp dengan info pengajuan.
+    // Kanal VA untuk top-up dikendalikan env TOPUP_VA_ENABLED, TETAPI nominal
+    // kecil tetap dilarang walau VA aktif: fee flat VA (terbukti Rp 4.000 dari
+    // settlement transaksi nyata dana10000, 13 Okt 2026) memakan margin 5-10%.
+    // VA hanya dicoba bila margin kotor (sell − cost) menutup ambang
+    // VA_MIN_GROSS (default 4.500). Nominal di bawah ambang jatuh ke QRIS,
+    // lalu ke WhatsApp dengan info pengajuan bila QRIS belum aktif.
     const VA_ENABLED = process.env.TOPUP_VA_ENABLED === "true";
+    const VA_SAFE =
+      VA_ENABLED && vaSafeForGross(product.sellPrice, product.costPrice);
     const attempts = [
       ...new Set(channelWanted ? [channelWanted, "SP", "VA"] : ["SP", "VA"]),
-    ].filter((code) => VA_ENABLED || QRIS_CODES.has(code));
+    ].filter((code) => VA_SAFE || QRIS_CODES.has(code));
     let pay: Awaited<ReturnType<typeof createDuitkuPayment>> | null = null;
     let payChannel = "";
     for (const code of attempts) {
@@ -243,7 +246,7 @@ export async function POST(req: Request) {
       orderId,
       mode: "wa",
       waLink,
-      gatewayError: VA_ENABLED
+      gatewayError: VA_SAFE
         ? pay?.error ?? "sesi pembayaran online gagal dibuat"
         : "Pembayaran online (QRIS) sedang dalam proses pengajuan aktivasi — pesanan diproses via WhatsApp.",
     });

@@ -189,9 +189,10 @@ export default function NominalPicker({ provider, initialSku }: Props) {
   const [openChannel, setOpenChannel] = useState<string | null>(null);
   /** Daftar metode pembayaran aktif (kode + logo resmi gateway). */
   const [duitkuMethods, setDuitkuMethods] = useState<DuitkuPaymentMethod[]>([]);
-  /** Kanal VA diizinkan untuk top-up? Dikendalikan env TOPUP_VA_ENABLED di
-   *  server (false = hanya QRIS — fee flat VA memakan margin nominal kecil). */
-  const [vaEnabled, setVaEnabled] = useState(true);
+  /** Kanal VA diizinkan untuk nominal terpilih? Dihitung server dari env
+   *  TOPUP_VA_ENABLED + ambang margin VA_MIN_GROSS (null = belum termuat —
+   *  VA disembunyikan dulu agar nominal kecil tidak bisa memilih VA). */
+  const [vaAllowed, setVaAllowed] = useState<boolean | null>(null);
 
   // Skema input provider (field per produk ala itemku) + ikon item nominal.
   const schema = fieldsForProvider(provider.slug);
@@ -258,20 +259,23 @@ export default function NominalPicker({ provider, initialSku }: Props) {
   }, []);
 
   // Muat daftar metode pembayaran aktif (logo QRIS / bank) untuk picker
-  // kanal di panel beli — sekali saja; respons ter-cache 10 menit di server.
-  // Nominal praseleksi (bila ada) ikut dikirim agar daftar kanal sesuai
-  // jumlah tagihan.
+  // kanal di panel beli — diulang tiap nominal dipilih agar penanda vaAllowed
+  // (VA aman/tidak untuk nominal itu) selalu mutakhir; respons ter-cache 10
+  // menit di server. Saat nominal berubah, VA disembunyikan dulu sampai
+  // server mengonfirmasi (nominal kecil tidak boleh sempat memilih VA).
   useEffect(() => {
-    if (duitkuMethods.length) return;
-    const amount =
-      nominal && nominal.sellPrice >= WA_MIN ? `?amount=${nominal.sellPrice}` : "";
-    fetch(`/api/duitku/methods${amount}`, { cache: "no-store" })
+    setVaAllowed(null);
+    const current = provider.nominals.find((n) => n.sku === sku) ?? null;
+    const params = current
+      ? `?sku=${encodeURIComponent(current.sku)}&amount=${current.sellPrice}`
+      : "";
+    fetch(`/api/duitku/methods${params}`, { cache: "no-store" })
       .then((r) => r.json())
       .then(
-        (j: { ok?: boolean; methods?: DuitkuPaymentMethod[]; vaEnabled?: boolean }) => {
+        (j: { ok?: boolean; methods?: DuitkuPaymentMethod[]; vaAllowed?: boolean }) => {
           if (j.ok && Array.isArray(j.methods)) {
             setDuitkuMethods(j.methods);
-            if (j.vaEnabled === false) setVaEnabled(false);
+            setVaAllowed(j.vaAllowed === true);
           }
         },
       )
@@ -279,7 +283,7 @@ export default function NominalPicker({ provider, initialSku }: Props) {
         // Gateway belum siap — fallback kanal SP/VA ditangani server.
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [duitkuMethods.length]);
+  }, [provider.slug, sku]);
 
   const selectTab = (c: TopUpCategory) => {
     setTab(c);
@@ -344,9 +348,10 @@ export default function NominalPicker({ provider, initialSku }: Props) {
   const isWaOnly = nominal !== null && nominal.sellPrice < WA_MIN;
 
   // ─── Picker metode pembayaran (pola sama dengan checkout produk) ───────
-  /** Baris kategori dari daftar kanal aktif (urutan tetap). Saat VA nonaktif
-   *  (env TOPUP_VA_ENABLED=false) hanya QRIS yang ditawarkan. */
-  const rows = vaEnabled
+  /** Baris kategori dari daftar kanal aktif (urutan tetap). VA hanya
+   *  ditawarkan bila server mengizinkan untuk nominal terpilih (vaAllowed —
+   *  saklar TOPUP_VA_ENABLED + ambang margin VA_MIN_GROSS). */
+  const rows = vaAllowed
     ? duitkuRows(duitkuMethods)
     : duitkuRows(duitkuMethods).filter((r) => r.key === "qris");
   /** Kanal yang dipakai saat pesanan dikirim: pilihan pembeli, atau QRIS
@@ -982,9 +987,10 @@ export default function NominalPicker({ provider, initialSku }: Props) {
                       </button>
                     ))}
                   </div>
-                ) : !vaEnabled ? (
-                  /* VA nonaktif & QRIS belum aktif — info pengajuan, pesanan
-                     tetap bisa lewat WhatsApp. */
+                ) : vaAllowed === false ? (
+                  /* VA tidak tersedia untuk nominal ini (atau nonaktif global)
+                     & QRIS belum aktif — info pengajuan, pesanan tetap bisa
+                     lewat WhatsApp. */
                   <div className="flex items-start gap-2.5 rounded-xl border border-amber-100 bg-amber-50 p-3">
                     <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
                     <p className="text-xs leading-relaxed text-amber-800">

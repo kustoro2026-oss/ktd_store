@@ -38,6 +38,20 @@ export function duitkuPaymentMethod(): string {
 /** Nominal minimum transaksi Duitku (Rp). */
 export const DUITKU_MIN_AMOUNT = 10_000;
 
+/** Ambang margin kotor (sellPrice − costPrice) minimal agar nominal layak
+ *  lewat kanal VA: fee flat VA dipotong dari settlement dan TIDAK terlihat
+ *  di API mana pun (bukti transaksi nyata 13 Okt 2026: fee M2 Mandiri VA =
+ *  4.000; rentang estimasi kanal lain 3.500–4.500). Default 4.500 = tidak
+ *  pernah rugi; override via env TOPUP_VA_MIN_GROSS. */
+const _rawMinGross = Number(process.env.TOPUP_VA_MIN_GROSS);
+export const VA_MIN_GROSS =
+  Number.isFinite(_rawMinGross) && _rawMinGross > 0 ? _rawMinGross : 4_500;
+
+/** True bila margin kotor produk menutup fee flat VA (aman lewat VA). */
+export function vaSafeForGross(sellPrice: number, costPrice: number): boolean {
+  return sellPrice - costPrice >= VA_MIN_GROSS;
+}
+
 /** HMAC-SHA256 hex huruf kecil — dipakai untuk semua signature Duitku. */
 function duitkuSign(parts: (string | number)[]): string {
   return createHmac("sha256", process.env.DUITKU_API_KEY ?? "")

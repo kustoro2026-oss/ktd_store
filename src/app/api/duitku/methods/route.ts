@@ -6,7 +6,9 @@ import {
   duitkuConfigured,
   getDuitkuPaymentMethods,
   DUITKU_MIN_AMOUNT,
+  vaSafeForGross,
 } from "@/lib/duitku";
+import { TOPUP_PRODUCTS } from "@/lib/topup";
 
 export const runtime = "nodejs";
 
@@ -16,16 +18,23 @@ export async function GET(req: Request) {
   }
   const url = new URL(req.url);
   const amount = Number(url.searchParams.get("amount")) || DUITKU_MIN_AMOUNT;
+  const sku = String(url.searchParams.get("sku") ?? "").trim();
   try {
     const methods = await getDuitkuPaymentMethods(amount);
-    // Penanda untuk picker top-up: false = kanal VA disembunyikan (hanya
-    // QRIS) karena fee flat VA memakan margin nominal kecil. Checkout produk
-    // fisik tidak membaca penanda ini — hanya NominalPicker top-up.
-    return NextResponse.json({
-      ok: true,
-      methods,
-      vaEnabled: process.env.TOPUP_VA_ENABLED === "true",
-    });
+    // Penanda untuk picker top-up: vaEnabled = saklar global env
+    // TOPUP_VA_ENABLED; vaAllowed = VA diizinkan untuk SKU nominal terpilih
+    // (selain saklar, margin kotor harus menutup fee flat VA — VA_MIN_GROSS).
+    // Checkout produk fisik tidak membaca penanda ini — hanya NominalPicker.
+    const vaEnabled = process.env.TOPUP_VA_ENABLED === "true";
+    let vaAllowed = vaEnabled;
+    if (sku) {
+      const product = TOPUP_PRODUCTS.find((p) => p.sku === sku);
+      vaAllowed =
+        vaEnabled &&
+        !!product &&
+        vaSafeForGross(product.sellPrice, product.costPrice);
+    }
+    return NextResponse.json({ ok: true, methods, vaEnabled, vaAllowed });
   } catch (e) {
     console.error("GET /api/duitku/methods error:", e);
     return NextResponse.json({ ok: false, methods: [] });
