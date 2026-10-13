@@ -143,9 +143,22 @@ async function handleTopupOrderCallback(cb: DuitkuCallback): Promise<boolean> {
     await markOrderPaid(order.id, cb.reference ?? "");
     // Eksekusi inline — total roundtrip Digiflazz singkat; bila terpotong
     // timeout, retry Duitku masuk ke claim yang sama (idempoten).
-    await executeTopupOrder(order.id);
+    const outcome = await executeTopupOrder(order.id);
+    console.log(
+      `[topup] ${order.id} lunas — eksekusi ${outcome.step}: ${outcome.detail}${outcome.wa ? ` | WA: ${outcome.wa}` : ""}`,
+    );
   } else if (cb.resultCode === "01") {
+    const wasPending = order.payment_status === "pending";
     await markOrderPaymentEnded(order.id, "failed", "Pembayaran gagal");
+    if (wasPending && order.buyer_phone) {
+      await notifyTopupBuyer(
+        order.buyer_phone,
+        [
+          `Halo ${order.buyer_name || "Kak"}, pembayaran pesanan ${order.id} (${order.product_name}) gagal atau kedaluwarsa.`,
+          "Silakan buat pesanan baru bila ingin mencoba lagi.",
+        ].join("\n"),
+      );
+    }
   }
   // resultCode lain dibiarkan — Duitku akan mengirim callback lagi saat
   // status berubah.

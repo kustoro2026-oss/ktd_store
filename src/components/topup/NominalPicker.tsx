@@ -376,6 +376,9 @@ export default function NominalPicker({ provider, initialSku }: Props) {
   const validate = (): string | null => {
     if (!nominal) return "Silakan pilih nominal terlebih dahulu.";
     if (!name.trim()) return "Mohon lengkapi Nama pemesan.";
+    if (!phone.trim()) return "Mohon isi No. HP Pemesan (untuk notifikasi WhatsApp).";
+    if (!/^\+?[0-9][0-9\s-]{7,17}$/.test(phone.trim()))
+      return "No. HP Pemesan tidak valid.";
     for (const f of schema.fields) {
       const val = fieldValue(f.key).trim();
       if (!val) {
@@ -714,7 +717,7 @@ export default function NominalPicker({ provider, initialSku }: Props) {
               </div>
               <div>
                 <label htmlFor="np-phone" className="mb-1.5 block text-sm font-semibold text-ink">
-                  No. HP Pemesan
+                  No. HP Pemesan <span className="text-red-500">*</span>
                 </label>
                 <input
                   id="np-phone"

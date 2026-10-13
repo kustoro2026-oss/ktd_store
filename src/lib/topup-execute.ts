@@ -60,6 +60,16 @@ export async function executeTopupOrder(
     await notifyTopupOwner(
       `[Top-up] Pesanan ${order.id} GAGAL dieksekusi (error tak terduga). Cek /topup/admin.`,
     );
+    await notifyTopupBuyer(
+      order.buyer_phone,
+      [
+        `Halo ${order.buyer_name || "Kak"}, maaf top up kamu belum berhasil (kendala teknis).`,
+        `Pesanan: ${order.id}`,
+        `Produk: ${order.product_name}`,
+        "",
+        `Hubungi CS kami ${cs} untuk cek ulang atau pengembalian dana.`,
+      ].join("\n"),
+    );
     return { step: "failed", detail: String(e) };
   }
 }
@@ -166,6 +176,9 @@ async function runExecution(order: TopUpOrder, testing: boolean): Promise<Execut
   // 3. Petakan status Digiflazz.
   if (res.success) {
     await finishTopup(order.id, "success", res.sn);
+    await notifyTopupOwner(
+      `[Top-up] Pesanan ${order.id} (${order.product_name}, ${formatRupiah(order.amount)}) LUNAS — top-up SUKSES${res.sn ? ` (SN ${res.sn})` : ""} ke ${order.customer_no}.`,
+    );
     const wa = await notifyTopupBuyer(
       order.buyer_phone,
       [
@@ -185,6 +198,9 @@ async function runExecution(order: TopUpOrder, testing: boolean): Promise<Execut
 
   if (res.pending) {
     await finishTopup(order.id, "pending", "", res.message || "status Pending Digiflazz");
+    await notifyTopupOwner(
+      `[Top-up] Pesanan ${order.id} (${order.product_name}, ${formatRupiah(order.amount)}) LUNAS tetapi status Pending di Digiflazz${res.message ? ` (${res.message})` : ""}. Pantau /topup/admin — sistem cek ulang otomatis.`,
+    );
     const wa = await notifyTopupBuyer(
       order.buyer_phone,
       [
@@ -269,6 +285,9 @@ export async function recheckTopupOrder(order: TopUpOrder): Promise<ExecuteOutco
   }
   if (res.success) {
     await finishTopup(order.id, "success", res.sn);
+    await notifyTopupOwner(
+      `[Top-up] Pesanan ${order.id} (${order.product_name}, ${formatRupiah(order.amount)}) SELESAI setelah cek ulang — top-up SUKSES${res.sn ? ` (SN ${res.sn})` : ""} ke ${order.customer_no}.`,
+    );
     const wa = await notifyTopupBuyer(
       order.buyer_phone,
       [
