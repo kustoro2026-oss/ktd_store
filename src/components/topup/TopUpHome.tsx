@@ -270,8 +270,8 @@ export default function TopUpHome() {
 
           {/* Search bar besar */}
           <form onSubmit={submitSearch} className="relative mx-auto mt-6 max-w-2xl text-left">
-            <div className="flex items-center overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-md transition-all focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20 focus-within:shadow-lg">
-              <Search className="ml-4 h-5 w-5 shrink-0 text-muted-2" />
+            <div className="flex items-center overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition-all duration-200 hover:border-gray-300 focus-within:border-brand/70 focus-within:shadow-lg focus-within:ring-4 focus-within:ring-brand/10">
+              <Search className="ml-4 h-5 w-5 shrink-0 text-muted-2 transition-colors" />
               <input
                 value={query}
                 onChange={(e) => {
@@ -290,11 +290,11 @@ export default function TopUpHome() {
                 aria-autocomplete="list"
                 aria-controls="topup-search-results"
                 aria-expanded={open}
-                className="min-w-0 w-full px-3 py-3.5 text-base text-ink outline-none placeholder:text-muted-2 sm:text-sm"
+                className="min-w-0 w-full bg-transparent px-3 py-3.5 text-base text-ink outline-none placeholder:text-muted-2 sm:text-sm"
               />
               <button
                 type="submit"
-                className="m-1.5 flex shrink-0 items-center gap-1.5 rounded-xl bg-brand px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-brand-2"
+                className="m-1.5 flex shrink-0 items-center gap-1.5 rounded-xl bg-brand px-4 py-2.5 text-sm font-bold text-white transition-all duration-200 hover:bg-brand-2 active:scale-[0.98]"
               >
                 <Search className="h-4 w-4 sm:hidden" />
                 <span>Cari</span>

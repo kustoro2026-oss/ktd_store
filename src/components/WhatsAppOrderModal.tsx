@@ -35,6 +35,7 @@ import { getPaymentGuide } from "@/lib/payment-guides";
 import { pixelContact, pixelInitiateCheckout, pixelLead } from "@/lib/meta-pixel";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
 import { channelCategory, duitkuRows } from "@/lib/duitku-channels";
+import { INPUT_CLS } from "@/lib/ui";
 
 // ─── localStorage: simpan data pembeli untuk auto-fill ──────────────────
 
@@ -128,8 +129,7 @@ type RateGroup = {
   results: Rate[];
 };
 
-const inputCls =
-  "w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-ink outline-none transition-colors placeholder:text-muted-2 focus:border-brand focus:ring-2 focus:ring-brand/20";
+const inputCls = INPUT_CLS;
 const labelCls = "mb-1 block text-xs font-semibold text-ink";
 
 const formatRupiah = (n: number) =>

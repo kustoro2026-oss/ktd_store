@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, Send } from "lucide-react";
+import { CheckCircle2, ChevronDown, Send } from "lucide-react";
 import { whatsappLink } from "@/lib/config";
+import { INPUT_CLS } from "@/lib/ui";
 
 const PAYMENT_METHODS = [
   "Transfer Bank BCA",
@@ -79,7 +80,7 @@ export default function PaymentConfirmForm() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Nama sesuai pesanan"
-            className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20"
+            className={INPUT_CLS}
           />
         </div>
         <div>
@@ -92,7 +93,7 @@ export default function PaymentConfirmForm() {
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             placeholder="08xxxxxxxxxx"
-            className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20"
+            className={INPUT_CLS}
           />
         </div>
       </div>
@@ -107,7 +108,7 @@ export default function PaymentConfirmForm() {
           value={product}
           onChange={(e) => setProduct(e.target.value)}
           placeholder="Contoh: Sepatu Sneakers Putih Ukuran 42"
-          className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20"
+          className={INPUT_CLS}
         />
       </div>
 
@@ -116,18 +117,21 @@ export default function PaymentConfirmForm() {
           <label htmlFor="pc-method" className="mb-1.5 block text-sm font-semibold text-ink">
             Metode Pembayaran
           </label>
-          <select
-            id="pc-method"
-            value={method}
-            onChange={(e) => setMethod(e.target.value)}
-            className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20"
-          >
-            {PAYMENT_METHODS.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
+          <div className="relative">
+            <select
+              id="pc-method"
+              value={method}
+              onChange={(e) => setMethod(e.target.value)}
+              className={`${INPUT_CLS} appearance-none pr-10`}
+            >
+              {PAYMENT_METHODS.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-2" />
+          </div>
         </div>
         <div>
           <label htmlFor="pc-amount" className="mb-1.5 block text-sm font-semibold text-ink">
@@ -139,7 +143,7 @@ export default function PaymentConfirmForm() {
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="Contoh: Rp 150.000"
-            className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20"
+            className={INPUT_CLS}
           />
         </div>
       </div>
@@ -154,7 +158,7 @@ export default function PaymentConfirmForm() {
           onChange={(e) => setNote(e.target.value)}
           rows={3}
           placeholder="Info tambahan, misal: transfer lewat rekening atas nama..."
-          className="w-full resize-none rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20"
+          className={`${INPUT_CLS} resize-none`}
         />
       </div>
 

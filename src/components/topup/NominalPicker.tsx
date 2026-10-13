@@ -14,6 +14,7 @@ import {
   ArrowLeft,
   Check,
   CheckCircle2,
+  ChevronDown,
   ChevronRight,
   Info,
   Loader2,
@@ -32,6 +33,7 @@ import {
 } from "@/lib/topup";
 import ProviderLogo from "./ProviderLogo";
 import { fieldsForProvider } from "@/lib/topup-fields";
+import { INPUT_CLS } from "@/lib/ui";
 import {
   duitkuRows,
   type DuitkuChannelRow,
@@ -580,7 +582,7 @@ export default function NominalPicker({ provider, initialSku }: Props) {
                 placeholder={`Cari nominal ${provider.label}…`}
                 autoComplete="off"
                 aria-label={`Cari nominal ${provider.label}`}
-                className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm text-ink outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20"
+                className={`${INPUT_CLS} pl-10 pr-4`}
               />
             </div>
           )}
@@ -743,7 +745,7 @@ export default function NominalPicker({ provider, initialSku }: Props) {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Nama pemesan"
-                  className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-base outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20 sm:text-sm"
+                  className={INPUT_CLS}
                 />
               </div>
               <div>
@@ -756,7 +758,7 @@ export default function NominalPicker({ provider, initialSku }: Props) {
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="08xxxxxxxxxx (untuk konfirmasi pesanan)"
-                  className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-base outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20 sm:text-sm"
+                  className={INPUT_CLS}
                 />
               </div>
               {schema.fields.map((f) => (
@@ -765,21 +767,24 @@ export default function NominalPicker({ provider, initialSku }: Props) {
                     {f.label} {!f.optional && <span className="text-red-500">*</span>}
                   </label>
                   {f.options ? (
-                    <select
-                      id={`np-${f.key}`}
-                      value={fieldValue(f.key)}
-                      onChange={(e) => setFieldValue(f.key, e.target.value)}
-                      className="w-full appearance-none rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-base outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20 sm:text-sm"
-                    >
-                      <option value="" disabled>
-                        {f.placeholder}
-                      </option>
-                      {f.options.map((o) => (
-                        <option key={o} value={o}>
-                          {o}
+                    <div className="relative">
+                      <select
+                        id={`np-${f.key}`}
+                        value={fieldValue(f.key)}
+                        onChange={(e) => setFieldValue(f.key, e.target.value)}
+                        className={`${INPUT_CLS} appearance-none pr-10`}
+                      >
+                        <option value="" disabled>
+                          {f.placeholder}
                         </option>
-                      ))}
-                    </select>
+                        {f.options.map((o) => (
+                          <option key={o} value={o}>
+                            {o}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-2" />
+                    </div>
                   ) : (
                     <input
                       id={`np-${f.key}`}
@@ -793,7 +798,7 @@ export default function NominalPicker({ provider, initialSku }: Props) {
                         )
                       }
                       placeholder={f.placeholder}
-                      className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-base outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20 sm:text-sm"
+                      className={INPUT_CLS}
                     />
                   )}
                   {f.help && (

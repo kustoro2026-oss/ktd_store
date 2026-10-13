@@ -11,6 +11,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { formatRupiah } from "@/lib/topup";
+import { INPUT_CLS } from "@/lib/ui";
 
 /**
  * Halaman admin top-up (internal CS) — alur pesanan WhatsApp.
@@ -171,7 +172,7 @@ export default function TopUpAdminPage() {
               window.sessionStorage.setItem("topup-admin-secret", e.target.value);
             }}
             placeholder="TOPUP_ADMIN_SECRET"
-            className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20"
+            className={INPUT_CLS}
           />
         </div>
 
@@ -188,7 +189,7 @@ export default function TopUpAdminPage() {
               if (e.key === "Enter" && secret && orderId) doPreview();
             }}
             placeholder="KTD-XXXXXXXXXX"
-            className="w-full rounded-xl border border-gray-200 px-4 py-2.5 font-mono text-sm outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20"
+            className={`${INPUT_CLS} font-mono uppercase`}
           />
         </div>
 

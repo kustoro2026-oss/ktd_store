@@ -248,7 +248,7 @@ export default function SearchBox({ variant, onNavigate }: Props) {
   if (variant === "desktop") {
     return (
       <form onSubmit={submitSearch} className="relative hidden flex-1 md:block">
-        <div className="flex items-center overflow-hidden rounded-lg bg-white text-ink ring-1 ring-transparent transition-shadow focus-within:ring-white/50">
+        <div className="flex items-center overflow-hidden rounded-xl border border-gray-200 bg-white text-ink transition-all duration-200 hover:border-gray-300 focus-within:border-brand/70 focus-within:ring-2 focus-within:ring-brand/10">
           <input
             value={query}
             onChange={(e) => {
@@ -290,7 +290,7 @@ export default function SearchBox({ variant, onNavigate }: Props) {
   return (
     <form
       onSubmit={submitSearch}
-      className="relative flex items-center rounded-lg bg-white text-ink"
+      className="relative flex items-center rounded-xl border border-gray-200 bg-white text-ink transition-all duration-200 focus-within:border-brand/70 focus-within:ring-2 focus-within:ring-brand/10"
     >
       <input
         value={query}
@@ -309,12 +309,12 @@ export default function SearchBox({ variant, onNavigate }: Props) {
         aria-autocomplete="list"
         aria-controls="ktd-search-list-mobile"
         aria-expanded={open}
-        className="min-w-0 w-full rounded-l-lg px-4 py-2.5 text-base text-ink outline-none placeholder:text-muted-2"
+        className="min-w-0 w-full rounded-l-xl px-4 py-2.5 text-base text-ink outline-none placeholder:text-muted-2"
       />
       <button
         type="submit"
         aria-label="Cari"
-        className="flex shrink-0 items-center gap-1.5 rounded-r-lg border-l border-gray-100 px-3.5 py-2.5 text-sm font-semibold text-brand transition-colors hover:bg-gray-50"
+        className="flex shrink-0 items-center gap-1.5 rounded-r-xl border-l border-gray-100 px-3.5 py-2.5 text-sm font-semibold text-brand transition-colors hover:bg-gray-50"
       >
         <Search className="h-4 w-4" />
         <span>Cari</span>

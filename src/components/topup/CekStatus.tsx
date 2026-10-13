@@ -6,6 +6,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Clock3, Loader2, Search, ShieldCheck } from "lucide-react";
 import { formatRupiah } from "@/lib/topup";
+import { INPUT_CLS } from "@/lib/ui";
 
 type StatusKey = "menunggu" | "diproses" | "sukses" | "gagal";
 
@@ -115,7 +116,7 @@ export default function CekStatus() {
           autoComplete="off"
           enterKeyHint="search"
           aria-label="No. HP atau ID pesanan"
-          className="min-w-0 w-full rounded-xl border border-gray-200 px-4 py-3 text-base text-ink outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20 sm:text-sm"
+          className={`${INPUT_CLS} min-w-0`}
         />
         <button
           type="submit"
