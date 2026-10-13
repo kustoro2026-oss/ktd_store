@@ -1850,7 +1850,7 @@ export default function WhatsAppOrderModal({
                           setSelectedByGroup({});
                         }}
                         inputMode="numeric"
-                        className="w-16 rounded-lg border border-gray-200 px-2.5 py-1.5 text-center text-sm font-semibold text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+                        className="w-16 rounded-lg border border-gray-200 px-2.5 py-1.5 text-center text-sm font-semibold text-ink outline-none focus:border-brand"
                       />
                     </div>
                   </div>

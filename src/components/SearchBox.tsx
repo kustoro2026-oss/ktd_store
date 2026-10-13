@@ -248,7 +248,7 @@ export default function SearchBox({ variant, onNavigate }: Props) {
   if (variant === "desktop") {
     return (
       <form onSubmit={submitSearch} className="relative hidden flex-1 md:block">
-        <div className="flex items-center overflow-hidden rounded-xl border border-gray-200 bg-white text-ink transition-all duration-200 hover:border-gray-300 focus-within:border-brand/70 focus-within:ring-2 focus-within:ring-brand/10">
+        <div className="flex items-center overflow-hidden rounded-xl border border-gray-200 bg-white text-ink transition-all duration-200 hover:border-gray-300 focus-within:border-brand">
           <input
             value={query}
             onChange={(e) => {
@@ -290,7 +290,7 @@ export default function SearchBox({ variant, onNavigate }: Props) {
   return (
     <form
       onSubmit={submitSearch}
-      className="relative flex items-center rounded-xl border border-gray-200 bg-white text-ink transition-all duration-200 focus-within:border-brand/70 focus-within:ring-2 focus-within:ring-brand/10"
+      className="relative flex items-center rounded-xl border border-gray-200 bg-white text-ink transition-all duration-200 focus-within:border-brand"
     >
       <input
         value={query}

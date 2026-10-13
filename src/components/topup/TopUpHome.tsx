@@ -270,7 +270,7 @@ export default function TopUpHome() {
 
           {/* Search bar besar */}
           <form onSubmit={submitSearch} className="relative mx-auto mt-6 max-w-2xl text-left">
-            <div className="flex items-center overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition-all duration-200 hover:border-gray-300 focus-within:border-brand/70 focus-within:shadow-lg focus-within:ring-4 focus-within:ring-brand/10">
+            <div className="flex items-center overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition-all duration-200 hover:border-gray-300 focus-within:border-brand focus-within:shadow-lg">
               <Search className="ml-4 h-5 w-5 shrink-0 text-muted-2 transition-colors" />
               <input
                 value={query}
