@@ -35,6 +35,12 @@ import {
 import { listHealthSnapshot, listTopupWebhookLogs } from "@/lib/db";
 import { processDigiflazzWebhook } from "@/lib/digiflazz-webhook";
 import { refreshHealthSnapshot } from "@/lib/topup-health";
+import {
+  normalizePhone,
+  sendWaTemplateParam,
+  sendWaText,
+  TOPUP_TEMPLATE,
+} from "@/lib/wa";
 
 export const runtime = "nodejs";
 
@@ -52,6 +58,7 @@ const ACTIONS = new Set([
   "webhook-sim",
   "webhook-log",
   "health-snapshot",
+  "wa-test",
 ]);
 
 const PASCA_COMMANDS: Record<string, PascaCommand> = {
@@ -292,6 +299,40 @@ export async function POST(req: Request) {
           : 20;
       const logs = await listTopupWebhookLogs(limit);
       return NextResponse.json({ ok: true, data: logs });
+    }
+
+    // Uji kirim WA dari production: template utility + teks bebas, hasil
+    // mentah Graph API dikembalikan utuh untuk diagnosis.
+    case "wa-test": {
+      const to = str("phone");
+      if (!to) {
+        return NextResponse.json(
+          { ok: false, error: "field_kurang", detail: "phone wajib diisi." },
+          { status: 400 },
+        );
+      }
+      const phone = normalizePhone(to);
+      if (!phone) {
+        return NextResponse.json(
+          { ok: false, error: "nomor_tidak_valid", detail: `nomor ${to} tidak valid` },
+          { status: 400 },
+        );
+      }
+      const text = (str("text") ?? `Tes notifikasi KTD Store ${new Date().toISOString()}`).slice(
+        0,
+        900,
+      );
+      const tpl = await sendWaTemplateParam(phone, TOPUP_TEMPLATE, text);
+      const txt = await sendWaText(phone, text);
+      return NextResponse.json({
+        ok: true,
+        phone,
+        template: TOPUP_TEMPLATE,
+        template_result: tpl.ok
+          ? { ok: true, waId: tpl.waId }
+          : { ok: false, error: tpl.error },
+        text_result: txt.ok ? { ok: true, waId: txt.waId } : { ok: false, error: txt.error },
+      });
     }
 
     // Snapshot kesehatan produk (read-only) — verifikasi pintu pra-bayar.

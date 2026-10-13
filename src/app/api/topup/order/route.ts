@@ -136,9 +136,11 @@ export async function POST(req: Request) {
         ...(buyerPhone ? [`No. HP: ${buyerPhone}`] : []),
         "Status: menunggu pembayaran",
       ].join("\n"),
-    ).catch(() => {
-      // Notifikasi gagal tidak boleh menggagalkan pesanan.
-    });
+    )
+      .then((r) => console.log(`[topup] ${orderId} WA owner saat dibuat: ${r}`))
+      .catch(() => {
+        // Notifikasi gagal tidak boleh menggagalkan pesanan.
+      });
   });
 
   const waLink = whatsappLink(
@@ -180,9 +182,15 @@ export async function POST(req: Request) {
           "",
           "Silakan selesaikan pembayaran segera agar pesanan cepat diproses.",
         ].join("\n"),
-      ).catch(() => {
-        // Notifikasi gagal tidak boleh menggagalkan pesanan.
-      });
+      )
+        .then((r) =>
+          console.log(
+            `[topup] ${args.orderId} WA pembeli saat dibuat (${args.buyerPhone}): ${r}`,
+          ),
+        )
+        .catch(() => {
+          // Notifikasi gagal tidak boleh menggagalkan pesanan.
+        });
     });
   }
 
