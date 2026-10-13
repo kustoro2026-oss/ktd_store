@@ -8,7 +8,6 @@
 // aktif dan mendelegasikan ke router yang sama agar transaksi lama tidak
 // pernah kehilangan callback.
 
-import { after } from "next/server";
 import {
   getStoreOrderByRef,
   getTopupOrderByRef,
@@ -141,13 +140,13 @@ async function handleTopupOrderCallback(cb: DuitkuCallback): Promise<boolean> {
   // status berubah.
 
   // Tick kesempatan kedua: cek ulang transaksi Pending tanpa menunggu cron.
-  after(async () => {
-    try {
-      await recheckPendingTopups();
-    } catch {
-      // Latar belakang — kegagalan tidak perlu mengganggu callback.
-    }
-  });
+  // DI-AWAIT sinkron — after() terbukti tidak tereksekusi di produksi,
+  // sehingga tick ini sebelumnya tidak pernah berjalan.
+  try {
+    await recheckPendingTopups();
+  } catch {
+    // Kegagalan tick tidak boleh mengganggu respons callback.
+  }
 
   return true;
 }

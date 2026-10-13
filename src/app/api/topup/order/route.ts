@@ -8,7 +8,7 @@
 // Body: { sku, id, server?, nickname?, buyerName, buyerPhone, paymentChannel? }
 // Respons: { ok, orderId, mode: "duitku" | "wa", paymentUrl?, waLink? }
 
-import { NextResponse, after } from "next/server";
+import { NextResponse } from "next/server";
 import { TOPUP_PRODUCTS, formatRupiah, providerForSku } from "@/lib/topup";
 import { composeCustomerNo, fieldsForProvider } from "@/lib/topup-fields";
 import { createTopupOrder, newOrderId, newRefId, setOrderPaymentSession } from "@/lib/db";
@@ -121,10 +121,11 @@ export async function POST(req: Request) {
     );
   }
 
-  // Notifikasi WA ke owner: ada pesanan baru (fire-and-forget — tidak
-  // menunda respons ke pembeli).
-  after(() => {
-    notifyTopupOwner(
+  // Notifikasi WA ke owner: ada pesanan baru. DI-AWAIT sinkron — after()
+  // terbukti tidak tereksekusi di produksi, sehingga notifikasi sebelumnya
+  // tidak pernah terkirim. Kegagalan WA tidak boleh menggagalkan pesanan.
+  try {
+    const r = await notifyTopupOwner(
       [
         "[Top-up] Pesanan baru masuk:",
         `No. Pesanan: ${orderId}`,
@@ -136,12 +137,11 @@ export async function POST(req: Request) {
         ...(buyerPhone ? [`No. HP: ${buyerPhone}`] : []),
         "Status: menunggu pembayaran",
       ].join("\n"),
-    )
-      .then((r) => console.log(`[topup] ${orderId} WA owner saat dibuat: ${r}`))
-      .catch(() => {
-        // Notifikasi gagal tidak boleh menggagalkan pesanan.
-      });
-  });
+    );
+    console.log(`[topup] ${orderId} WA owner saat dibuat: ${r}`);
+  } catch {
+    // Notifikasi gagal tidak boleh menggagalkan pesanan.
+  }
 
   const waLink = whatsappLink(
     [
