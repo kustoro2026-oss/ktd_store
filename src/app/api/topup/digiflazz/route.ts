@@ -20,7 +20,7 @@
 // hub sudah mewajibkan dialog konfirmasi sebelum mengirim. Guard x-topup-secret
 // identik dengan route admin toko lainnya.
 
-import { NextResponse, after } from "next/server";
+import { NextResponse } from "next/server";
 import {
   buildCekSaldoPayload,
   buildDepositPayload,
@@ -137,15 +137,17 @@ export async function POST(req: Request) {
       );
       // Piggyback: data price-list prepaid yang sama dipakai menyegarkan
       // snapshot kesehatan produk (nol panggilan API tambahan — kuota
-      // price-list Digiflazz terbatas, rc=83).
+      // price-list Digiflazz terbatas, rc=83). DI-AWAIT sinkron: praktik
+      // after() lama terbukti tidak mengeksekusi refresh di produksi
+      // (snapshot membeku 79 jam), sehingga pintu pra-bayar kehilangan
+      // kesegaran datanya.
       if (cmd === "prepaid" && r.ok) {
-        after(() => {
-          refreshHealthSnapshot(r.data)
-            .then((h) => {
-              if (!h.ok) console.warn("[topup] refresh snapshot kesehatan:", h.detail);
-            })
-            .catch((e) => console.warn("[topup] refresh snapshot kesehatan gagal:", e));
-        });
+        try {
+          const h = await refreshHealthSnapshot(r.data);
+          if (!h.ok) console.warn("[topup] refresh snapshot kesehatan:", h.detail);
+        } catch (e) {
+          console.warn("[topup] refresh snapshot kesehatan gagal:", e);
+        }
       }
       return resp(r, { cmd });
     }
