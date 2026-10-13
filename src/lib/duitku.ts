@@ -52,6 +52,15 @@ export function vaSafeForGross(sellPrice: number, costPrice: number): boolean {
   return sellPrice - costPrice >= VA_MIN_GROSS;
 }
 
+/** Harga jual minimal (dibulatkan ke ratusan) agar margin kotor menutup
+ *  VA_MIN_GROSS — dipakai untuk pesan info ke pembeli. Margin standar
+ *  generator katalog: game 10%, kategori lain 5%. */
+export function vaMinSellForCategory(category: string): number {
+  const margin = category === "game" ? 0.1 : 0.05;
+  const ratio = margin / (1 + margin);
+  return Math.ceil(VA_MIN_GROSS / ratio / 100) * 100;
+}
+
 /** HMAC-SHA256 hex huruf kecil — dipakai untuk semua signature Duitku. */
 function duitkuSign(parts: (string | number)[]): string {
   return createHmac("sha256", process.env.DUITKU_API_KEY ?? "")

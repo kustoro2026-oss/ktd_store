@@ -193,6 +193,10 @@ export default function NominalPicker({ provider, initialSku }: Props) {
    *  TOPUP_VA_ENABLED + ambang margin VA_MIN_GROSS (null = belum termuat —
    *  VA disembunyikan dulu agar nominal kecil tidak bisa memilih VA). */
   const [vaAllowed, setVaAllowed] = useState<boolean | null>(null);
+  /** Saklar global VA dari server (true = VA aktif untuk nominal besar). */
+  const [vaEnabled, setVaEnabled] = useState(true);
+  /** Harga jual minimal untuk pembayaran online (pesan info ke pembeli). */
+  const [vaMinSell, setVaMinSell] = useState<number | null>(null);
 
   // Skema input provider (field per produk ala itemku) + ikon item nominal.
   const schema = fieldsForProvider(provider.slug);
@@ -272,10 +276,18 @@ export default function NominalPicker({ provider, initialSku }: Props) {
     fetch(`/api/duitku/methods${params}`, { cache: "no-store" })
       .then((r) => r.json())
       .then(
-        (j: { ok?: boolean; methods?: DuitkuPaymentMethod[]; vaAllowed?: boolean }) => {
+        (j: {
+          ok?: boolean;
+          methods?: DuitkuPaymentMethod[];
+          vaEnabled?: boolean;
+          vaAllowed?: boolean;
+          vaMinSell?: number;
+        }) => {
           if (j.ok && Array.isArray(j.methods)) {
             setDuitkuMethods(j.methods);
+            setVaEnabled(j.vaEnabled !== false);
             setVaAllowed(j.vaAllowed === true);
+            setVaMinSell(typeof j.vaMinSell === "number" ? j.vaMinSell : null);
           }
         },
       )
@@ -989,14 +1001,16 @@ export default function NominalPicker({ provider, initialSku }: Props) {
                   </div>
                 ) : vaAllowed === false ? (
                   /* VA tidak tersedia untuk nominal ini (atau nonaktif global)
-                     & QRIS belum aktif — info pengajuan, pesanan tetap bisa
-                     lewat WhatsApp. */
+                     & QRIS belum aktif — info minimal harga / pengajuan;
+                     pesanan tetap bisa lewat WhatsApp. */
                   <div className="flex items-start gap-2.5 rounded-xl border border-amber-100 bg-amber-50 p-3">
                     <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
                     <p className="text-xs leading-relaxed text-amber-800">
-                      Pembayaran online (QRIS) sedang dalam proses pengajuan
-                      aktivasi. Untuk sementara, pesanan Anda akan diproses via
-                      WhatsApp — CS kami siap memandu pembayaran hingga selesai.
+                      {vaEnabled
+                        ? `Pembayaran online tersedia untuk nominal mulai ${formatRupiah(
+                            vaMinSell ?? 50000,
+                          )}. Nominal yang Anda pilih diproses via WhatsApp — CS kami siap memandu pembayaran hingga selesai.`
+                        : "Pembayaran online (QRIS) sedang dalam proses pengajuan aktivasi. Untuk sementara, pesanan Anda akan diproses via WhatsApp — CS kami siap memandu pembayaran hingga selesai."}
                     </p>
                   </div>
                 ) : (

@@ -12,7 +12,7 @@ import { NextResponse } from "next/server";
 import { TOPUP_PRODUCTS, formatRupiah, providerForSku } from "@/lib/topup";
 import { composeCustomerNo, fieldsForProvider } from "@/lib/topup-fields";
 import { createTopupOrder, newOrderId, newRefId, setOrderPaymentSession } from "@/lib/db";
-import { createDuitkuPayment, duitkuConfigured, DUITKU_MIN_AMOUNT, vaSafeForGross } from "@/lib/duitku";
+import { createDuitkuPayment, duitkuConfigured, DUITKU_MIN_AMOUNT, vaSafeForGross, vaMinSellForCategory } from "@/lib/duitku";
 import { QRIS_CODES } from "@/lib/duitku-channels";
 import { gateBalanceForCost } from "@/lib/topup-balance";
 import { gateProductHealth } from "@/lib/topup-health";
@@ -248,7 +248,11 @@ export async function POST(req: Request) {
       waLink,
       gatewayError: VA_SAFE
         ? pay?.error ?? "sesi pembayaran online gagal dibuat"
-        : "Pembayaran online (QRIS) sedang dalam proses pengajuan aktivasi — pesanan diproses via WhatsApp.",
+        : VA_ENABLED
+          ? `Pembayaran online tersedia untuk nominal mulai ${formatRupiah(
+              vaMinSellForCategory(product.category),
+            )} — pesanan Anda diproses via WhatsApp.`
+          : "Pembayaran online (QRIS) sedang dalam proses pengajuan aktivasi — pesanan diproses via WhatsApp.",
     });
   }
 
