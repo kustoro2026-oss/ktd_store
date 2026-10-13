@@ -456,12 +456,73 @@ const BRANDS = {
     targetNumeric: false,
     customerNoLabel: "Email / Nomor HP",
   },
+  // ---- Game butuh gabungan ID + Server/Zone (kolom server wajib) —
+  // ditemukan lewat audit desc price-list 13 Okt 2026; tanpa kolom server
+  // pembeli bisa bayar tapi pengisian gagal di seller. ----
+  // Format "[UID]|[Server]" (pemisah "|").
+  "Banishers Faiths Entwined": { slug: "banishers-faiths-entwined", label: "Banishers Faiths Entwined", category: "game", needsServer: true, serverSeparator: "|" },
+  "Battle Through the Heavens 3D Fight": { slug: "battle-through-the-heavens-3d-fight", label: "Battle Through the Heavens 3D Fight", category: "game", needsServer: true, serverSeparator: "|" },
+  "Dragon Nest M Classic": { slug: "dragon-nest-m-classic", label: "Dragon Nest M Classic", category: "game", needsServer: true, serverSeparator: "|" },
+  "Gangstar Mirage City": { slug: "gangstar-mirage-city", label: "Gangstar Mirage City", category: "game", needsServer: true, serverSeparator: "|" },
+  Heartopia: { slug: "heartopia", label: "Heartopia", category: "game", needsServer: true, serverSeparator: "|" },
+  "Honkai Impact 3": { slug: "honkai-impact-3", label: "Honkai Impact 3", category: "game", needsServer: true, serverSeparator: "|" },
+  "Identity V": { slug: "identity-v", label: "Identity V", category: "game", needsServer: true, serverSeparator: "|" },
+  "Knives Out": { slug: "knives-out", label: "Knives Out", category: "game", needsServer: true, serverSeparator: "|" },
+  "LifeAfter Credits": { slug: "lifeafter-credits", label: "LifeAfter Credits", category: "game", needsServer: true, serverSeparator: "|" },
+  "MU Origin 2": { slug: "mu-origin-2", label: "MU Origin 2", category: "game", needsServer: true, serverSeparator: "|" },
+  "One Punch Man": { slug: "one-punch-man", label: "One Punch Man", category: "game", needsServer: true, serverSeparator: "|" },
+  "Punishing Gray Raven": { slug: "punishing-gray-raven", label: "Punishing Gray Raven", category: "game", needsServer: true, serverSeparator: "|" },
+  "Sword of Justice": { slug: "sword-of-justice", label: "Sword of Justice", category: "game", needsServer: true, serverSeparator: "|" },
+  "Wuthering Waves": { slug: "wuthering-waves", label: "Wuthering Waves", category: "game", needsServer: true, serverSeparator: "|" },
+  "Zenless Zone Zero": { slug: "zenless-zone-zero", label: "Zenless Zone Zero", category: "game", needsServer: true, serverSeparator: "|" },
+  // Format gabungan spasi ("ID Server" ala ML / "user_id zone_id").
+  "Age of Empires Mobile": { slug: "age-of-empires-mobile", label: "Age of Empires Mobile", category: "game", needsServer: true },
+  "Astra Knights of Veda": { slug: "astra-knights-of-veda", label: "Astra Knights of Veda", category: "game", needsServer: true },
+  "Be The King": { slug: "be-the-king", label: "Be The King", category: "game", needsServer: true },
+  "Culinary Tour": { slug: "culinary-tour", label: "Culinary Tour", category: "game", needsServer: true },
+  "Destiny Rising": { slug: "destiny-rising", label: "Destiny Rising", category: "game", needsServer: true },
+  "Duet Night Abyss": { slug: "duet-night-abyss", label: "Duet Night Abyss", category: "game", needsServer: true },
+  "Harry Potter Magic Awakened": { slug: "harry-potter-magic-awakened", label: "Harry Potter Magic Awakened", category: "game", needsServer: true },
+  "Isekai Feast": { slug: "isekai-feast", label: "Isekai Feast", category: "game", needsServer: true },
+  Lineage2M: { slug: "lineage2m", label: "Lineage2M", category: "game", needsServer: true },
+  "Machina Waking": { slug: "machina-waking", label: "Machina Waking", category: "game", needsServer: true, serverLabel: "Server / Nickname" },
+  "Magic Chess": { slug: "magic-chess", label: "Magic Chess", category: "game", needsServer: true },
+  "Mob Rush": { slug: "mob-rush", label: "Mob Rush", category: "game", needsServer: true },
+  "Mobile Legends Adventure": { slug: "mobile-legends-adventure", label: "Mobile Legends Adventure", category: "game", needsServer: true },
+  "NBA Infinite": { slug: "nba-infinite", label: "NBA Infinite", category: "game", needsServer: true },
+  "Octopath Traveler": { slug: "octopath-traveler", label: "Octopath Traveler", category: "game", needsServer: true },
+  "Once Human": { slug: "once-human", label: "Once Human", category: "game", needsServer: true, serverLabel: "Region & Server" },
+  "Paw Tales Eternal Bond": { slug: "paw-tales-eternal-bond", label: "Paw Tales Eternal Bond", category: "game", needsServer: true },
+  "Perfect World 2": { slug: "perfect-world-2", label: "Perfect World 2", category: "game", needsServer: true },
+  "Persona 5 The Phantom X": { slug: "persona-5-the-phantom-x", label: "Persona 5 The Phantom X", category: "game", needsServer: true, serverLabel: "Role ID" },
+  "Ragnarok Idle Adventure Plus": { slug: "ragnarok-idle-adventure-plus", label: "Ragnarok Idle Adventure Plus", category: "game", needsServer: true },
+  "Ragnarok M: Eternal Love": { slug: "ragnarok-m-eternal-love", label: "Ragnarok M: Eternal Love", category: "game", needsServer: true },
+  "Seal M Sea": { slug: "seal-m-sea", label: "Seal M Sea", category: "game", needsServer: true },
+  "Snowbreak Containment Zone": { slug: "snowbreak-containment-zone", label: "Snowbreak Containment Zone", category: "game", needsServer: true },
+  "The Ants Underground Kingdom": { slug: "the-ants-underground-kingdom", label: "The Ants Underground Kingdom", category: "game", needsServer: true },
+  "Tower of Fantasy": { slug: "tower-of-fantasy", label: "Tower of Fantasy", category: "game", needsServer: true },
+  "War Robots": { slug: "war-robots", label: "War Robots", category: "game", needsServer: true, serverLabel: "Platform" },
+  "Watcher of Realms": { slug: "watcher-of-realms", label: "Watcher of Realms", category: "game", needsServer: true },
+  "Asphalt 9": { slug: "asphalt-9", label: "Asphalt 9", category: "game", needsServer: true, serverLabel: "Platform" },
+  "Lordnine Infinite Class": { slug: "lordnine-infinite-class", label: "Lordnine Infinite Class", category: "game", needsServer: true, serverLabel: "Nickname" },
+  // ---- Input teks bebas (email/username) — kolom numerik dimatikan ----
+  "Airplane Chefs": { slug: "airplane-chefs", label: "Airplane Chefs", category: "game", targetNumeric: false, customerNoLabel: "Email Nordcurrent ID" },
+  "Stumble Guys": { slug: "stumble-guys", label: "Stumble Guys", category: "game", targetNumeric: false, customerNoLabel: "Username" },
+  Zepeto: { slug: "zepeto", label: "Zepeto", category: "game", targetNumeric: false, customerNoLabel: "Username Zepeto" },
+  Valorant: { slug: "valorant", label: "Valorant", prefixes: ["Valorant", "VALORANT"], category: "game", targetNumeric: false, customerNoLabel: "Riot ID" },
+  // Riot ID berisi huruf + tag (#) — jangan kolom numerik.
+  "League of Legends PC": { slug: "league-of-legends-pc", label: "League of Legends PC", category: "game", targetNumeric: false, customerNoLabel: "Riot ID" },
+  "League of Legends Wild Rift": { slug: "league-of-legends-wild-rift", label: "League of Legends Wild Rift", category: "game", targetNumeric: false, customerNoLabel: "Riot ID + Tag" },
+  "Legends of Runeterra": { slug: "legends-of-runeterra", label: "Legends of Runeterra", category: "game", targetNumeric: false, customerNoLabel: "Riot ID" },
+  Growtopia: { slug: "growtopia", label: "Growtopia", category: "game", targetNumeric: false, customerNoLabel: "GrowID" },
+  // Slug auto menghasilkan dash menggantung ("werewolf-party-game-") — kunci manual.
+  "Werewolf (Party Game)": { slug: "werewolf-party-game", label: "Werewolf (Party Game)", category: "game" },
 };
 
 const FALLBACK_META = { slug: null, label: null, prefixes: [] };
 
 function metaFor(brand) {
-  return BRANDS[brand] || FALLBACK_META;
+  return { ...FALLBACK_META, ...(BRANDS[brand] || {}) };
 }
 
 function shortName(productName, brand) {
@@ -523,6 +584,8 @@ function build(items) {
         customerNoLabel: meta.customerNoLabel || cat.targetLabel,
         targetNumeric: meta.targetNumeric !== false,
         ...(meta.needsServer ? { needsServer: true } : {}),
+        ...(meta.serverSeparator ? { serverSeparator: meta.serverSeparator } : {}),
+        ...(meta.serverLabel ? { serverLabel: meta.serverLabel } : {}),
         nominals: [],
       };
       providers.set(slug, prov);
@@ -619,8 +682,12 @@ export interface TopUpProvider {
   customerNoLabel: string;
   /** false = input bebas teks (K-Vision). */
   targetNumeric: boolean;
-  /** Produk Mobile Legends: butuh kolom Server/Zone. */
+  /** Produk butuh kolom Server/Zone (digabung ke customer_no). */
   needsServer?: boolean;
+  /** Pemisah gabungan ID + server (bawaan spasi; "|" untuk format [UID]|[Server]). */
+  serverSeparator?: string;
+  /** Label kolom server (bawaan: "Server / Zone"). */
+  serverLabel?: string;
   nominals: TopUpNominal[];
 }
 

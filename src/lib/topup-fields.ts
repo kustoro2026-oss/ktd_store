@@ -6,6 +6,8 @@
 // - AOV/CoD Mobile  : "Masukkan PlayerID"
 // - Valorant        : "Masukkan ID" (Riot ID: nama#tag)
 // - PUBG/FF/FF Max  : ID game saja (kolom kosong = format standar ID)
+// - 41 brand game lain butuh server/zone (needsServer di generator): kolom
+//   server otomatis tampil lewat defaultSchema, gabung spasi atau "|".
 // Field tambahan (nickname) hanya untuk verifikasi CS, TIDAK ikut customer_no.
 
 export type TopUpFieldKey = "target" | "server" | "nickname";
@@ -198,21 +200,45 @@ const SCHEMAS: Record<string, ProviderFieldSchema> = {
   },
 };
 
-/** Skema bawaan: satu kolom sesuai customerNoLabel provider. */
-function defaultSchema(slug: string, label: string, targetNumeric: boolean): ProviderFieldSchema {
+/** Skema bawaan: satu kolom sesuai customerNoLabel provider; provider
+ *  butuh-server (needsServer) mendapat kolom server tambahan yang digabung
+ *  ke customer_no dengan pemisah spasi atau "|" (serverSeparator). */
+function defaultSchema(p: {
+  customerNoLabel?: string;
+  targetNumeric?: boolean;
+  needsServer?: boolean;
+  serverSeparator?: string;
+  serverLabel?: string;
+}): ProviderFieldSchema {
+  const label = p.customerNoLabel ?? "ID Tujuan";
+  const fields: TopUpField[] = [
+    {
+      key: "target",
+      label,
+      placeholder:
+        label.toLowerCase().includes("hp") || label.toLowerCase().includes("meter")
+          ? "Contoh: 08xxxxxxxxxx"
+          : "Masukkan " + label,
+      ...(p.targetNumeric ? { numeric: true, maxLength: 16 } : {}),
+    },
+  ];
+  if (p.needsServer) {
+    fields.push({
+      key: "server",
+      label: p.serverLabel ?? "Server / Zone",
+      placeholder: "Contoh: 1001 / S1 / Asia",
+      maxLength: 24,
+      help: "Tulis server/zone yang tertera di profil game Anda — dikirim digabung dengan ID.",
+    });
+  }
+  const sep = p.serverSeparator ?? " ";
   return {
-    fields: [
-      {
-        key: "target",
-        label,
-        placeholder:
-          label.toLowerCase().includes("hp") || label.toLowerCase().includes("meter")
-            ? "Contoh: 08xxxxxxxxxx"
-            : "Masukkan " + label,
-        ...(targetNumeric ? { numeric: true, maxLength: 16 } : {}),
-      },
-    ],
-    compose: (v) => v.target.trim(),
+    fields,
+    compose: (v) => {
+      const id = v.target.trim();
+      const srv = (v.server ?? "").trim();
+      return srv ? `${id}${sep}${srv}` : id;
+    },
   };
 }
 
@@ -223,7 +249,7 @@ export function fieldsForProvider(slug: string): ProviderFieldSchema {
   const known = SCHEMAS[slug];
   if (known) return known;
   const p = providerBySlug(slug);
-  return defaultSchema(slug, p?.customerNoLabel ?? "ID Tujuan", p?.targetNumeric ?? true);
+  return defaultSchema(p ?? { targetNumeric: true });
 }
 
 /** Susun customer_no Digiflazz dari nilai form. */
