@@ -60,19 +60,25 @@ const statusBadge = (s: string) =>
         ? "bg-amber-100 text-amber-700"
         : "bg-gray-100 text-gray-600";
 
-/** Terjemahan status ke bahasa pembeli (dipakai juga di cek-status). */
-const statusLabel = (s: string) =>
+/** Label status PEMBAYARAN (pending = menunggu pembayaran). */
+const payLabel = (s: string) =>
   s === "paid"
     ? "Sudah Dibayar"
-    : s === "success"
-      ? "Sukses"
-      : s === "pending" || s === "processing"
-        ? "Sedang Diproses"
-        : s === "failed"
-          ? "Gagal"
-          : s === "expired"
-            ? "Kedaluwarsa"
-            : "Menunggu Pembayaran";
+    : s === "expired"
+      ? "Kedaluwarsa"
+      : s === "failed"
+        ? "Gagal"
+        : "Menunggu Pembayaran";
+
+/** Label status TOP-UP (pending = sedang diproses). */
+const topupLabel = (s: string) =>
+  s === "success"
+    ? "Sukses"
+    : s === "pending" || s === "processing"
+      ? "Sedang Diproses"
+      : s === "failed"
+        ? "Gagal"
+        : "Menunggu Pembayaran";
 
 export default function TopUpAdminPage() {
   const [secret, setSecret] = useState("");
@@ -219,10 +225,10 @@ export default function TopUpAdminPage() {
               <p className="font-mono text-sm font-bold text-ink">{pOrder.id}</p>
               <div className="flex gap-1.5">
                 <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusBadge(pOrder.payment_status)}`}>
-                  {statusLabel(pOrder.payment_status)}
+                  {payLabel(pOrder.payment_status)}
                 </span>
                 <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusBadge(pOrder.topup_status)}`}>
-                  {statusLabel(pOrder.topup_status)}
+                  {topupLabel(pOrder.topup_status)}
                 </span>
               </div>
             </div>
@@ -264,9 +270,12 @@ export default function TopUpAdminPage() {
                 SN: <span className="font-mono">{pOrder.digiflazz_sn}</span>
               </p>
             )}
-            {pOrder.error_message && (
-              <p className="text-xs text-red-600">{pOrder.error_message}</p>
-            )}
+            {(pOrder.topup_status === "failed" ||
+              pOrder.topup_status === "pending" ||
+              pOrder.topup_status === "processing") &&
+              pOrder.error_message && (
+                <p className="text-xs text-red-600">{pOrder.error_message}</p>
+              )}
 
             {preview.catatan && (
               <p className="flex items-start gap-2 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800">
