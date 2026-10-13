@@ -348,7 +348,8 @@ export default function TopupBayarPage() {
                 <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
                 <span>
                   Pembayaran diverifikasi otomatis — tidak perlu konfirmasi manual.
-                  {order.payment_va ? " Virtual Account berlaku 24 jam." : ""}
+                  {order.payment_va ? " Virtual Account berlaku 24 jam." : ""} Dana
+                  dijamin kembali 100% jika pengisian gagal.
                 </span>
               </p>
             </div>
@@ -384,6 +385,10 @@ export default function TopupBayarPage() {
                 Top up Anda sedang dikirim ke {order.customer_no}. Biasanya selesai
                 dalam beberapa menit — status akan ter-update otomatis di halaman ini.
               </p>
+              <p className="mt-2 flex items-start gap-2 text-xs leading-relaxed text-emerald-700">
+                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
+                Jika pengisian gagal, dana Anda dijamin dikembalikan 100% tanpa potongan.
+              </p>
             </div>
           )}
 
@@ -402,22 +407,37 @@ export default function TopupBayarPage() {
           )}
 
           {topupFailed && (
-            <div className="rounded-2xl border border-red-100 bg-red-50 p-5">
-              <p className="flex items-center gap-2 text-sm font-bold text-red-700">
+            <div className="rounded-2xl border border-amber-100 bg-amber-50 p-5">
+              <p className="flex items-center gap-2 text-sm font-bold text-amber-800">
                 <XCircle className="h-5 w-5" /> Top Up Belum Berhasil
               </p>
-              <p className="mt-2 text-sm leading-relaxed text-red-700">
-                {order.error_message || "Top up gagal diproses."} Hubungi CS kami
-                melalui WhatsApp untuk cek ulang atau pengembalian dana.
+              <p className="mt-2 text-sm leading-relaxed text-amber-800">
+                Kendala: {order.error_message || "Top up gagal diproses"}. Jangan
+                khawatir — dana Anda aman.
               </p>
-              <a
-                href={whatsappLink(`Halo, saya butuh bantuan untuk pesanan top up ${order.id} (${order.product_name}).`)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#25D366] px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-[#1eb85a]"
-              >
-                Hubungi CS <ExternalLink className="h-4 w-4" />
-              </a>
+              <div className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50 p-4">
+                <p className="flex items-center gap-2 text-sm font-bold text-emerald-800">
+                  <ShieldCheck className="h-5 w-5" /> Jaminan Uang Kembali 100%
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-emerald-700">
+                  Pembayaran Anda dijamin dikembalikan penuh tanpa potongan — CS
+                  kami segera memproses pengembalian dana.
+                </p>
+                {/refund/i.test(order.error_message) && (
+                  <p className="mt-1 text-xs text-emerald-700">
+                    Saldo di supplier sudah otomatis dikembalikan — proses
+                    pengembalian dana ke Anda sedang ditindaklanjuti.
+                  </p>
+                )}
+                <a
+                  href={whatsappLink(`Halo, saya butuh konfirmasi pengembalian dana untuk pesanan top up ${order.id} (${order.product_name}).`)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 inline-flex items-center gap-2 rounded-xl bg-[#25D366] px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-[#1eb85a]"
+                >
+                  Konfirmasi Pengembalian Dana <ExternalLink className="h-4 w-4" />
+                </a>
+              </div>
             </div>
           )}
 

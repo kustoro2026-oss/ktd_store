@@ -76,6 +76,8 @@ function publicOrder(o: TopUpOrder) {
     status: displayStatus(o),
     createdAt: o.created_at,
     canPay: o.payment_status === "pending",
+    /** Pesanan sudah dibayar tapi pengisian gagal — jaminan uang kembali. */
+    refundable: o.payment_status === "paid" && o.topup_status === "failed",
   };
 }
 

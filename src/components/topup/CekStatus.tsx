@@ -17,6 +17,8 @@ type PublicOrder = {
   status: { key: StatusKey; label: string };
   createdAt: string;
   canPay: boolean;
+  /** Sudah bayar tapi pengisian gagal — tampilkan jaminan uang kembali. */
+  refundable: boolean;
 };
 
 const STATUS_STYLE: Record<StatusKey, string> = {
@@ -168,6 +170,17 @@ export default function CekStatus() {
               Lanjut Bayar
             </Link>
           )}
+          {result.order.refundable && (
+            <div className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50 p-3">
+              <p className="flex items-center gap-2 text-xs font-bold text-emerald-800">
+                <ShieldCheck className="h-4 w-4" /> Jaminan Uang Kembali 100%
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-emerald-700">
+                Dana Anda dijamin dikembalikan penuh tanpa potongan — CS kami sedang
+                memproses pengembalian.
+              </p>
+            </div>
+          )}
         </div>
       )}
 
@@ -207,6 +220,11 @@ export default function CekStatus() {
                       <p className="mt-0.5 text-xs text-muted-2">
                         {formatWib(o.createdAt)} • Tujuan {o.target}
                       </p>
+                      {o.refundable && (
+                        <p className="mt-0.5 text-xs font-semibold text-emerald-600">
+                          Dana dijamin kembali 100% — sedang diproses CS
+                        </p>
+                      )}
                     </div>
                     <div className="flex shrink-0 items-center gap-3">
                       <span className="text-sm font-extrabold text-brand">
