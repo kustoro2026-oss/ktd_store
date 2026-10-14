@@ -38,7 +38,13 @@ export function digiflazzConfigured(): boolean {
 async function relay(
   ep: string,
   payload: Record<string, unknown>,
-): Promise<{ ok: boolean; data?: unknown; error?: string; status?: number }> {
+): Promise<{
+  ok: boolean;
+  data?: unknown;
+  error?: string;
+  status?: number;
+  raw?: string;
+}> {
   try {
     const res = await fetch(`${relayUrl()}?ep=${ep}`, {
       method: "POST",
@@ -59,7 +65,9 @@ async function relay(
     // Hanya 2xx yang dianggap berhasil — 4xx (token relay salah, endpoint
     // diblokir) berarti request tidak pernah sampai Digiflazz dan harus
     // diperlakukan retryable (pending), bukan kegagalan transaksi permanen.
-    return { ok: res.ok, data, status: res.status };
+    // Body mentah ikut dibawa (dipotong) — penting untuk diagnosis saat
+    // relay membalas 200 tapi tanpa field data (mis. halaman keamanan hosting).
+    return { ok: res.ok, data, status: res.status, raw: text.slice(0, 300) };
   } catch (e) {
     return { ok: false, error: String(e) };
   }
@@ -80,6 +88,8 @@ export type DgRawResult = {
   data?: unknown;
   error?: string;
   status?: number;
+  /** Potongan body mentah respons relay (untuk diagnosis produksi). */
+  raw?: string;
 };
 
 /** Teruskan payload ke relay tanpa interpretasi — respons data mentah
@@ -186,7 +196,15 @@ export async function checkDigiflazzBalance(): Promise<BalanceResult> {
   }
   const d = r.data as { deposit?: string | number; message?: string } | undefined;
   if (!d || typeof d.deposit === "undefined") {
-    return { ok: false, balance: 0, error: d?.message ?? "saldo tidak terbaca" };
+    return {
+      ok: false,
+      balance: 0,
+      error:
+        d?.message ??
+        (r.raw
+          ? `saldo tidak terbaca — relay membalas tanpa field data: ${r.raw}`
+          : "saldo tidak terbaca"),
+    };
   }
   return { ok: true, balance: Number(d.deposit ?? 0) };
 }

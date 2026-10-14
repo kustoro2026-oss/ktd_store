@@ -24,14 +24,20 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
   }
   if (!digiflazzConfigured()) {
-    return NextResponse.json({ ok: false, error: "config_missing" }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: "config_missing" },
+      { status: process.env.NODE_ENV === "production" ? 200 : 500 },
+    );
   }
 
   const bal = await checkDigiflazzBalance();
   if (!bal.ok) {
+    // Di produksi Cloudflare mengganti body 5xx dengan halaman HTML polos
+    // (header x-vercel ikut hilang) — balas 200 + detail supaya kegagalan
+    // infrastruktur tetap terbaca (pola sama dengan konsol digiflazz).
     return NextResponse.json(
       { ok: false, error: "cek_saldo_gagal", detail: bal.error },
-      { status: 502 },
+      { status: process.env.NODE_ENV === "production" ? 200 : 502 },
     );
   }
   return NextResponse.json({ ok: true, balance: bal.balance });
