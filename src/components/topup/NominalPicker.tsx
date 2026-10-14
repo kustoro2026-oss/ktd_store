@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
+  ExternalLink,
   Info,
   Loader2,
   QrCode,
@@ -34,6 +35,7 @@ import {
 import ProviderLogo from "./ProviderLogo";
 import { fieldsForProvider } from "@/lib/topup-fields";
 import { INPUT_CLS } from "@/lib/ui";
+import { whatsappLink } from "@/lib/config";
 import {
   duitkuRows,
   type DuitkuChannelRow,
@@ -172,6 +174,8 @@ export default function NominalPicker({ provider, initialSku }: Props) {
   const [nickname, setNickname] = useState("");
   const [error, setError] = useState("");
   const [sent, setSent] = useState(false);
+  /** ID pesanan terakhir yang tersimpan — dipakai tombol lanjut ke CS. */
+  const [orderId, setOrderId] = useState("");
   const [busy, setBusy] = useState(false);
   const [nomFilter, setNomFilter] = useState("");
   /** Jumlah kartu yang tampil per sub-kelompok nominal (label → jumlah). */
@@ -451,6 +455,7 @@ export default function NominalPicker({ provider, initialSku }: Props) {
         }),
       });
       const j = (await res.json()) as OrderResponse;
+      if (j.orderId) setOrderId(j.orderId);
       if (j.ok && j.mode === "duitku" && j.orderId) {
         remember();
         router.push(`/topup/bayar/${j.orderId}`);
@@ -479,6 +484,17 @@ export default function NominalPicker({ provider, initialSku }: Props) {
   };
 
   if (sent && nominal) {
+    // Tombol lanjut ke CS: pesan terisi otomatis dengan No. Pesanan supaya
+    // bot langsung mengenali (balas status gratis) dan CS mudah melacak.
+    const csLink = whatsappLink(
+      [
+        `Halo, saya ingin melanjutkan pembayaran pesanan top up ${orderId || ""} (${nominal.name}).`,
+        target ? `Tujuan pengisian: ${target}` : "",
+        "Bukti transfer akan saya lampirkan di chat ini.",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    );
     return (
       <div className="mx-auto flex max-w-lg flex-col items-center gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-8 text-center">
         <CheckCircle2 className="h-12 w-12 text-emerald-500" />
@@ -488,10 +504,19 @@ export default function NominalPicker({ provider, initialSku }: Props) {
           yang terbuka: lampirkan bukti transfer dan CS kami akan memverifikasi,
           lalu pengisian diproses otomatis.
         </p>
+        <a
+          href={csLink}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 rounded-xl bg-[#25D366] px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-[#1eb85a]"
+        >
+          Hubungi CS via WhatsApp
+          <ExternalLink className="h-4 w-4" />
+        </a>
         <button
           type="button"
           onClick={() => setSent(false)}
-          className="mt-2 rounded-xl border border-emerald-200 px-5 py-2 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
+          className="rounded-xl border border-emerald-200 px-5 py-2 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
         >
           Buat Pesanan Lain
         </button>
