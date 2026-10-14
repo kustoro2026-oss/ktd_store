@@ -9,6 +9,7 @@
 import { NextResponse } from "next/server";
 import { expireStalePendingOrders } from "@/lib/db";
 import { recheckPendingTopups } from "@/lib/topup-execute";
+import { cronOrAdminGuard } from "@/lib/admin-guard";
 
 export const runtime = "nodejs";
 
@@ -16,11 +17,14 @@ const CRON_SECRET = process.env.CRON_SECRET ?? "";
 const ADMIN_SECRET = process.env.TOPUP_ADMIN_SECRET ?? "";
 
 export async function GET(req: Request) {
-  const cronSecret = req.headers.get("x-cron-secret") ?? "";
-  const adminSecret = req.headers.get("x-topup-secret") ?? "";
-  const cronOk = CRON_SECRET && cronSecret === CRON_SECRET;
-  const adminOk = ADMIN_SECRET && adminSecret === ADMIN_SECRET;
-  if (!cronOk && !adminOk) {
+  const g = cronOrAdminGuard(req, CRON_SECRET, ADMIN_SECRET);
+  if (g === "rate_limited") {
+    return NextResponse.json(
+      { ok: false, error: "Terlalu banyak percobaan. Silakan coba beberapa saat lagi." },
+      { status: 429 },
+    );
+  }
+  if (g !== "ok") {
     return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
   }
 

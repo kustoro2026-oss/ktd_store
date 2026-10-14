@@ -34,6 +34,7 @@ import {
 } from "@/lib/digiflazz";
 import { listHealthSnapshot, listTopupWebhookLogs } from "@/lib/db";
 import { processDigiflazzWebhook } from "@/lib/digiflazz-webhook";
+import { adminGuard } from "@/lib/admin-guard";
 import { refreshHealthSnapshot } from "@/lib/topup-health";
 import {
   normalizePhone,
@@ -94,8 +95,16 @@ function resp(r: DgRawResult, extra?: Record<string, unknown>) {
 const butuh = (fields: (string | null)[]) => fields.every((f) => f !== null && f !== "");
 
 export async function POST(req: Request) {
-  const secret = req.headers.get("x-topup-secret") ?? "";
-  if (!ADMIN_SECRET || secret !== ADMIN_SECRET) {
+  // Kuota lebih longgar (60/10 menit) karena konsol hub menjelajah daftar
+  // harga & cek saldo dari satu IP server, bukan per pengguna akhir.
+  const g = adminGuard(req, ADMIN_SECRET, 60);
+  if (g === "rate_limited") {
+    return NextResponse.json(
+      { ok: false, error: "Terlalu banyak percobaan. Silakan coba beberapa saat lagi." },
+      { status: 429 },
+    );
+  }
+  if (g !== "ok") {
     return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
   }
 

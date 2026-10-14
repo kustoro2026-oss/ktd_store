@@ -6,14 +6,21 @@
 
 import { NextResponse } from "next/server";
 import { checkDigiflazzBalance, digiflazzConfigured } from "@/lib/digiflazz";
+import { adminGuard } from "@/lib/admin-guard";
 
 export const runtime = "nodejs";
 
 const ADMIN_SECRET = process.env.TOPUP_ADMIN_SECRET ?? "";
 
 export async function GET(req: Request) {
-  const secret = req.headers.get("x-topup-secret") ?? "";
-  if (!ADMIN_SECRET || secret !== ADMIN_SECRET) {
+  const g = adminGuard(req, ADMIN_SECRET);
+  if (g === "rate_limited") {
+    return NextResponse.json(
+      { ok: false, error: "Terlalu banyak percobaan. Silakan coba beberapa saat lagi." },
+      { status: 429 },
+    );
+  }
+  if (g !== "ok") {
     return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
   }
   if (!digiflazzConfigured()) {
