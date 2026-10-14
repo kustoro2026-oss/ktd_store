@@ -9,6 +9,7 @@
 
 import { NextResponse } from "next/server";
 import { getTopupOrder, listTopupOrdersByPhone, type TopUpOrder } from "@/lib/db";
+import { clientIp, rateLimitHit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -17,33 +18,6 @@ export const runtime = "nodejs";
 // untuk memetakan riwayat transaksi. Batasi 30 request/menit per IP (state
 // in-memory; di serverless tiap instance punya counter sendiri — tetap
 // mengurangi scan massal dari satu klien hangat).
-
-const g = globalThis as unknown as { __ktdCekLimit?: Map<string, number[]> };
-const WINDOW_MS = 60_000;
-const MAX_PER_WINDOW = 30;
-
-function clientIp(req: Request): string {
-  return (
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    req.headers.get("x-real-ip") ||
-    "unknown"
-  );
-}
-
-function rateLimited(ip: string): boolean {
-  const now = Date.now();
-  const map = (g.__ktdCekLimit ??= new Map<string, number[]>());
-  const hits = (map.get(ip) ?? []).filter((t) => now - t < WINDOW_MS);
-  hits.push(now);
-  map.set(ip, hits);
-  // Bersihkan entri usang sesekali agar map tidak tumbuh tanpa batas.
-  if (map.size > 500) {
-    for (const [k, v] of map) {
-      if (v.every((t) => now - t >= WINDOW_MS)) map.delete(k);
-    }
-  }
-  return hits.length > MAX_PER_WINDOW;
-}
 
 /** "0812xxxx" → "08••••xx12" — aman untuk ditampilkan ke publik. */
 function maskTarget(s: string): string {
@@ -82,7 +56,7 @@ function publicOrder(o: TopUpOrder) {
 }
 
 export async function GET(req: Request) {
-  if (rateLimited(clientIp(req))) {
+  if (rateLimitHit(`cek:${clientIp(req)}`, 60_000, 30)) {
     return NextResponse.json(
       { ok: false, error: "terlalu_sering" },
       { status: 429 },

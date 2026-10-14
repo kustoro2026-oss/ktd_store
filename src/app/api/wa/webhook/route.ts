@@ -16,7 +16,7 @@ const CATALOG_URL = "https://toko.kustoro2026.com/";
 // Hub (admin.kustoro2026.com/api/wa/webhook). Bila pesan masuk tetap sampai
 // di sini, cabang top-up di bawah memberi jawaban yang sama seperti bot Hub.
 import { getTopupOrder } from "@/lib/db";
-import { normalizePhone } from "@/lib/wa";
+import { normalizePhone, safeEqual, verifyWaSignature } from "@/lib/wa";
 
 /**
  * Pemetaan ID iklan CTWA (Meta Ads) → URL produk yang diiklankan.
@@ -217,16 +217,47 @@ export async function GET(request: Request) {
   const token = searchParams.get("hub.verify_token");
   const challenge = searchParams.get("hub.challenge");
   const expected = process.env.WA_VERIFY_TOKEN;
-  if (mode === "subscribe" && expected && token === expected && challenge) {
+  if (
+    mode === "subscribe" &&
+    expected &&
+    token &&
+    challenge &&
+    safeEqual(token, expected)
+  ) {
     return new Response(challenge, { status: 200 });
   }
   return new Response("Gagal verifikasi webhook", { status: 403 });
 }
 
 export async function POST(request: Request) {
+  // Verifikasi signature Meta WAJIB sebelum payload diproses: HMAC-SHA256
+  // atas body mentah dengan WA_APP_SECRET. Tanpa env ini route menolak semua
+  // permintaan (fail closed) supaya webhook palsu tidak bisa memicu balasan
+  // bot berbayar.
+  const appSecret = process.env.WA_APP_SECRET;
+  if (!appSecret) {
+    return Response.json(
+      { error: "WA_APP_SECRET belum diatur — verifikasi webhook tidak aktif" },
+      { status: 500 },
+    );
+  }
+  const rawBody = await request.text();
+  if (
+    !verifyWaSignature(
+      rawBody,
+      request.headers.get("X-Hub-Signature-256"),
+      appSecret,
+    )
+  ) {
+    return Response.json(
+      { error: "Signature webhook tidak valid" },
+      { status: 401 },
+    );
+  }
+
   let payload: { entry?: WaEntry[] };
   try {
-    payload = (await request.json()) as { entry?: WaEntry[] };
+    payload = JSON.parse(rawBody) as { entry?: WaEntry[] };
   } catch {
     return Response.json({ error: "payload JSON tidak valid" }, { status: 400 });
   }

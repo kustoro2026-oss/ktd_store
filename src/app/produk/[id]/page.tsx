@@ -7,6 +7,7 @@ import { getDetailCached } from "@/lib/detail-cache";
 import type { AnekaProductDetail } from "@/lib/anekadropship";
 import { SITE_URL } from "@/lib/config";
 import { toLocalImages } from "@/lib/localImages";
+import { escapeJsonLd } from "@/lib/sanitize";
 
 // Never statically optimize — product data is scraped at request time.
 export const dynamic = "force-dynamic";
@@ -175,11 +176,11 @@ export default async function ProductDetailPage({
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: escapeJsonLd(productJsonLd) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: escapeJsonLd(breadcrumbJsonLd) }}
       />
       <ProductDetailView detail={viewDetail} />
     </>

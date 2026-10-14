@@ -1,6 +1,8 @@
 // Klien WhatsApp Cloud API untuk notifikasi transaksi top-up KTD Store.
 // Kredensial dibaca dari env (WA_TOKEN, WA_PHONE_NUMBER_ID) — WABA yang sama
 // dengan nomor bot toko 6282173427249.
+import crypto from "node:crypto";
+
 const GRAPH_VERSION = "v24.0";
 
 /** Template utility 1 variabel yang dipakai untuk status transaksi —
@@ -11,6 +13,34 @@ export const TOPUP_TEMPLATE = process.env.WA_TOPUP_TEMPLATE ?? "order_alert_ktd2
 
 export function waConfigured(): boolean {
   return !!(process.env.WA_TOKEN && process.env.WA_PHONE_NUMBER_ID);
+}
+
+/** Banding dua string dengan waktu konstan — anti timing attack untuk
+ *  rahasia webhook (verify token dan signature). */
+export function safeEqual(a: string, b: string): boolean {
+  const ab = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ab.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ab, bb);
+}
+
+/** Verifikasi header X-Hub-Signature-256 yang dikirim Meta di SETIAP payload
+ *  webhook: HMAC-SHA256 atas body MENTAH dengan WA_APP_SECRET (App Secret
+ *  aplikasi Meta, dari App Dashboard). Tanpa verifikasi ini siapa pun yang
+ *  tahu URL webhook bisa memalsukan pesan masuk. */
+export function verifyWaSignature(
+  rawBody: string,
+  header: string | null,
+  appSecret: string,
+): boolean {
+  if (!header) return false;
+  const m = header.trim().match(/^sha256=([0-9a-f]{64})$/i);
+  if (!m) return false;
+  const expected = crypto
+    .createHmac("sha256", appSecret)
+    .update(rawBody)
+    .digest("hex");
+  return safeEqual(expected.toLowerCase(), m[1].toLowerCase());
 }
 
 /** Normalisasi nomor HP Indonesia → format 62xxxxxxxxxxx. */

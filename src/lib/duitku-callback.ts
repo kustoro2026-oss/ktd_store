@@ -21,7 +21,11 @@ import { verifyDuitkuCallback, type DuitkuCallback } from "@/lib/duitku";
 import { executeTopupOrder, recheckPendingTopups } from "@/lib/topup-execute";
 import { notifyTopupOwner } from "@/lib/wa";
 
-const OK = new Response("OK", { status: 200 });
+/** Response 200 "OK" DIBUAT BARU tiap permintaan — body Response bersifat
+ *  single-use, jadi objek yang disimpan di scope modul akan terkirim kosong
+ *  (tetap status 200) pada permintaan kedua dan seterusnya. Bug yang sama
+ *  pernah terjadi di webhook Digiflazz lama. */
+const okResponse = () => new Response("OK", { status: 200 });
 
 const rupiah = (n: number) => `Rp ${new Intl.NumberFormat("id-ID").format(n)}`;
 
@@ -170,10 +174,10 @@ export async function routeDuitkuCallback(rawBody: string): Promise<Response> {
   ];
   for (const ref of refs) {
     const probe = { ...cb, merchantOrderId: ref };
-    if (await handleStoreOrderCallback(probe)) return OK;
-    if (await handleTopupOrderCallback(probe)) return OK;
+    if (await handleStoreOrderCallback(probe)) return okResponse();
+    if (await handleTopupOrderCallback(probe)) return okResponse();
   }
 
   // Ref tidak dikenal (mungkin callback milik fitur lain) — akhiri retry.
-  return OK;
+  return okResponse();
 }

@@ -27,6 +27,7 @@ import {
   type StoreOrderItem,
 } from "@/lib/db";
 import { createDuitkuPayment, duitkuConfigured, DUITKU_MIN_AMOUNT } from "@/lib/duitku";
+import { clientIp, rateLimitHit } from "@/lib/rate-limit";
 import { SITE_URL } from "@/lib/config";
 
 export const runtime = "nodejs";
@@ -43,6 +44,15 @@ function safePageUrl(raw: unknown): string {
 }
 
 export async function POST(req: Request) {
+  // Batasi pembuatan pesanan per IP — cegah spam pesanan & flood inquiry
+  // Duitku dari satu klien (in-memory per instance, lihat rate-limit.ts).
+  if (rateLimitHit(`checkout:${clientIp(req)}`, 10 * 60_000, 10)) {
+    return NextResponse.json(
+      { ok: false, error: "Terlalu banyak percobaan. Silakan coba beberapa saat lagi." },
+      { status: 429 },
+    );
+  }
+
   let body: {
     productId?: unknown;
     items?: unknown;

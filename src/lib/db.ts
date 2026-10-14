@@ -11,6 +11,7 @@
 // menolak meneruskan baris berprototipe null dari node:sqlite ke Client
 // Component, jadi baris disalin dulu.
 import fs from "node:fs";
+import crypto from "node:crypto";
 import path from "node:path";
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
 import type { Pool } from "@neondatabase/serverless";
@@ -26,7 +27,7 @@ export type TopupStatus =
   | "failed";
 
 export type TopUpOrder = {
-  /** ID pesanan tampilan, mis. KTD-M2XQ9K. */
+  /** ID pesanan tampilan, mis. KTD-M2XQ9KABC123. */
   id: string;
   /** Referensi unik — dipakai sebagai merchantOrderId Duitku DAN ref_id
    *  Digiflazz. */
@@ -333,19 +334,28 @@ export function nowUtc(): string {
 
 // ---------- ID pesanan ----------
 
-/** ID tampilan pendek, mis. KTD-M2XQ9K. */
+/** 6 karakter acak kriptografis (crypto.randomInt) — Math.random bisa
+ *  diprediksi sehingga ID pesanan bisa ditebak; endpoint status publik
+ *  (/api/topup/cek, GET /api/checkout/[id]) mengandalkan kerahasiaan ID. */
+function randomBase36(len: number): string {
+  const chars: string[] = [];
+  for (let i = 0; i < len; i++) {
+    chars.push(crypto.randomInt(0, 36).toString(36).toUpperCase());
+  }
+  return chars.join("");
+}
+
+/** ID tampilan pendek, mis. KTD-M2XQ9KABC123. */
 export function newOrderId(): string {
   const t = Date.now().toString(36).toUpperCase();
-  const r = Math.random().toString(36).slice(2, 4).toUpperCase();
-  return `KTD-${t}${r}`;
+  return `KTD-${t}${randomBase36(6)}`;
 }
 
 /** Ref unik internal — dipakai sebagai merchantOrderId Duitku sekaligus
  *  ref_id Digiflazz (tanpa strip supaya aman di kedua sistem). */
 export function newRefId(): string {
   const t = Date.now().toString(36).toUpperCase();
-  const r = Math.random().toString(36).slice(2, 8).toUpperCase();
-  return `KTD${t}${r}`;
+  return `KTD${t}${randomBase36(6)}`;
 }
 
 // ---------- pesanan top-up ----------

@@ -17,11 +17,21 @@ import { QRIS_CODES } from "@/lib/duitku-channels";
 import { gateBalanceForCost } from "@/lib/topup-balance";
 import { gateProductHealth } from "@/lib/topup-health";
 import { notifyTopupOwner } from "@/lib/wa";
+import { clientIp, rateLimitHit } from "@/lib/rate-limit";
 import { SITE_URL, whatsappLink } from "@/lib/config";
 
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
+  // Batasi pembuatan pesanan per IP — cegah spam pesanan, notifikasi WA
+  // owner, dan flood inquiry Duitku dari satu klien.
+  if (rateLimitHit(`topup-order:${clientIp(req)}`, 10 * 60_000, 10)) {
+    return NextResponse.json(
+      { ok: false, error: "Terlalu banyak percobaan. Silakan coba beberapa saat lagi." },
+      { status: 429 },
+    );
+  }
+
   let body: {
     sku?: unknown;
     id?: unknown;

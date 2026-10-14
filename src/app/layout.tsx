@@ -7,6 +7,7 @@ import FloatingActions from "@/components/FloatingActions";
 import MetaPixel from "@/components/MetaPixel";
 import { CartProvider } from "@/lib/cart";
 import { SITE_URL } from "@/lib/config";
+import { escapeJsonLd } from "@/lib/sanitize";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -101,11 +102,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <MetaPixel />
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
+          dangerouslySetInnerHTML={{ __html: escapeJsonLd(websiteJsonLd) }}
         />
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+          dangerouslySetInnerHTML={{ __html: escapeJsonLd(organizationJsonLd) }}
         />
         <CartProvider>
           <Header />
