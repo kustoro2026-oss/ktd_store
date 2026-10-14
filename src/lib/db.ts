@@ -14,7 +14,7 @@ import fs from "node:fs";
 import crypto from "node:crypto";
 import path from "node:path";
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
-import type { Pool } from "@neondatabase/serverless";
+import type { Pool } from "pg";
 import { normalizePhone } from "./wa";
 
 export type PaymentStatus = "pending" | "paid" | "expired" | "failed";
@@ -103,9 +103,12 @@ function splitStatements(sql: string): string[] {
 
 async function pgPool(): Promise<Pool> {
   if (!g.__ktdTopupPg) {
-    const { Pool } = await import("@neondatabase/serverless");
-    const pool = new Pool({ connectionString: pgUrl() });
-    // Driver serverless Neon tidak dijamin mendukung query multi-statement —
+    const { Pool } = await import("pg");
+    const pool = new Pool({
+      connectionString: pgUrl(),
+      ssl: { rejectUnauthorized: false },
+    });
+    // Driver tidak dijamin mendukung query multi-statement —
     // jalankan tiap statement satu per satu. Kegagalan init tidak boleh
     // mengunci seluruh lapisan DB (tabel lama tetap bisa dipakai).
     for (const stmt of splitStatements(SCHEMA_SQL + "\n" + STORE_SCHEMA_SQL)) {
