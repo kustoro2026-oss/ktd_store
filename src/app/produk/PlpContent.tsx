@@ -51,6 +51,8 @@ type Props = {
   category: string;
   search: string;
   page: number;
+  /** Basis URL pagination (default /produk; halaman kategori memakai /produk/kategori/[slug]). */
+  listingBase?: string;
 };
 
 export default function PlpContent({
@@ -60,6 +62,7 @@ export default function PlpContent({
   category,
   search,
   page,
+  listingBase = "/produk",
 }: Props) {
   // Fall back to client fetching when the server couldn't reach the upstream.
   const { data: catData } = useApi<{ categories: AnekaCategory[] }>(
@@ -81,8 +84,16 @@ export default function PlpContent({
   const catName =
     categories.find((c) => c.slug.toLowerCase() === category.toLowerCase())?.name ?? category;
 
-  const buildUrl = (p: number) =>
-    `/produk?search=${encodeURIComponent(search)}&category=${encodeURIComponent(category)}&page=${p}`;
+  const buildUrl = (p: number) => {
+    const params = new URLSearchParams();
+    if (listingBase === "/produk") {
+      if (search) params.set("search", search);
+      if (category) params.set("category", category);
+    }
+    if (p > 1) params.set("page", String(p));
+    const qs = params.toString();
+    return qs ? `${listingBase}?${qs}` : listingBase;
+  };
 
   const title = search
     ? `Hasil pencarian "${search}"`
@@ -124,7 +135,7 @@ export default function PlpContent({
               {categories.map((c) => (
                 <li key={c.slug}>
                   <Link
-                    href={`/produk?category=${encodeURIComponent(c.slug)}`}
+                    href={`/produk/kategori/${encodeURIComponent(c.slug)}`}
                     className={`block rounded-lg px-2.5 py-2 ${category === c.slug ? "bg-brand/5 font-semibold text-brand" : "text-muted transition-colors hover:bg-gray-50 hover:text-brand"}`}
                   >
                     {c.name}
@@ -161,7 +172,7 @@ export default function PlpContent({
             {categories.map((c) => (
               <Link
                 key={c.slug}
-                href={`/produk?category=${encodeURIComponent(c.slug)}`}
+                href={`/produk/kategori/${encodeURIComponent(c.slug)}`}
                 className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold ${category === c.slug ? "border-brand bg-brand text-white" : "border-gray-200 bg-white text-muted"}`}
               >
                 <CategoryIcon slug={c.slug} className="h-3.5 w-3.5" />

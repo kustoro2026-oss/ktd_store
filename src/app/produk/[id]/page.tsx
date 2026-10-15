@@ -7,6 +7,7 @@ import { getDetailCached } from "@/lib/detail-cache";
 import type { AnekaProductDetail } from "@/lib/anekadropship";
 import { SITE_URL } from "@/lib/config";
 import { toLocalImages } from "@/lib/localImages";
+import { getStaticProducts } from "@/lib/products-cache";
 import { escapeJsonLd } from "@/lib/sanitize";
 
 // Never statically optimize — product data is scraped at request time.
@@ -139,6 +140,8 @@ export default async function ProductDetailPage({
   // Gambar lokal untuk tampilan (cache bersama tidak boleh dimutasi).
   const localImages = toLocalImages(detail.id, detail.images);
   const viewDetail = { ...detail, images: localImages };
+  // Kategori situs dari cache statis (untuk metadata + schema).
+  const category = getStaticProducts().find((p) => p.id === detail.id)?.category;
   const productJsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -146,6 +149,9 @@ export default async function ProductDetailPage({
     sku: detail.id,
     image: localImages.length ? absoluteImages(localImages.slice(0, 3)) : undefined,
     description: description || undefined,
+    brand: { "@type": "Brand", name: "KTD Store" },
+    category: category || undefined,
+    itemCondition: "https://schema.org/NewCondition",
     offers: {
       "@type": "Offer",
       url: `${SITE_URL}/produk/${detail.id}`,

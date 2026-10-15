@@ -43,7 +43,7 @@ export function PopularCategories({
           {categories.slice(0, 16).map((c) => (
             <Link
               key={c.slug}
-              href={`/produk?category=${encodeURIComponent(c.slug)}`}
+              href={`/produk/kategori/${encodeURIComponent(c.slug)}`}
               onClick={() => saveLastCategory(c.slug)}
               className="group flex flex-col items-center justify-center gap-2 rounded-xl border border-gray-100 bg-white p-3 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-md"
             >

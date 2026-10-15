@@ -252,7 +252,7 @@ export default function Header() {
                   {categories.map((c) => (
                     <Link
                       key={c.slug}
-                      href={`/produk?category=${encodeURIComponent(c.slug)}`}
+                      href={`/produk/kategori/${encodeURIComponent(c.slug)}`}
                       className="flex items-center gap-2.5 truncate rounded-lg px-2.5 py-2 text-sm text-muted transition-colors hover:bg-brand/5 hover:text-brand"
                     >
                       <CategoryIcon slug={c.slug} className="h-4 w-4 shrink-0 text-brand" />
@@ -277,7 +277,7 @@ export default function Header() {
             {categories.slice(0, 7).map((c) => (
               <Link
                 key={c.slug}
-                href={`/produk?category=${encodeURIComponent(c.slug)}`}
+                href={`/produk/kategori/${encodeURIComponent(c.slug)}`}
                 className="whitespace-nowrap px-2.5 py-2 text-muted transition-colors hover:text-brand"
               >
                 {c.name}
@@ -338,7 +338,7 @@ export default function Header() {
               {categories.map((c) => (
                 <Link
                   key={c.slug}
-                  href={`/produk?category=${encodeURIComponent(c.slug)}`}
+                  href={`/produk/kategori/${encodeURIComponent(c.slug)}`}
                   onClick={() => setMobileOpen(false)}
                   className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-ink transition-colors hover:bg-gray-50"
                 >

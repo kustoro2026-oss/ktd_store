@@ -1,46 +1,11 @@
 import type { Metadata } from "next";
 import PlpContent from "./PlpContent";
-import { filterByRelevance, prioritizeAneka } from "@/lib/search";
 import { getLocalImages } from "@/lib/localImages";
+import { filterAndRankProducts } from "@/lib/produk-listing";
 import { getStaticCategories, getStaticProducts } from "@/lib/products-cache";
 
 function getProducts(search: string, category: string, page: number) {
-  let products = getStaticProducts();
-
-  if (search) {
-    products = filterByRelevance(products, search);
-  }
-  if (category) {
-    // 1) Products whose `category` field matches exactly (mostly EVM items
-    //    after the site-category mapping).
-    const exactMatch = products.filter(
-      (p) => (p as { category?: string }).category?.toLowerCase() === category.toLowerCase(),
-    );
-    // 2) The remaining products: match the category NAME against product
-    //    names — most aneka items have an empty/unusable `category` field,
-    //    so exact-match alone would drop every aneka product from the page.
-    const catName =
-      getStaticCategories()
-        .find((c) => c.slug.toLowerCase() === category.toLowerCase())
-        ?.name ?? category;
-    const nameMatch = filterByRelevance(
-      products.filter(
-        (p) => (p as { category?: string }).category?.toLowerCase() !== category.toLowerCase(),
-      ),
-      catName,
-    );
-    products = [...exactMatch, ...nameMatch];
-  }
-
-  // Prioritize aneka products in every listing: early pages are
-  // aneka-majority while Evermos items stay sprinkled in (3 aneka : 1
-  // Evermos). Deterministic per keyword + category so SSR /produk and
-  // /api/products stay identical and pagination pages 1..N remain consistent
-  // (no duplicates / gaps).
-  products = prioritizeAneka(
-    products,
-    `listing|${search.trim().toLowerCase()}|${category.trim().toLowerCase()}`,
-  );
+  const products = filterAndRankProducts(getStaticProducts(), search, category);
 
   const localized = products.map((p) => {
     const local = getLocalImages(p.id);
@@ -66,6 +31,13 @@ export async function generateMetadata({
   return {
     title: `${title} — KTD Store`,
     description: `Jelajahi koleksi produk ${title.toLowerCase()} terbaru di KTD Store. Harga terbaik langsung dari supplier.`,
+    // Anti-duplikasi SEO: halaman ?category= menunjuk ke URL bersih
+    // /produk/kategori/[slug]; halaman hasil pencarian tidak diindeks.
+    ...(category
+      ? { alternates: { canonical: `/produk/kategori/${encodeURIComponent(category)}` } }
+      : search
+        ? { robots: { index: false, follow: false } }
+        : {}),
   };
 }
 

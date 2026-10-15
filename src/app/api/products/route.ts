@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { filterByRelevance, prioritizeAneka } from "@/lib/search";
 import { getLocalImages } from "@/lib/localImages";
-import { getStaticCategories, getStaticProducts } from "@/lib/products-cache";
+import { filterAndRankProducts } from "@/lib/produk-listing";
+import { getStaticProducts } from "@/lib/products-cache";
 import { isFlashSaleProduct, shuffleArray } from "@/lib/promo";
 
 export const dynamic = "force-dynamic";
@@ -18,40 +18,8 @@ export async function GET(req: NextRequest) {
   const flashsale = searchParams.get("flashsale") === "1";
   const sort = searchParams.get("sort") ?? "";
 
-  let products = getStaticProducts();
-
-  // Apply filters from static cache
-  if (search) {
-    products = filterByRelevance(products, search);
-  }
-  if (category) {
-    // 1) Products whose `category` field matches exactly (mostly EVM items
-    //    after the site-category mapping).
-    const exactMatch = products.filter(
-      (p) => (p as { category?: string }).category?.toLowerCase() === category.toLowerCase(),
-    );
-    // 2) The remaining products: match the category NAME against product
-    //    names — most aneka items have an empty/unusable `category` field,
-    //    so exact-match alone would drop every aneka product from the page.
-    const catName =
-      getStaticCategories()
-        .find((c) => c.slug.toLowerCase() === category.toLowerCase())
-        ?.name ?? category;
-    const nameMatch = filterByRelevance(
-      products.filter(
-        (p) => (p as { category?: string }).category?.toLowerCase() !== category.toLowerCase(),
-      ),
-      catName,
-    );
-    products = [...exactMatch, ...nameMatch];
-  }
-
-  // Prioritize aneka products in every listing — same seed as SSR /produk so
-  // ordering & pagination stay identical (3 aneka : 1 Evermos per group).
-  products = prioritizeAneka(
-    products,
-    `listing|${search.trim().toLowerCase()}|${category.trim().toLowerCase()}`,
-  );
+  // Filter + urutan identik dengan SSR /produk (lib bersama).
+  let products = filterAndRankProducts(getStaticProducts(), search, category);
 
   // Flash Sale: hanya produk eligible (harga, stok, profit) dari seluruh katalog
   if (flashsale) {
