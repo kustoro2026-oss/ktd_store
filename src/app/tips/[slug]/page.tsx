@@ -1,7 +1,24 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { blogPosts, getBlogPost } from "@/lib/data";
+import { blogPosts, blogCategorySlug, getBlogPost } from "@/lib/data";
+import { getStaticCategories } from "@/lib/products-cache";
+import { SITE_URL } from "@/lib/config";
+import { escapeJsonLd } from "@/lib/sanitize";
+
+const MONTH_ID: Record<string, number> = {
+  Jan: 1, Feb: 2, Mar: 3, Apr: 4, Mei: 5, Jun: 6,
+  Jul: 7, Agu: 8, Sep: 9, Okt: 10, Nov: 11, Des: 12,
+};
+
+/** "15 Sep 2026" → "2026-09-15" (untuk BlogPosting JSON-LD). */
+function isoDate(dateStr: string): string {
+  const m = /^(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})$/.exec(dateStr);
+  if (!m) return "";
+  const mm = MONTH_ID[m[2]];
+  if (!mm) return "";
+  return `${m[3]}-${String(mm).padStart(2, "0")}-${String(Number(m[1])).padStart(2, "0")}`;
+}
 
 export function generateStaticParams() {
   return blogPosts.map((b) => ({ slug: b.slug }));
@@ -48,8 +65,34 @@ export default async function BlogPostPage({
 
   const others = blogPosts.filter((b) => b.slug !== post.slug);
 
+  // Internal link CTA ke halaman kategori (bila artikel terpetakan).
+  const catSlug = blogCategorySlug[post.slug];
+  const cat = catSlug ? getStaticCategories().find((c) => c.slug === catSlug) : undefined;
+
+  const articleJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    headline: post.title,
+    description: post.excerpt,
+    image: [post.image.startsWith("http") ? post.image : `${SITE_URL}${post.image}`],
+    datePublished: isoDate(post.date),
+    dateModified: isoDate(post.date),
+    author: { "@type": "Organization", name: "KTD Store", url: SITE_URL },
+    publisher: {
+      "@type": "Organization",
+      name: "KTD Store",
+      url: SITE_URL,
+      logo: { "@type": "ImageObject", url: `${SITE_URL}/images/logo.png` },
+    },
+    mainEntityOfPage: `${SITE_URL}/tips/${post.slug}`,
+  };
+
   return (
     <div className="container-site py-5">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: escapeJsonLd(articleJsonLd) }}
+      />
       {/* Breadcrumb */}
       <nav className="mb-4 flex flex-wrap items-center gap-1 text-xs text-muted-2" aria-label="Breadcrumb">
         <Link href="/" className="transition-colors hover:text-brand">Beranda</Link>
@@ -103,12 +146,29 @@ export default async function BlogPostPage({
               Temukan produk terkait artikel ini di katalog kami.
             </p>
           </div>
-          <Link
-            href={`/produk?search=${encodeURIComponent(post.query)}`}
-            className="shrink-0 rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-2"
-          >
-            Lihat Produk Terkait
-          </Link>
+          <div className="flex shrink-0 flex-col items-center gap-2">
+            {cat ? (
+              <Link
+                href={`/produk/kategori/${encodeURIComponent(cat.slug)}`}
+                className="rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-2"
+              >
+                Lihat Produk {cat.name}
+              </Link>
+            ) : (
+              <Link
+                href={`/produk?search=${encodeURIComponent(post.query)}`}
+                className="rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-2"
+              >
+                Lihat Produk Terkait
+              </Link>
+            )}
+            <Link
+              href={`/produk?search=${encodeURIComponent(post.query)}`}
+              className="text-xs font-medium text-brand hover:underline"
+            >
+              Atau cari "{post.query}" di katalog →
+            </Link>
+          </div>
         </div>
       </article>
 

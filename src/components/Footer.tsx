@@ -2,6 +2,21 @@ import Link from "next/link";
 import Image from "next/image";
 import { WHATSAPP_NUMBER, whatsappDisplay } from "@/lib/config";
 import FooterMarketplace from "@/components/FooterMarketplace";
+import { getStaticCategories, getStaticProducts } from "@/lib/products-cache";
+
+/** Kategori populer untuk internal link footer: urutkan berdasarkan jumlah
+ *  produk yang tercatat per kategori (deterministik, dari cache statis). */
+function popularCategories(n: number) {
+  const cats = getStaticCategories();
+  const counts = new Map<string, number>();
+  for (const p of getStaticProducts()) {
+    if (!p.category) continue;
+    counts.set(p.category, (counts.get(p.category) ?? 0) + 1);
+  }
+  return [...cats]
+    .sort((a, b) => (counts.get(b.slug) ?? 0) - (counts.get(a.slug) ?? 0))
+    .slice(0, n);
+}
 
 const payments = [
   { name: "BCA", src: "/images/footer/bca.png" },
@@ -47,6 +62,20 @@ export default function Footer() {
         <Link href="/bantuan" className="transition-colors hover:text-brand">Bantuan</Link>
         <Link href="/syarat-ketentuan" className="transition-colors hover:text-brand">Syarat & Ketentuan</Link>
         <Link href="/kebijakan-privasi" className="transition-colors hover:text-brand">Kebijakan Privasi</Link>
+      </div>
+
+      {/* Kategori populer — internal link ke halaman kategori (SEO) */}
+      <div className="container-site flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-gray-100 py-4 text-sm text-muted">
+        <span className="font-semibold text-ink">Kategori Populer:</span>
+        {popularCategories(8).map((c) => (
+          <Link
+            key={c.slug}
+            href={`/produk/kategori/${encodeURIComponent(c.slug)}`}
+            className="transition-colors hover:text-brand"
+          >
+            {c.name}
+          </Link>
+        ))}
       </div>
 
       <div className="bg-gray-50/70">

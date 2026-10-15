@@ -16,6 +16,7 @@ import WhatsAppIcon from "@/components/WhatsAppIcon";
 import WhatsAppOrderModal from "@/components/WhatsAppOrderModal";
 import RelatedProducts from "@/components/RelatedProducts";
 import ProductVideos from "@/components/ProductVideos";
+import { PRODUCT_FAQ } from "@/lib/faq";
 import type { AnekaProductDetail } from "@/lib/anekadropship";
 
 const SIZE_RE =
@@ -72,7 +73,14 @@ function buildVariantOptions(detail: AnekaProductDetail): VarOpt[] {
   return out;
 }
 
-export default function ProductDetailView({ detail }: { detail: AnekaProductDetail }) {
+export default function ProductDetailView({
+  detail,
+  category,
+}: {
+  detail: AnekaProductDetail;
+  /** Kategori situs (bila produk terdaftar di salah satu kategori) — untuk breadcrumb. */
+  category?: { name: string; slug: string } | null;
+}) {
   const [activeImg, setActiveImg] = useState(0);
   const [waOpen, setWaOpen] = useState(false);
   // Marketplace whose link was clicked but the product isn't uploaded there yet.
@@ -198,6 +206,17 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
         <Link href="/" className="transition-colors hover:text-brand">Beranda</Link>
         <span>/</span>
         <Link href="/produk" className="transition-colors hover:text-brand">Produk</Link>
+        {category && (
+          <>
+            <span>/</span>
+            <Link
+              href={`/produk/kategori/${encodeURIComponent(category.slug)}`}
+              className="transition-colors hover:text-brand"
+            >
+              {category.name}
+            </Link>
+          </>
+        )}
         <span>/</span>
         <span className="truncate text-muted">{detail.name}</span>
       </nav>
@@ -494,6 +513,21 @@ export default function ProductDetailView({ detail }: { detail: AnekaProductDeta
           />
         </section>
       )}
+
+      {/* FAQ — menjawab pertanyaan umum seputar pemesanan & pembayaran */}
+      <section className="mt-10" aria-label="Pertanyaan yang Sering Diajukan">
+        <h2 className="mb-4 text-xl font-bold text-ink sm:text-2xl">
+          Pertanyaan yang Sering Diajukan
+        </h2>
+        <div className="space-y-3">
+          {PRODUCT_FAQ.map((f) => (
+            <div key={f.q} className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5">
+              <h3 className="text-sm font-bold text-ink">{f.q}</h3>
+              <p className="mt-1.5 text-sm leading-6 text-muted">{f.a}</p>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* Related products */}
       <RelatedProducts productId={detail.id} productName={detail.name} />

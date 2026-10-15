@@ -6,7 +6,11 @@ import {
   MessageCircle,
   ShieldCheck,
   Tags,
+  Building2,
+  Globe,
+  Mail,
 } from "lucide-react";
+import { WHATSAPP_NUMBER, whatsappDisplay } from "@/lib/config";
 
 export const metadata: Metadata = {
   title: "Tentang Kami",
@@ -136,6 +140,75 @@ export default function TentangKamiPage() {
               </div>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Profil usaha — identitas legal & kontak resmi (konsisten untuk
+          sitasi direktori bisnis / backlink). */}
+      <section className="mt-10">
+        <h2 className="text-xl font-bold text-ink sm:text-2xl">Profil Usaha</h2>
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <div className="flex items-start gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand/5 text-brand">
+              <Building2 className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <h3 className="font-bold text-ink">Nama Usaha</h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-muted">
+                KTD STORE — toko online produk pilihan, terdaftar sebagai
+                Penyelenggara Sistem Elektronik (PSE) Lingkup Privat di
+                Kementerian Komunikasi dan Digital.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-start gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand/5 text-brand">
+              <Globe className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <h3 className="font-bold text-ink">Website Resmi</h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-muted">
+                <Link href="/" className="font-medium text-brand hover:underline">
+                  toko.kustoro2026.com
+                </Link>
+              </p>
+            </div>
+          </div>
+          <div className="flex items-start gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand/5 text-brand">
+              <Mail className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <h3 className="font-bold text-ink">Email</h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-muted">
+                <a
+                  href="mailto:info@kustoro2026.com"
+                  className="font-medium text-brand hover:underline"
+                >
+                  info@kustoro2026.com
+                </a>
+              </p>
+            </div>
+          </div>
+          <div className="flex items-start gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand/5 text-brand">
+              <MessageCircle className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <h3 className="font-bold text-ink">WhatsApp CS</h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-muted">
+                <a
+                  href={`https://wa.me/${WHATSAPP_NUMBER}`}
+                  className="font-medium text-brand hover:underline"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {whatsappDisplay()}
+                </a>{" "}
+                — setiap hari 09:00–18:00 WIB (kecuali hari libur nasional)
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 

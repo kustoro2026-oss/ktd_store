@@ -99,14 +99,20 @@ export function SeoText() {
         </h1>
         <p className="mt-3 text-sm leading-6 text-muted">
           Belanja kebutuhan Anda dengan mudah, aman, dan nyaman. Kami menyediakan
-          berbagai kategori produk pilihan mulai dari kesehatan, kecantikan,
-          elektronik, fashion, peralatan rumah tangga, hingga kebutuhan hewan
-          peliharaan dan pertanian — semua dengan harga bersaing.
+          berbagai kategori produk pilihan mulai dari{" "}
+          <Link href="/produk/kategori/Kesehatan" className="font-medium text-brand hover:underline">kesehatan</Link>,{" "}
+          <Link href="/produk/kategori/Kecantikan" className="font-medium text-brand hover:underline">kecantikan</Link>,{" "}
+          <Link href="/produk/kategori/ELEKTRONIK" className="font-medium text-brand hover:underline">elektronik</Link>,{" "}
+          fashion,{" "}
+          <Link href="/produk/kategori/Alat%20Rumah%20Tangga" className="font-medium text-brand hover:underline">peralatan rumah tangga</Link>,{" "}
+          hingga kebutuhan hewan peliharaan dan pertanian — semua dengan harga
+          bersaing.
         </p>
         <p className="mt-3 text-sm leading-6 text-muted">
-          Temukan produk favorit Anda dari berbagai kategori pilihan. Setiap
-          produk dilengkapi deskripsi lengkap dan dapat dipesan dengan mudah
-          melalui WhatsApp.
+          Temukan produk favorit Anda dari{" "}
+          <Link href="/produk" className="font-medium text-brand hover:underline">berbagai kategori pilihan</Link>.{" "}
+          Setiap produk dilengkapi deskripsi lengkap dan dapat dipesan dengan
+          mudah melalui WhatsApp.
         </p>
       </div>
     </section>

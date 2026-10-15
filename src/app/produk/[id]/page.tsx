@@ -7,8 +7,9 @@ import { getDetailCached } from "@/lib/detail-cache";
 import type { AnekaProductDetail } from "@/lib/anekadropship";
 import { SITE_URL } from "@/lib/config";
 import { toLocalImages } from "@/lib/localImages";
-import { getStaticProducts } from "@/lib/products-cache";
+import { getStaticProducts, getStaticCategories } from "@/lib/products-cache";
 import { escapeJsonLd } from "@/lib/sanitize";
+import { PRODUCT_FAQ } from "@/lib/faq";
 
 // Never statically optimize — product data is scraped at request time.
 export const dynamic = "force-dynamic";
@@ -65,15 +66,22 @@ export async function generateMetadata({
     const inStock = Number(String(detail.stok).replace(/\D/g, "") || "0") > 0;
     const productUrl = `${SITE_URL}/produk/${detail.id}`;
     return {
-      title: detail.name,
+      title: `${detail.name} — KTD Store`,
       description,
-      keywords: [detail.name, "KTD Store", "belanja online", "dropship Indonesia"],
+      keywords: [
+        detail.name,
+        `beli ${detail.name}`,
+        `harga ${detail.name}`,
+        "KTD Store",
+        "belanja online",
+        "dropship Indonesia",
+      ],
       alternates: { canonical: `/produk/${detail.id}` },
       robots: { index: true, follow: true },
       openGraph: {
         type: "website",
         url: productUrl,
-        title: detail.name,
+        title: `${detail.name} — KTD Store`,
         description,
         images: ogImages,
         siteName: "KTD Store",
@@ -81,7 +89,7 @@ export async function generateMetadata({
       },
       twitter: {
         card: "summary_large_image",
-        title: detail.name,
+        title: `${detail.name} — KTD Store`,
         description,
         images: ogImages.map((img) => img.url),
       },
@@ -140,8 +148,14 @@ export default async function ProductDetailPage({
   // Gambar lokal untuk tampilan (cache bersama tidak boleh dimutasi).
   const localImages = toLocalImages(detail.id, detail.images);
   const viewDetail = { ...detail, images: localImages };
-  // Kategori situs dari cache statis (untuk metadata + schema).
-  const category = getStaticProducts().find((p) => p.id === detail.id)?.category;
+  // Kategori situs dari cache statis (untuk metadata + schema + breadcrumb).
+  // Catatan: banyak item aneka tidak punya kategori terisi — hanya tampilkan
+  // bila kategorinya memang terdaftar di daftar kategori situs.
+  const rawCategory = getStaticProducts().find((p) => p.id === detail.id)?.category;
+  const categoryCat = getStaticCategories().find((c) => c.slug === rawCategory);
+  const category = categoryCat
+    ? { name: categoryCat.name, slug: categoryCat.slug }
+    : null;
   const productJsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -150,7 +164,7 @@ export default async function ProductDetailPage({
     image: localImages.length ? absoluteImages(localImages.slice(0, 3)) : undefined,
     description: description || undefined,
     brand: { "@type": "Brand", name: "KTD Store" },
-    category: category || undefined,
+    category: category?.name || undefined,
     itemCondition: "https://schema.org/NewCondition",
     offers: {
       "@type": "Offer",
@@ -169,13 +183,39 @@ export default async function ProductDetailPage({
     itemListElement: [
       { "@type": "ListItem", position: 1, name: "Beranda", item: SITE_URL },
       { "@type": "ListItem", position: 2, name: "Produk", item: `${SITE_URL}/produk` },
-      {
-        "@type": "ListItem",
-        position: 3,
-        name: detail.name,
-        item: `${SITE_URL}/produk/${detail.id}`,
-      },
+      ...(category
+        ? [
+            {
+              "@type": "ListItem",
+              position: 3,
+              name: category.name,
+              item: `${SITE_URL}/produk/kategori/${encodeURIComponent(category.slug)}`,
+            },
+            {
+              "@type": "ListItem",
+              position: 4,
+              name: detail.name,
+              item: `${SITE_URL}/produk/${detail.id}`,
+            },
+          ]
+        : [
+            {
+              "@type": "ListItem",
+              position: 3,
+              name: detail.name,
+              item: `${SITE_URL}/produk/${detail.id}`,
+            },
+          ]),
     ],
+  };
+  const faqJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: PRODUCT_FAQ.map((f) => ({
+      "@type": "Question",
+      name: f.q,
+      acceptedAnswer: { "@type": "Answer", text: f.a },
+    })),
   };
 
   return (
@@ -188,7 +228,11 @@ export default async function ProductDetailPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: escapeJsonLd(breadcrumbJsonLd) }}
       />
-      <ProductDetailView detail={viewDetail} />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: escapeJsonLd(faqJsonLd) }}
+      />
+      <ProductDetailView detail={viewDetail} category={category} />
     </>
   );
 }
