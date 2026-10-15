@@ -12,22 +12,33 @@ export function generateStaticParams() {
   return getStaticCategories().map((c) => ({ slug: c.slug }));
 }
 
+/** Slug dari params bisa datang ter-encode (%20) atau sudah ter-decode —
+ *  perilaku Next 16 berbeda antara generateMetadata dan komponen halaman. */
+function decodeSlug(raw: string): string {
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
-  const { slug } = await params;
+  const { slug: rawSlug } = await params;
+  const slug = decodeSlug(rawSlug);
   const cat = getCategoryBySlug(slug);
   if (!cat) return { title: "Kategori Tidak Ditemukan" };
   const description = `Jelajahi koleksi produk ${cat.name} di KTD Store. Produk pilihan langsung dari supplier dengan harga terbaik.`;
   return {
     title: `Kategori ${cat.name}`,
     description,
-    alternates: { canonical: `/produk/kategori/${cat.slug}` },
+    alternates: { canonical: `/produk/kategori/${encodeURIComponent(cat.slug)}` },
     openGraph: {
       type: "website",
-      url: `${SITE_URL}/produk/kategori/${cat.slug}`,
+      url: `${SITE_URL}/produk/kategori/${encodeURIComponent(cat.slug)}`,
       title: `Kategori ${cat.name} — KTD Store`,
       description,
       siteName: "KTD Store",
@@ -45,8 +56,9 @@ export default async function KategoriProdukPage({
   params: Promise<{ slug: string }>;
   searchParams: Promise<{ page?: string }>;
 }) {
-  const { slug } = await params;
+  const { slug: rawSlug } = await params;
   const { page: pageParam } = await searchParams;
+  const slug = decodeSlug(rawSlug);
   const cat = getCategoryBySlug(slug);
   if (!cat) notFound();
 
@@ -66,7 +78,7 @@ export default async function KategoriProdukPage({
     "@context": "https://schema.org",
     "@type": "CollectionPage",
     name: `Kategori ${cat.name} — KTD Store`,
-    url: `${SITE_URL}/produk/kategori/${cat.slug}`,
+    url: `${SITE_URL}/produk/kategori/${encodeURIComponent(cat.slug)}`,
     description: `Koleksi produk kategori ${cat.name} di KTD Store.`,
     mainEntity: {
       "@type": "ItemList",
@@ -102,8 +114,8 @@ export default async function KategoriProdukPage({
         totalPages={Math.ceil(localized.length / PER_PAGE)}
         page={page}
         search=""
-        category={slug}
-        listingBase={`/produk/kategori/${slug}`}
+        category={cat.slug}
+        listingBase={`/produk/kategori/${encodeURIComponent(cat.slug)}`}
       />
     </>
   );

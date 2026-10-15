@@ -26,7 +26,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // Halaman kategori (URL bersih) — sama seperti link navigasi internal.
   const categoryRoutes: MetadataRoute.Sitemap = getStaticCategories().map((c) => ({
-    url: `${SITE_URL}/produk/kategori/${c.slug}`,
+    url: `${SITE_URL}/produk/kategori/${encodeURIComponent(c.slug)}`,
     lastModified: new Date(),
     changeFrequency: "weekly",
     priority: 0.7,
@@ -34,7 +34,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // Halaman provider top-up (Free Fire, pulsa, dll).
   const topupRoutes: MetadataRoute.Sitemap = TOPUP_PROVIDERS.map((p) => ({
-    url: `${SITE_URL}/topup/${p.slug}`,
+    url: `${SITE_URL}/topup/${encodeURIComponent(p.slug)}`,
     lastModified: new Date(),
     changeFrequency: "weekly",
     priority: 0.6,
