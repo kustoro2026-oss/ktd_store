@@ -31,14 +31,19 @@ export function adminGuard(
   return secretMatch(given, expected) ? "ok" : "forbidden";
 }
 
-/** Guard route cron: terima x-cron-secret (tanpa rate limit — dipanggil
- *  Vercel Cron sekali sehari) ATAU x-topup-secret (admin, kena rate limit). */
+/** Guard route cron: terima x-cron-secret / Authorization Bearer (Vercel Cron
+ *  mengirimkan CRON_SECRET di header Authorization Bearer, bukan x-cron-secret)
+ *  tanpa rate limit, ATAU x-topup-secret (admin, kena rate limit). */
 export function cronOrAdminGuard(
   req: Request,
   cronExpected: string,
   adminExpected: string,
 ): AdminGuardResult {
-  const givenCron = req.headers.get("x-cron-secret") ?? "";
+  const auth = req.headers.get("authorization") ?? "";
+  const givenCron =
+    (auth.startsWith("Bearer ") ? auth.slice(7) : "") ||
+    req.headers.get("x-cron-secret") ||
+    "";
   if (cronExpected && secretMatch(givenCron, cronExpected)) return "ok";
   const givenAdmin = req.headers.get("x-topup-secret") ?? "";
   if (!adminExpected || !givenAdmin) return "forbidden";

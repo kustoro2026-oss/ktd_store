@@ -178,6 +178,20 @@ export async function routeDuitkuCallback(rawBody: string): Promise<Response> {
     if (await handleTopupOrderCallback(probe)) return okResponse();
   }
 
+  // Ref tidak dikenal. Bila callback menyatakan SUDAH DIBAYAR (00) tetapi
+  // pesanannya tidak ada di database, pemilik WAJIB tahu — kemungkinan
+  // pesanan lama yang hilang saat migrasi database (pembayaran masuk,
+  // eksekusi top-up tidak pernah jalan). Jangan diam saja.
+  if (cb.resultCode === "00") {
+    try {
+      await notifyTopupOwner(
+        `[Top-up] Callback Duitku untuk ref ${cb.merchantOrderId} LUNAS (${rupiah(cb.amount ?? 0)}) tetapi pesanannya TIDAK ditemukan di database — periksa manual: kemungkinan pesanan dibuat sebelum migrasi database dan belum dieksekusi.`,
+      );
+    } catch {
+      // Notif gagal tidak boleh mengubah respons callback.
+    }
+  }
+
   // Ref tidak dikenal (mungkin callback milik fitur lain) — akhiri retry.
   return okResponse();
 }

@@ -1,9 +1,9 @@
 // Database pesanan top-up — dua backend dengan API async yang sama:
 //
-// - Produksi (Vercel): Postgres via driver serverless Neon. Filesystem
+// - Produksi (Vercel): Postgres via driver pg (Supabase Postgres pooler). Filesystem
 //   serverless Vercel bersifat sementara, jadi SQLite tidak bisa dipakai di
-//   sana. Koneksi diambil dari env DATABASE_URL (atau POSTGRES_URL bawaan
-//   Vercel Postgres) — hubungkan database lewat dashboard Vercel → Storage.
+//   sana. Koneksi diambil dari env DATABASE_URL — hubungkan database lewat
+//   dashboard Vercel → Settings → Environment Variables.
 // - Pengembangan lokal: SQLite via node:sqlite (file data/topup.db,
 //   folder ini di-gitignore).
 //
@@ -148,7 +148,7 @@ async function sqliteDb(): Promise<DatabaseSync> {
   if (!g.__ktdTopupSqlite) {
     if (process.env.VERCEL) {
       throw new Error(
-        "Pesanan top-up di Vercel butuh DATABASE_URL (Postgres/Neon) — hubungkan database di dashboard Vercel → Storage, lalu redeploy.",
+        "Pesanan top-up di Vercel butuh DATABASE_URL (Postgres Supabase) — set di dashboard Vercel → Settings → Environment Variables, lalu redeploy.",
       );
     }
     const { DatabaseSync: Db } = await import("node:sqlite");
