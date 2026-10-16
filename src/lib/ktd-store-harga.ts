@@ -4,16 +4,16 @@
  * rekomendasi katalog Aneka.
  *
  * Data diambil dari endpoint publik KTD Hub (GET /api/ktd-store/harga) dan
- * disimpan di state module (per worker) dengan TTL 5 menit, selaras dengan
- * cache-control endpoint — konsisten dengan pesan KTD Hub "situs memakai
- * harga baru dalam ±5 menit". Kegagalan jaringan tidak mengganggu render:
- * harga lama (atau harga katalog) tetap dipakai.
+ * disimpan di state module (per worker) dengan TTL 60 detik, selaras dengan
+ * cache endpoint — perubahan harga dari KTD Hub menyebar ke situs dalam
+ * ±2-3 menit. Kegagalan jaringan tidak mengganggu render: harga lama (atau
+ * harga katalog) tetap dipakai.
  */
 
 const HARGA_URL =
   process.env.KTD_HUB_HARGA_URL ?? "https://admin.kustoro2026.com/api/ktd-store/harga";
 
-const TTL_MS = 5 * 60 * 1000;
+const TTL_MS = 60 * 1000;
 
 const state = globalThis as unknown as {
   __ktdHarga?: { at: number; data: Record<string, number> };
@@ -25,7 +25,7 @@ export async function muatHargaKtd(): Promise<void> {
   const hit = state.__ktdHarga;
   if (hit && Date.now() - hit.at < TTL_MS) return;
   try {
-    const res = await fetch(HARGA_URL, { next: { revalidate: 300 } });
+    const res = await fetch(HARGA_URL, { next: { revalidate: 60 } });
     if (!res.ok) return;
     const json = (await res.json()) as { ok?: boolean; data?: Record<string, number> };
     if (!json.ok || !json.data) return;
