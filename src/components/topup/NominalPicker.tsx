@@ -399,6 +399,16 @@ export default function NominalPicker({ provider, initialSku }: Props) {
     return null;
   })();
 
+  /** Pembayaran online sama sekali tidak tersedia untuk nominal ini
+   *  (VA tidak diizinkan dan QRIS belum aktif) — tombol Beli Sekarang
+   *  dinonaktifkan agar pembeli tidak menunggu sesi bayar yang tidak ada. */
+  const onlineBlocked = !isWaOnly && vaAllowed === false && rows.length === 0;
+  /** Tombol Beli Sekarang hanya aktif setelah pembeli memilih metode
+   *  pembayaran; nominal di bawah Rp 10.000 dan kondisi onlineBlocked
+   *  tidak dapat dibeli dari halaman ini. */
+  const canBuy =
+    !busy && !!nominal && !isWaOnly && !onlineBlocked && chosenDuitku !== null;
+
   const remember = () => {
     try {
       localStorage.setItem(
@@ -849,9 +859,10 @@ export default function NominalPicker({ provider, initialSku }: Props) {
               <div className="flex items-start gap-2.5 rounded-xl border border-amber-100 bg-amber-50 p-3">
                 <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
                 <p className="text-xs leading-relaxed text-amber-800">
-                  Nominal di bawah Rp 10.000 (minimum pembayaran online) diproses
-                  via WhatsApp — pesanan tetap tercatat dan CS kami akan
-                  memverifikasi pembayaran Anda.
+                  Pembayaran online tersedia untuk nominal minimal Rp 10.000.
+                  Nominal di bawah jumlah tersebut belum dapat dibeli melalui
+                  halaman ini — silakan pilih nominal lain atau hubungi CS kami
+                  melalui WhatsApp.
                 </p>
               </div>
             )}
@@ -1044,8 +1055,8 @@ export default function NominalPicker({ provider, initialSku }: Props) {
                             vaMinOther,
                           )} dan top up game di bawah ${formatRupiah(
                             vaMinGame,
-                          )} belum dapat menggunakan pembayaran online karena sedang pengajuan aktivasi QRIS. Pesanan Anda diproses via WhatsApp — CS kami siap memandu pembayaran hingga selesai.`
-                        : "Pembayaran online (QRIS) sedang dalam proses pengajuan aktivasi — pesanan Anda diproses via WhatsApp, CS kami siap memandu pembayaran hingga selesai."}
+                          )} belum dapat menggunakan pembayaran online karena aktivasi QRIS masih dalam proses pengajuan. Silakan pilih nominal lain atau hubungi CS kami melalui WhatsApp — CS siap memandu pembayaran hingga selesai.`
+                        : "Pembayaran online sedang tidak tersedia karena aktivasi QRIS masih dalam proses pengajuan. Silakan hubungi CS kami melalui WhatsApp — CS siap memandu pembayaran hingga selesai."}
                     </p>
                   </div>
                 ) : (
@@ -1074,8 +1085,14 @@ export default function NominalPicker({ provider, initialSku }: Props) {
               </div>
               <button
                 type="submit"
-                disabled={busy || !nominal}
-                className="flex items-center gap-2 rounded-xl bg-brand px-5 py-3 text-sm font-bold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-brand-2 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={!canBuy}
+                className={`flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-bold shadow-sm transition-all ${
+                  busy
+                    ? "cursor-wait bg-brand text-white"
+                    : canBuy
+                      ? "bg-brand text-white hover:-translate-y-0.5 hover:bg-brand-2"
+                      : "cursor-not-allowed bg-gray-200 text-gray-500"
+                }`}
               >
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 {busy ? "Memproses..." : "Beli Sekarang"}
@@ -1085,8 +1102,12 @@ export default function NominalPicker({ provider, initialSku }: Props) {
             <p className="flex items-start gap-2 text-[11px] leading-relaxed text-muted">
               <Zap className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand" />
               {isWaOnly
-                ? "Nominal ini diproses via WhatsApp — CS kami akan memverifikasi pembayaran Anda."
-                : "Pilih metode pembayaran di atas — pengisian otomatis setelah pembayaran terverifikasi, biasanya dalam beberapa menit."}
+                ? "Nominal minimal untuk pembelian online adalah Rp 10.000 — silakan pilih nominal lain atau hubungi CS kami melalui WhatsApp."
+                : onlineBlocked
+                  ? "Pembayaran online untuk nominal ini sedang tidak tersedia — silakan pilih nominal lain atau hubungi CS kami melalui WhatsApp."
+                  : chosenDuitku
+                    ? "Pengisian otomatis setelah pembayaran terverifikasi, biasanya dalam beberapa menit."
+                    : "Silakan pilih metode pembayaran untuk mengaktifkan tombol Beli Sekarang — pengisian otomatis setelah pembayaran terverifikasi, biasanya dalam beberapa menit."}
             </p>
           </div>
         </form>

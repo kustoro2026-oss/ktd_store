@@ -176,7 +176,7 @@ export async function POST(req: Request) {
         orderId,
         mode: "wa",
         waLink,
-        gatewayError: `Nominal di bawah minimum pembayaran online (Rp ${DUITKU_MIN_AMOUNT.toLocaleString("id-ID")})`,
+        gatewayError: `Pembayaran online tersedia untuk nominal minimal Rp ${DUITKU_MIN_AMOUNT.toLocaleString("id-ID")} — nominal ini belum dapat dibeli melalui halaman.`,
       });
     }
     // Gate saldo: jangan buat sesi bayar bila saldo Digiflazz tidak cukup —
@@ -263,8 +263,8 @@ export async function POST(req: Request) {
               vaMinSellForCategory("pulsa"),
             )} dan top up game di bawah ${formatRupiah(
               vaMinSellForCategory("game"),
-            )} belum dapat menggunakan pembayaran online karena sedang pengajuan aktivasi QRIS. Pesanan Anda diproses via WhatsApp — CS kami siap memandu pembayaran hingga selesai.`
-          : "Pembayaran online (QRIS) sedang dalam proses pengajuan aktivasi — pesanan Anda diproses via WhatsApp, CS kami siap memandu pembayaran hingga selesai.",
+            )} belum dapat menggunakan pembayaran online karena aktivasi QRIS masih dalam proses pengajuan. Silakan pilih nominal lain atau hubungi CS kami melalui WhatsApp — CS siap memandu pembayaran hingga selesai.`
+          : "Pembayaran online sedang tidak tersedia karena aktivasi QRIS masih dalam proses pengajuan. Silakan hubungi CS kami melalui WhatsApp — CS siap memandu pembayaran hingga selesai.",
     });
   }
 
