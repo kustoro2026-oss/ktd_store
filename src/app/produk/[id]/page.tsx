@@ -8,6 +8,7 @@ import type { AnekaProductDetail } from "@/lib/anekadropship";
 import { SITE_URL } from "@/lib/config";
 import { toLocalImages } from "@/lib/localImages";
 import { getStaticProducts, getStaticCategories } from "@/lib/products-cache";
+import { muatHargaKtd } from "@/lib/ktd-store-harga";
 import { escapeJsonLd } from "@/lib/sanitize";
 import { PRODUCT_FAQ } from "@/lib/faq";
 
@@ -47,6 +48,8 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { id } = await params;
   try {
+    // Harga override KTD Store — dipakai getDetailCached (via getStaticProducts).
+    await muatHargaKtd();
     const detail = await getDetail(id);
     if (!detail?.name) return { title: "Produk Tidak Ditemukan" };
     const description =
@@ -113,6 +116,9 @@ export default async function ProductDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+
+  // Harga override KTD Store — dipakai getDetailCached (via getStaticProducts).
+  await muatHargaKtd();
 
   let detail: AnekaProductDetail | null = null;
   let fetchError: string | null = null;

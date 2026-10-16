@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { toLocalImages } from "@/lib/localImages";
 import { getStaticProducts } from "@/lib/products-cache";
+import { muatHargaKtd } from "@/lib/ktd-store-harga";
 import { getCachedVariants } from "@/lib/variant-cache";
 import { getCachedDescription } from "@/lib/description-cache";
 
@@ -15,6 +16,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
+
+  // Harga override KTD Store (±5 menit cache) — dipakai getStaticProducts.
+  await muatHargaKtd();
 
   const products = getStaticProducts();
   const p = products.find((p) => p.id === id);

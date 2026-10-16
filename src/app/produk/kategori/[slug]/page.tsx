@@ -5,8 +5,12 @@ import PlpContent from "../../PlpContent";
 import { getLocalImages } from "@/lib/localImages";
 import { filterAndRankProducts, getCategoryBySlug } from "@/lib/produk-listing";
 import { getStaticCategories, getStaticProducts } from "@/lib/products-cache";
+import { muatHargaKtd } from "@/lib/ktd-store-harga";
 import { SITE_URL } from "@/lib/config";
 import { escapeJsonLd } from "@/lib/sanitize";
+
+/** Kategori di-prerender saat build; harga override KTD Store di-refresh via ISR. */
+export const revalidate = 300;
 
 /** Semua kategori di-prerender saat build (sumber data statis JSON). */
 export function generateStaticParams() {
@@ -68,6 +72,9 @@ export default async function KategoriProdukPage({
   const slug = decodeSlug(rawSlug);
   const cat = getCategoryBySlug(slug);
   if (!cat) notFound();
+
+  // Harga override KTD Store (±5 menit cache) — dipakai getStaticProducts di bawah.
+  await muatHargaKtd();
 
   const page = Math.max(1, Number(pageParam ?? "1"));
 

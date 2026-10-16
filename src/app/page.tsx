@@ -21,6 +21,7 @@ import {
 } from "@/lib/hourlyProducts";
 import type { AnekaProduct, CardProduct } from "@/lib/anekadropship";
 import { isFlashSaleProduct } from "@/lib/promo";
+import { muatHargaKtd } from "@/lib/ktd-store-harga";
 
 // Lazy-load below-fold sections
 const FlashSale = dynamic(() => import("@/components/FlashSale"));
@@ -75,7 +76,9 @@ function topBySold(list: AnekaProduct[], n: number): AnekaProduct[] {
 }
 
 export default async function Home() {
-  // 100% static — no external network calls.
+  // Harga override KTD Store (±5 menit cache) — dipakai getStaticProducts di bawah.
+  await muatHargaKtd();
+
   const staticCats = getStaticCategories();
 
   // Seluruh katalog gabungan (aneka + Evermos) untuk pool Flash Sale.

@@ -3,6 +3,7 @@ import PlpContent from "./PlpContent";
 import { getLocalImages } from "@/lib/localImages";
 import { filterAndRankProducts } from "@/lib/produk-listing";
 import { getStaticCategories, getStaticProducts } from "@/lib/products-cache";
+import { muatHargaKtd } from "@/lib/ktd-store-harga";
 
 function getProducts(search: string, category: string, page: number) {
   const products = filterAndRankProducts(getStaticProducts(), search, category);
@@ -46,6 +47,9 @@ export default async function ProdukPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
+  // Harga override KTD Store (±5 menit cache) — dipakai getStaticProducts.
+  await muatHargaKtd();
+
   const sp = await searchParams;
   const search = (sp.search ?? "").toString();
   const category = (sp.category ?? "").toString();

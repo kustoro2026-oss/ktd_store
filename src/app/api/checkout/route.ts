@@ -29,6 +29,7 @@ import {
 import { createDuitkuPayment, duitkuConfigured, DUITKU_MIN_AMOUNT } from "@/lib/duitku";
 import { clientIp, rateLimitHit } from "@/lib/rate-limit";
 import { SITE_URL } from "@/lib/config";
+import { muatHargaKtd } from "@/lib/ktd-store-harga";
 
 export const runtime = "nodejs";
 
@@ -96,6 +97,10 @@ export async function POST(req: Request) {
   }
 
   // ---------- item & subtotal (hitung ulang dari katalog) ----------
+  // Harga override KTD Store dimuat lebih dulu supaya subtotal konsisten
+  // dengan harga yang tampil di halaman produk (±5 menit cache).
+  await muatHargaKtd();
+
   const productId = String(body.productId ?? "").trim();
   let entries: { id: string; qty: number }[] = [];
   const qty = Math.min(Math.max(1, Number(body.qty) || 1), 999);

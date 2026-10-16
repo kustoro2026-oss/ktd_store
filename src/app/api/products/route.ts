@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getLocalImages } from "@/lib/localImages";
 import { filterAndRankProducts } from "@/lib/produk-listing";
 import { getStaticProducts } from "@/lib/products-cache";
+import { muatHargaKtd } from "@/lib/ktd-store-harga";
 import { isFlashSaleProduct, shuffleArray } from "@/lib/promo";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +13,10 @@ const CACHE_HEADERS = {
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
+
+  // Harga override KTD Store (±5 menit cache) — dipakai getStaticProducts di bawah.
+  await muatHargaKtd();
+
   const search = searchParams.get("search") ?? "";
   const category = searchParams.get("category") ?? "";
   const page = Number(searchParams.get("page") ?? "1");

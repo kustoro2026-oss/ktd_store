@@ -12,6 +12,7 @@
 import type { AnekaCategory, AnekaProduct } from "./anekadropship";
 import _cacheData from "./products-cache.json";
 import _evermosData from "./evermos-products-cache.json";
+import { formatHargaKtd, petaHargaKtd } from "./ktd-store-harga";
 
 interface CacheData {
     generatedAt: string;
@@ -44,6 +45,20 @@ function mergeProducts(primary: AnekaProduct[], secondary: AnekaProduct[]): Anek
 
 const mergedProducts: AnekaProduct[] = mergeProducts(cacheData.products, evermosData.products);
 
+/**
+ * Terapkan harga override KTD Store (bila sudah dimuat) ke SALINAN produk —
+ * cache asli tidak diubah. Hanya produk Aneka (id numerik) yang punya override;
+ * produk Evermos (EVM-*) tidak pernah ada di peta override.
+ */
+function denganOverrideKtd(products: AnekaProduct[]): AnekaProduct[] {
+    const peta = petaHargaKtd();
+    if (!peta || peta.size === 0) return products;
+    return products.map((p) => {
+        const harga = peta.get(String(p.id));
+        return harga ? { ...p, rekomendasiJual: formatHargaKtd(harga) } : p;
+    });
+}
+
 /** Get categories from static cache. */
 export function getStaticCategories(): AnekaCategory[] {
     return cacheData.categories;
@@ -51,12 +66,12 @@ export function getStaticCategories(): AnekaCategory[] {
 
 /** Get all products (anekadropship + Evermos) from static cache. */
 export function getStaticProducts(): AnekaProduct[] {
-    return mergedProducts;
+    return denganOverrideKtd(mergedProducts);
 }
 
 /** Produk anekadropship saja (tanpa Evermos) — pool rotasi section beranda. */
 export function getStaticAnekaProducts(): AnekaProduct[] {
-    return cacheData.products;
+    return denganOverrideKtd(cacheData.products);
 }
 
 /** Produk Evermos (EVM-*) saja — pool rotasi section beranda. */

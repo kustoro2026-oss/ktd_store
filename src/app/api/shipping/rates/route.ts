@@ -1,6 +1,7 @@
 import { getRates, upstreamError } from "@/lib/kiriminaja";
 import { fallbackOriginDistrict } from "@/lib/origin-resolver";
 import { rateGroupsForProducts } from "@/lib/shipping-rates";
+import { muatHargaKtd } from "@/lib/ktd-store-harga";
 
 export async function POST(request: Request) {
   let body: {
@@ -43,6 +44,10 @@ export async function POST(request: Request) {
 
   try {
     if (ids.length > 0) {
+      // Harga override KTD Store — dipakai rateGroupsForProducts (nilai asuransi
+      // per paket dihitung dari harga produk, bukan dari itemValue klien).
+      await muatHargaKtd();
+
       const groups = await rateGroupsForProducts({
         ids,
         destination,
