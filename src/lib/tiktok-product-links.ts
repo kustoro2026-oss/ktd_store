@@ -66,6 +66,77 @@ const ALIASES: Record<string, string> = {
   // (listing baru di TikTok Shop, belum ikut scrape tokopedia-products.json — link dari seller)
   "pupuk booster tanaman buah 250 gram perangsang bunga buah lebat":
     "https://shop-id.tokopedia.com/view/product/1737704674627913264",
+
+  // === Sinkronisasi upload massal 18 Okt 2026: nama listing TikTok disusun ulang saat upload ===
+  // "SEMIR BAN 1L R-46"
+  "semir ban 1l r 46":
+    "https://shop-id.tokopedia.com/view/product/1738055226661045808?region=ID&locale=id-ID",
+  // "PELUMAS GEMUK 100gr R-46"
+  "pelumas gemuk 100gr r 46":
+    "https://shop-id.tokopedia.com/view/product/1738055226662028848?region=ID&locale=id-ID",
+  // "PELUMAS GEMUK 200gr R-46"
+  "pelumas gemuk 200gr r 46":
+    "https://shop-id.tokopedia.com/view/product/1738055226662094384?region=ID&locale=id-ID",
+  // "Hanin Kemeja Lavender"
+  "hanin kemeja lavender":
+    "https://shop-id.tokopedia.com/view/product/1738055226662684208?region=ID&locale=id-ID",
+  // "Hanin Kemeja Navy"
+  "hanin kemeja navy":
+    "https://shop-id.tokopedia.com/view/product/1738055226662749744?region=ID&locale=id-ID",
+  // "Hanin Kemeja Burgundy"
+  "hanin kemeja burgundy":
+    "https://shop-id.tokopedia.com/view/product/1738055226662815280?region=ID&locale=id-ID",
+  // "Hanin Kemeja Kunyit"
+  "hanin kemeja kunyit":
+    "https://shop-id.tokopedia.com/view/product/1738055226662880816?region=ID&locale=id-ID",
+  // "Hanin Kemeja Abu"
+  "hanin kemeja abu":
+    "https://shop-id.tokopedia.com/view/product/1738055226662946352?region=ID&locale=id-ID",
+  // "Hanin Kemeja Dusty Pink"
+  "hanin kemeja dusty pink":
+    "https://shop-id.tokopedia.com/view/product/1738055226663142960?region=ID&locale=id-ID",
+  // "Hanin Kemeja Hitam"
+  "hanin kemeja hitam":
+    "https://shop-id.tokopedia.com/view/product/1738055226663208496?region=ID&locale=id-ID",
+  // "Hanin Kemeja Olive"
+  "hanin kemeja olive":
+    "https://shop-id.tokopedia.com/view/product/1738055226663274032?region=ID&locale=id-ID",
+  // "Hanin Kemeja Ijo Botol"
+  "hanin kemeja ijo botol":
+    "https://shop-id.tokopedia.com/view/product/1738055226663339568?region=ID&locale=id-ID",
+  // "Hanin Kemeja Lemon"
+  "hanin kemeja lemon":
+    "https://shop-id.tokopedia.com/view/product/1738055226663405104?region=ID&locale=id-ID",
+  // "Hanin Kemeja Putih"
+  "hanin kemeja putih":
+    "https://shop-id.tokopedia.com/view/product/1738055226663536176?region=ID&locale=id-ID",
+  // "Hanin Kemeja Teracota"
+  "hanin kemeja teracota":
+    "https://shop-id.tokopedia.com/view/product/1738055226663601712?region=ID&locale=id-ID",
+  // "Hanin Kemeja Wardah"
+  "hanin kemeja wardah":
+    "https://shop-id.tokopedia.com/view/product/1738055226663732784?region=ID&locale=id-ID",
+  // "Hanin Kemeja Latte"
+  "hanin kemeja latte":
+    "https://shop-id.tokopedia.com/view/product/1738055226663798320?region=ID&locale=id-ID",
+  // "Hanin Kemeja Mahogany"
+  "hanin kemeja mahogany":
+    "https://shop-id.tokopedia.com/view/product/1738055226663863856?region=ID&locale=id-ID",
+  // "KOYO TIBET AJAIB – 8 PCS"
+  "koyo tibet ajaib 8 pcs":
+    "https://shop-id.tokopedia.com/view/product/1738055595904501296?region=ID&locale=id-ID",
+  // "Pembasmi Kutu Tungau"
+  "pembasmi kutu tungau":
+    "https://shop-id.tokopedia.com/view/product/1738055595904894512?region=ID&locale=id-ID",
+  // "WAX LEATHER R46"
+  "wax leather r46":
+    "https://shop-id.tokopedia.com/view/product/1738056014184482352?region=ID&locale=id-ID",
+  // "Ansara-Dress Brokat Anak"
+  "ansara dress brokat anak":
+    "https://shop-id.tokopedia.com/view/product/1738057240816682544?region=ID&locale=id-ID",
+  // "RUBBING COMPOUND" (harus ke listing generic, bukan Rubbing Compound 100gr milik anid lain)
+  "rubbing compound":
+    "https://shop-id.tokopedia.com/view/product/1738055226661373488?region=ID&locale=id-ID",
 };
 
 /**
