@@ -137,10 +137,10 @@ export type WhatsAppShipping = {
 
 // ─── Metode pembayaran ───────────────────────────────────────────────────────
 //
-// Pilihan pembayaran pada modal Checkout Pesanan: pembayaran online via
-// gateway Duitku (QRIS/VA — diverifikasi otomatis webhook, tanpa kirim bukti
-// transfer manual) atau COD (bayar di tempat). Nomor rekening manual di
-// BANK_ACCOUNTS tetap ada untuk halaman konfirmasi pembayaran lama.
+// Pilihan pembayaran pada modal Checkout Pesanan: QRIS (diverifikasi
+// otomatis webhook, tanpa kirim bukti transfer manual) atau COD (bayar di
+// tempat). Nomor rekening manual di BANK_ACCOUNTS tetap ada untuk halaman
+// konfirmasi pembayaran lama.
 
 export type PaymentMethod = {
   key: "cod" | "duitku";
@@ -151,8 +151,8 @@ export type PaymentMethod = {
 export const PAYMENT_METHODS: PaymentMethod[] = [
   {
     key: "duitku",
-    label: "Bayar Online (QRIS / Virtual Account)",
-    note: "Pembayaran online aman — diverifikasi otomatis, kirim bukti transfer opsional.",
+    label: "QRIS",
+    note: "Scan dari semua e-wallet & m-banking — pembayaran diverifikasi otomatis, berlaku 15 menit.",
   },
   {
     key: "cod",

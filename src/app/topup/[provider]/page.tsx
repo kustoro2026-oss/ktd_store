@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
   const min = Math.min(...p.nominals.map((n) => n.sellPrice));
   const title = `Top Up ${p.label} — Mulai ${formatRupiah(min)} | KTD Store`;
-  const description = `Top up ${p.label} murah, cepat, dan otomatis di KTD Store. Bayar via QRIS atau Virtual Account — saldo masuk otomatis setelah pembayaran terverifikasi.`;
+  const description = `Top up ${p.label} murah, cepat, dan otomatis di KTD Store. Bayar via QRIS dari e-wallet atau m-banking apa pun — saldo masuk otomatis setelah pembayaran terverifikasi.`;
   return {
     title,
     description,

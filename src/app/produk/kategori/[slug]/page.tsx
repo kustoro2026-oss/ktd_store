@@ -170,10 +170,11 @@ export default async function KategoriProdukPage({
             penjualan yang bisa Anda cek sebelum membeli.
           </p>
           <p className="mt-3 text-sm leading-6 text-muted">
-            Pembayaran dapat dilakukan melalui transfer bank, Virtual Account,
-            atau QRIS, dan pesanan dikirim dengan kurir ekspedisi terpercaya ke
-            seluruh Indonesia. Pilih produk favorit Anda, tentukan varian, lalu
-            selesaikan pemesanan dengan mudah via WhatsApp.
+            Pembayaran online dilakukan dengan memindai kode QRIS dari aplikasi
+            e-wallet atau m-banking apa pun, dan pesanan dikirim dengan kurir
+            ekspedisi terpercaya ke seluruh Indonesia. Pilih produk favorit
+            Anda, tentukan varian, lalu selesaikan pemesanan dengan mudah via
+            WhatsApp.
           </p>
           <p className="mt-3 text-sm leading-6 text-muted">
             Kategori lainnya di KTD Store:{" "}

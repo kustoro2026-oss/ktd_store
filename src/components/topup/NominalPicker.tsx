@@ -4,18 +4,15 @@
 // tab kategori tersegmen (bila provider lintas kategori), pencarian nominal,
 // grid kartu nominal bertahap (load more) yang dikelompokkan per
 // sub-kategori (Pulsa Reguler, Paket Harian, ...), dan panel beli sticky kanan
-// (bawah di mobile) dengan picker metode pembayaran gaya checkout produk
-// (QRIS / VA / e-wallet / kartu / minimarket). Alur pesanan:
+// (bawah di mobile) dengan pembayaran QRIS. Alur pesanan:
 // POST /api/topup/order → halaman bayar, atau fallback WhatsApp untuk
 // nominal < Rp 10.000.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft,
   Check,
   CheckCircle2,
   ChevronDown,
-  ChevronRight,
   ExternalLink,
   Info,
   Loader2,
@@ -36,11 +33,6 @@ import ProviderLogo from "./ProviderLogo";
 import { fieldsForProvider } from "@/lib/topup-fields";
 import { INPUT_CLS } from "@/lib/ui";
 import { whatsappLink } from "@/lib/config";
-import {
-  duitkuRows,
-  type DuitkuChannelRow,
-  type DuitkuPaymentMethod,
-} from "@/lib/duitku-channels";
 
 type OrderResponse = {
   ok?: boolean;
@@ -187,23 +179,8 @@ export default function NominalPicker({ provider, initialSku }: Props) {
   /** Referensi elemen tiap sub-kelompok untuk lompat scroll halus. */
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
 
-  // Picker metode pembayaran — pola sama dengan checkout produk:
-  // kategori → provider → kartu metode terpilih (klik untuk ganti).
-  /** Kode kanal Duitku pilihan pembeli (mis. SP = QRIS ShopeePay). Kosong = pakai QRIS pertama yang aktif. */
-  const [payProvider, setPayProvider] = useState("");
-  /** Kategori yang sedang dibuka daftar provider-nya (akordeon step 2). */
-  const [openChannel, setOpenChannel] = useState<string | null>(null);
-  /** Daftar metode pembayaran aktif (kode + logo resmi gateway). */
-  const [duitkuMethods, setDuitkuMethods] = useState<DuitkuPaymentMethod[]>([]);
-  /** Kanal VA diizinkan untuk nominal terpilih? Dihitung server dari env
-   *  TOPUP_VA_ENABLED + ambang margin VA_MIN_GROSS (null = belum termuat —
-   *  VA disembunyikan dulu agar nominal kecil tidak bisa memilih VA). */
-  const [vaAllowed, setVaAllowed] = useState<boolean | null>(null);
-  /** Saklar global VA dari server (true = VA aktif untuk nominal besar). */
-  const [vaEnabled, setVaEnabled] = useState(true);
-  /** Harga jual minimal pembayaran online per kategori (pesan info). */
-  const [vaMinGame, setVaMinGame] = useState<number>(49500);
-  const [vaMinOther, setVaMinOther] = useState<number>(94500);
+  /** QRIS adalah satu-satunya metode pembayaran online — tidak ada pilihan
+   *  kanal; server memakai kanal QRIS aktif sesuai prioritasnya. */
 
   // Skema input provider (field per produk ala itemku) + ikon item nominal.
   const schema = fieldsForProvider(provider.slug);
@@ -269,43 +246,6 @@ export default function NominalPicker({ provider, initialSku }: Props) {
     return () => window.removeEventListener("resize", measure);
   }, []);
 
-  // Muat daftar metode pembayaran aktif (logo QRIS / bank) untuk picker
-  // kanal di panel beli — diulang tiap nominal dipilih agar penanda vaAllowed
-  // (VA aman/tidak untuk nominal itu) selalu mutakhir; respons ter-cache 10
-  // menit di server. Saat nominal berubah, VA disembunyikan dulu sampai
-  // server mengonfirmasi (nominal kecil tidak boleh sempat memilih VA).
-  useEffect(() => {
-    setVaAllowed(null);
-    const current = provider.nominals.find((n) => n.sku === sku) ?? null;
-    const params = current
-      ? `?sku=${encodeURIComponent(current.sku)}&amount=${current.sellPrice}`
-      : "";
-    fetch(`/api/duitku/methods${params}`, { cache: "no-store" })
-      .then((r) => r.json())
-      .then(
-        (j: {
-          ok?: boolean;
-          methods?: DuitkuPaymentMethod[];
-          vaEnabled?: boolean;
-          vaAllowed?: boolean;
-          vaMinGame?: number;
-          vaMinOther?: number;
-        }) => {
-          if (j.ok && Array.isArray(j.methods)) {
-            setDuitkuMethods(j.methods);
-            setVaEnabled(j.vaEnabled !== false);
-            setVaAllowed(j.vaAllowed === true);
-            if (typeof j.vaMinGame === "number") setVaMinGame(j.vaMinGame);
-            if (typeof j.vaMinOther === "number") setVaMinOther(j.vaMinOther);
-          }
-        },
-      )
-      .catch(() => {
-        // Gateway belum siap — fallback kanal SP/VA ditangani server.
-      });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [provider.slug, sku]);
-
   const selectTab = (c: TopUpCategory) => {
     setTab(c);
     setNomFilter("");
@@ -368,46 +308,9 @@ export default function NominalPicker({ provider, initialSku }: Props) {
   );
   const isWaOnly = nominal !== null && nominal.sellPrice < WA_MIN;
 
-  // ─── Picker metode pembayaran (pola sama dengan checkout produk) ───────
-  /** Baris kategori dari daftar kanal aktif (urutan tetap). VA hanya
-   *  ditawarkan bila server mengizinkan untuk nominal terpilih (vaAllowed —
-   *  saklar TOPUP_VA_ENABLED + ambang margin VA_MIN_GROSS). */
-  const rows = vaAllowed
-    ? duitkuRows(duitkuMethods)
-    : duitkuRows(duitkuMethods).filter((r) => r.key === "qris");
-  /** Kanal yang dipakai saat pesanan dikirim: pilihan pembeli, atau QRIS
-   *  pertama yang aktif bila pembeli belum memilih. */
-  const effectiveProvider =
-    payProvider ||
-    rows.find((r) => r.key === "qris")?.methods[0]?.code ||
-    rows[0]?.methods[0]?.code ||
-    "SP";
-  /** Kategori yang sedang dibuka daftar provider-nya (step 2). */
-  const openDuitkuRow = openChannel
-    ? rows.find((r) => r.key === openChannel) ?? null
-    : null;
-  /** Provider terpilih beserta kategori induknya — kartu "metode terpilih". */
-  const chosenDuitku: {
-    row: DuitkuChannelRow;
-    method: DuitkuPaymentMethod;
-  } | null = (() => {
-    if (!payProvider) return null;
-    for (const row of rows) {
-      const method = row.methods.find((m) => m.code === payProvider);
-      if (method) return { row, method };
-    }
-    return null;
-  })();
-
-  /** Pembayaran online sama sekali tidak tersedia untuk nominal ini
-   *  (VA tidak diizinkan dan QRIS belum aktif) — tombol Beli Sekarang
-   *  dinonaktifkan agar pembeli tidak menunggu sesi bayar yang tidak ada. */
-  const onlineBlocked = !isWaOnly && vaAllowed === false && rows.length === 0;
-  /** Tombol Beli Sekarang hanya aktif setelah pembeli memilih metode
-   *  pembayaran; nominal di bawah Rp 10.000 dan kondisi onlineBlocked
-   *  tidak dapat dibeli dari halaman ini. */
-  const canBuy =
-    !busy && !!nominal && !isWaOnly && !onlineBlocked && chosenDuitku !== null;
+  /** Tombol Beli Sekarang aktif bila nominal valid dan bukan jalur WA;
+   *  bila QRIS sedang gangguan, server mengarahkan pembeli ke WhatsApp. */
+  const canBuy = !busy && !!nominal && !isWaOnly;
 
   const remember = () => {
     try {
@@ -461,7 +364,6 @@ export default function NominalPicker({ provider, initialSku }: Props) {
           nickname: nickname.trim(),
           buyerName: name.trim(),
           buyerPhone: phone.trim(),
-          paymentChannel: effectiveProvider,
         }),
       });
       const j = (await res.json()) as OrderResponse;
@@ -872,207 +774,21 @@ export default function NominalPicker({ provider, initialSku }: Props) {
                 <p className="mb-1.5 text-sm font-semibold text-ink">
                   Metode Pembayaran
                 </p>
-                {openDuitkuRow ? (
-                  /* Step 2 — tampilan khusus kategori terpilih: tombol kembali
-                     + header kategori + daftar provider. */
-                  <div className="rounded-xl bg-gray-50 p-3">
-                    <button
-                      type="button"
-                      onClick={() => setOpenChannel(null)}
-                      className="mb-2 flex items-center gap-1.5 rounded-lg px-1 py-1 text-xs font-semibold text-brand transition-colors hover:bg-brand/10"
-                    >
-                      <ArrowLeft className="h-4 w-4" />
-                      Kembali
-                      <span className="font-normal text-muted-2">
-                        — pilih metode pembayaran lain
-                      </span>
-                    </button>
-                    <div className="mb-2 flex items-center gap-3 rounded-lg bg-white px-3 py-2.5">
-                      <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-                        {openDuitkuRow.methods.slice(0, 5).map((m) =>
-                          m.image ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              key={m.code}
-                              src={m.image}
-                              alt={m.name}
-                              className="h-6 w-auto rounded object-contain"
-                            />
-                          ) : (
-                            <span
-                              key={m.code}
-                              className="text-[10px] font-semibold text-muted-2"
-                            >
-                              {m.name}
-                            </span>
-                          ),
-                        )}
-                      </span>
-                      <span className="shrink-0 text-right">
-                        <span className="block text-xs font-bold uppercase tracking-wide text-ink">
-                          {openDuitkuRow.label}
-                        </span>
-                        <span className="block text-[10px] leading-snug text-muted-2">
-                          {openDuitkuRow.note}
-                        </span>
-                      </span>
-                    </div>
-                    <p className="px-1 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-2">
-                      {openDuitkuRow.key === "qris"
-                        ? "Pilih aplikasi QRIS"
-                        : openDuitkuRow.key === "va"
-                          ? "Pilih bank tujuan transfer"
-                          : "Pilih metode"}
-                    </p>
-                    <div className="space-y-1">
-                      {openDuitkuRow.methods.map((m) => {
-                        const selected = payProvider === m.code;
-                        return (
-                          <button
-                            key={m.code}
-                            type="button"
-                            onClick={() => {
-                              setPayProvider(m.code);
-                              setOpenChannel(null);
-                            }}
-                            className={`flex w-full items-center gap-2.5 rounded-lg bg-white px-2.5 py-2.5 text-left transition-all ${
-                              selected ? "ring-2 ring-brand/30" : "hover:bg-brand/5"
-                            }`}
-                          >
-                            {m.image ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                src={m.image}
-                                alt={m.name}
-                                className="h-6 w-auto rounded object-contain"
-                              />
-                            ) : (
-                              <span className="flex h-6 w-6 items-center justify-center rounded bg-gray-100 text-[9px] font-bold text-muted-2">
-                                {m.code}
-                              </span>
-                            )}
-                            <span className="min-w-0 flex-1 truncate text-xs font-semibold text-ink">
-                              {m.name}
-                            </span>
-                            <span
-                              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 ${
-                                selected
-                                  ? "border-brand bg-brand"
-                                  : "border-gray-300 bg-white"
-                              }`}
-                            >
-                              {selected && (
-                                <span className="h-1.5 w-1.5 rounded-full bg-white" />
-                              )}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : chosenDuitku ? (
-                  /* Metode terpilih — kartu tunggal; klik untuk mengganti. */
-                  <button
-                    type="button"
-                    onClick={() => setPayProvider("")}
-                    className="flex w-full items-center gap-3 rounded-xl bg-brand/5 px-3 py-3 text-left ring-2 ring-brand/30 transition-colors hover:bg-brand/10"
-                  >
-                    {chosenDuitku.method.image ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={chosenDuitku.method.image}
-                        alt={chosenDuitku.method.name}
-                        className="h-6 w-auto rounded object-contain"
-                      />
-                    ) : (
-                      <span className="flex h-6 w-6 items-center justify-center rounded bg-gray-100 text-[9px] font-bold text-muted-2">
-                        {chosenDuitku.method.code}
-                      </span>
-                    )}
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-xs font-bold uppercase tracking-wide text-ink">
-                        {chosenDuitku.method.name}
-                      </span>
-                      <span className="block text-[10px] leading-snug text-muted-2">
-                        {chosenDuitku.row.label} — {chosenDuitku.row.note}
-                      </span>
+                <div className="flex items-center gap-3 rounded-xl bg-brand/5 px-3 py-3 ring-1 ring-brand/20">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white">
+                    <QrCode className="h-5 w-5 text-brand" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-xs font-bold uppercase tracking-wide text-ink">
+                      QRIS
                     </span>
-                    <span className="shrink-0 text-xs font-semibold text-brand">
-                      Ganti
+                    <span className="block text-[10px] leading-snug text-muted-2">
+                      Scan dari semua e-wallet &amp; m-banking — kode berlaku 15
+                      menit setelah pesanan dibuat.
                     </span>
-                  </button>
-                ) : rows.length > 0 ? (
-                  /* Step 1 — baris kategori gaya marketplace. */
-                  <div className="space-y-1.5">
-                    {rows.map((row) => (
-                      <button
-                        key={row.key}
-                        type="button"
-                        onClick={() => setOpenChannel(row.key)}
-                        className="flex w-full items-center gap-3 rounded-xl bg-gray-50 px-3 py-3 text-left transition-colors hover:bg-gray-100"
-                      >
-                        <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-                          {row.methods.slice(0, 5).map((m) =>
-                            m.image ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                key={m.code}
-                                src={m.image}
-                                alt={m.name}
-                                className="h-6 w-auto rounded object-contain"
-                              />
-                            ) : (
-                              <span
-                                key={m.code}
-                                className="text-[10px] font-semibold text-muted-2"
-                              >
-                                {m.name}
-                              </span>
-                            ),
-                          )}
-                        </span>
-                        <span className="shrink-0 text-right">
-                          <span className="block text-xs font-bold uppercase tracking-wide text-ink">
-                            {row.label}
-                          </span>
-                          <span className="block text-[10px] leading-snug text-muted-2">
-                            {row.note}
-                          </span>
-                        </span>
-                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-2" />
-                      </button>
-                    ))}
-                  </div>
-                ) : vaAllowed === false ? (
-                  /* VA tidak tersedia untuk nominal ini (atau nonaktif global)
-                     & QRIS belum aktif — info minimal harga / pengajuan;
-                     pesanan tetap bisa lewat WhatsApp. */
-                  <div className="flex items-start gap-2.5 rounded-xl border border-amber-100 bg-amber-50 p-3">
-                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-                    <p className="text-xs leading-relaxed text-amber-800">
-                      {vaEnabled
-                        ? `Untuk sementara, transaksi isi saldo di bawah ${formatRupiah(
-                            vaMinOther,
-                          )} dan top up game di bawah ${formatRupiah(
-                            vaMinGame,
-                          )} belum dapat menggunakan pembayaran online karena aktivasi QRIS masih dalam proses pengajuan. Silakan pilih nominal lain atau hubungi CS kami melalui WhatsApp — CS siap memandu pembayaran hingga selesai.`
-                        : "Pembayaran online sedang tidak tersedia karena aktivasi QRIS masih dalam proses pengajuan. Silakan hubungi CS kami melalui WhatsApp — CS siap memandu pembayaran hingga selesai."}
-                    </p>
-                  </div>
-                ) : (
-                  /* Daftar kanal belum termuat — tampilkan default QRIS. */
-                  <div className="flex items-center gap-3 rounded-xl bg-gray-50 px-3 py-3">
-                    <QrCode className="h-6 w-6 shrink-0 text-brand" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-xs font-bold uppercase tracking-wide text-ink">
-                        QRIS
-                      </span>
-                      <span className="block text-[10px] leading-snug text-muted-2">
-                        Scan dari semua e-wallet & m-banking
-                      </span>
-                    </span>
-                  </div>
-                )}
+                  </span>
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-brand" />
+                </div>
               </div>
             )}
 
@@ -1103,11 +819,7 @@ export default function NominalPicker({ provider, initialSku }: Props) {
               <Zap className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand" />
               {isWaOnly
                 ? "Nominal minimal untuk pembelian online adalah Rp 10.000 — silakan pilih nominal lain atau hubungi CS kami melalui WhatsApp."
-                : onlineBlocked
-                  ? "Pembayaran online untuk nominal ini sedang tidak tersedia — silakan pilih nominal lain atau hubungi CS kami melalui WhatsApp."
-                  : chosenDuitku
-                    ? "Pengisian otomatis setelah pembayaran terverifikasi, biasanya dalam beberapa menit."
-                    : "Silakan pilih metode pembayaran untuk mengaktifkan tombol Beli Sekarang — pengisian otomatis setelah pembayaran terverifikasi, biasanya dalam beberapa menit."}
+                : "Pengisian otomatis setelah pembayaran QRIS terverifikasi, biasanya dalam beberapa menit."}
             </p>
           </div>
         </form>

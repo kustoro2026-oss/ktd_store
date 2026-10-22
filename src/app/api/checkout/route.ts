@@ -10,10 +10,13 @@
 //
 // Body: { productId?, items?[{id,qty}], qty?, weight?, destination, name,
 //         phone, address, note, districtLabel, selectedRates[{index,service,
-//         serviceType}], clientTotal, pageUrl,
-//         paymentChannel?: "qris" | "va" }
+//         serviceType}], clientTotal, pageUrl }
 // Respons: { ok, mode: "duitku" | "wa", orderId, paymentUrl?, total?,
-//            qrString?, vaNumber?, channel?, sandbox?, gatewayError? }
+//            qrString?, vaNumber?, channel?, expires_in?, sandbox?,
+//            gatewayError? }
+//
+// Pembayaran online HANYA QRIS: kanal dicoba berurutan sesuai preferensi
+// (Nusapay SQ lalu ShopeePay SP/Nobu NQ bila aktif). Tidak ada fallback VA.
 
 import { NextResponse } from "next/server";
 import { getDetailCached } from "@/lib/detail-cache";
@@ -26,7 +29,13 @@ import {
   setStoreOrderSession,
   type StoreOrderItem,
 } from "@/lib/db";
-import { createDuitkuPayment, duitkuConfigured, DUITKU_MIN_AMOUNT } from "@/lib/duitku";
+import {
+  activeQrisCodes,
+  createDuitkuPayment,
+  duitkuConfigured,
+  DUITKU_MIN_AMOUNT,
+  QRIS_EXPIRY_MINUTES,
+} from "@/lib/duitku";
 import { clientIp, rateLimitHit } from "@/lib/rate-limit";
 import { SITE_URL } from "@/lib/config";
 import { muatHargaKtd } from "@/lib/ktd-store-harga";
@@ -68,7 +77,6 @@ export async function POST(req: Request) {
     selectedRates?: unknown;
     clientTotal?: unknown;
     pageUrl?: unknown;
-    paymentChannel?: unknown;
   } = {};
   try {
     body = await req.json();
@@ -254,13 +262,10 @@ export async function POST(req: Request) {
       ? `${items[0].name}${items[0].qty > 1 ? ` (×${items[0].qty})` : ""}`
       : `${items.length} produk KTD Store`;
 
-  // Channel spesifik pilihan pembeli (mis. SP = QRIS ShopeePay, VA = Maybank
-  // VA, FT = Indomaret) — kirim apa adanya. Bila ditolak gateway (mis. belum
-  // aktif), jatuh ke QRIS (SP) lalu VA tanpa duplikasi kode.
-  const channelWanted = String(body.paymentChannel ?? "").trim().toUpperCase();
-  const attempts = [
-    ...new Set(channelWanted ? [channelWanted, "SP", "VA"] : ["SP", "VA"]),
-  ];
+  // Hanya QRIS: coba kanal aktif sesuai prioritas (SQ → SP → NQ) tanpa
+  // fallback VA. Kode lama yang dikirim klien diabaikan agar pembeli tidak
+  // bisa dipaksa ke kanal non-QRIS.
+  const attempts = await activeQrisCodes();
   let pay: Awaited<ReturnType<typeof createDuitkuPayment>> | null = null;
   let payChannel = "";
   for (const code of attempts) {
@@ -273,6 +278,7 @@ export async function POST(req: Request) {
       returnUrl: safePageUrl(body.pageUrl),
       callbackUrl: `${SITE_URL}/api/duitku/callback`,
       paymentMethod: code,
+      expiryMinutes: QRIS_EXPIRY_MINUTES,
     });
     if (attempt.ok) {
       pay = attempt;
@@ -281,11 +287,11 @@ export async function POST(req: Request) {
     }
     pay = attempt; // simpan error terakhir untuk gatewayError
   }
-  if (pay?.ok && pay.paymentUrl) {
+  if (pay?.ok && (pay.paymentUrl || pay.qrString || pay.vaNumber)) {
     await setStoreOrderSession(
       orderId,
       pay.reference ?? "",
-      pay.paymentUrl,
+      pay.paymentUrl ?? "",
       pay.vaNumber ?? "",
       pay.qrString ?? "",
     );
@@ -297,6 +303,8 @@ export async function POST(req: Request) {
       qrString: pay.qrString ?? "",
       vaNumber: pay.vaNumber ?? "",
       channel: payChannel,
+      /** Sisa masa bayar (detik) — dipakai hitungan waktu di overlay. */
+      expires_in: QRIS_EXPIRY_MINUTES * 60,
       total,
       sandbox: process.env.DUITKU_SANDBOX === "true",
     });
@@ -306,6 +314,8 @@ export async function POST(req: Request) {
     ok: true,
     orderId,
     mode: "wa",
-    gatewayError: pay?.error ?? "sesi pembayaran online gagal dibuat",
+    gatewayError:
+      pay?.error ??
+      "Pembayaran QRIS sedang tidak tersedia — pesanan dapat dilanjutkan via WhatsApp.",
   });
 }

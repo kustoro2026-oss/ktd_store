@@ -17,6 +17,7 @@
 // 10000 IDR") — pesanan di bawah itu otomatis dialihkan ke jalur WhatsApp.
 
 import { createHmac } from "crypto";
+import { QRIS_CODES } from "./duitku-channels";
 
 export function duitkuBaseUrl(): string {
   return process.env.DUITKU_SANDBOX === "true"
@@ -30,13 +31,27 @@ export function duitkuConfigured(): boolean {
 
 /** Kode metode pembayaran default (bisa diubah via env DUITKU_PAYMENT_METHOD):
  *  VA = Maybank VA, BC = BCA VA, BR = BRIVA, BT = Permata VA, IR = Indomaret,
- *  NQ = QRIS Nobu, SP = QRIS ShopeePay. */
+ *  SQ = QRIS Nusapay (kanal QRIS aktif sejak Okt 2026), SP = QRIS ShopeePay,
+ *  NQ = QRIS Nobu. */
 export function duitkuPaymentMethod(): string {
   return (process.env.DUITKU_PAYMENT_METHOD ?? "VA").trim() || "VA";
 }
 
 /** Nominal minimum transaksi Duitku (Rp). */
 export const DUITKU_MIN_AMOUNT = 10_000;
+
+/** Masa berlaku QRIS (menit). Duitku membatasi QRIS maksimal 60 menit;
+ *  nilai ini dipakai untuk expiryPeriod inquiry sekaligus hitungan waktu
+ *  yang ditampilkan ke pembeli. Override via env bila perlu. */
+const _rawQrisExpiry = Number(process.env.DUITKU_QRIS_EXPIRY_MIN);
+export const QRIS_EXPIRY_MINUTES =
+  Number.isFinite(_rawQrisExpiry) && _rawQrisExpiry > 0 && _rawQrisExpiry <= 60
+    ? Math.round(_rawQrisExpiry)
+    : 15;
+
+/** Urutan preferensi kanal QRIS: Nusapay (SQ) utama, lalu ShopeePay (SP) dan
+ *  Nobu (NQ) sebagai cadangan bila salah satu bermasalah/dicabut. */
+export const QRIS_PRIORITY = ["SQ", "SP", "NQ"];
 
 /** Ambang margin kotor (sellPrice − costPrice) minimal agar nominal layak
  *  lewat kanal VA: fee flat VA dipotong dari settlement dan TIDAK terlihat
@@ -141,6 +156,54 @@ export async function getDuitkuPaymentMethods(
   }
 }
 
+let qrisCodesCache: { at: number; codes: string[] } | null = null;
+
+/** Kode kanal QRIS yang sedang aktif untuk merchant — dipakai sebagai
+ *  fallback inquiry, BUKAN konstanta: gateway mencabut/menambah kanal dari
+ *  sisi mereka (Okt 2026: SP & NQ nonaktif, SQ/Nusapay aktif), jadi fallback
+ *  hard-code bisa mengarah ke kanal mati dan menggagalkan sesi bayar.
+ *  Cache 10 menit terpisah dari cache metode per-nominal. */
+export async function activeQrisCodes(): Promise<string[]> {
+  if (qrisCodesCache && Date.now() - qrisCodesCache.at < 10 * 60 * 1000) {
+    return qrisCodesCache.codes;
+  }
+  const list = await getDuitkuPaymentMethods();
+  const codes = list
+    .map((m) => m.code)
+    .filter((c) => QRIS_CODES.has(c))
+    .sort((a, b) => {
+      const ia = QRIS_PRIORITY.indexOf(a);
+      const ib = QRIS_PRIORITY.indexOf(b);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    });
+  if (codes.length) {
+    qrisCodesCache = { at: Date.now(), codes };
+    return codes;
+  }
+  // Daftar gagal diambil — coba kanal QRIS terkini; kode yang ditolak gateway
+  // otomatis lanjut ke fallback berikutnya.
+  return ["SQ", "SP"];
+}
+
+/** Sisa masa berlaku pembayaran dari created_at pesanan (UTC). QRIS memakai
+ *  QRIS_EXPIRY_MINUTES; kanal lama non-QRIS tetap 1440 menit agar halaman
+ *  pesanan lama tidak mendadak tampil kedaluwarsa. */
+export function paymentExpiryInfo(
+  createdAtUtc: string,
+  channel = "",
+): { expiresAt: string; expiresIn: number } {
+  const minutes = QRIS_CODES.has(channel.toUpperCase())
+    ? QRIS_EXPIRY_MINUTES
+    : 1440;
+  const parsed = Date.parse(`${createdAtUtc.replace(" ", "T")}Z`);
+  const base = Number.isFinite(parsed) ? parsed : Date.now();
+  const expiresAtMs = base + minutes * 60_000;
+  return {
+    expiresAt: new Date(expiresAtMs).toISOString(),
+    expiresIn: Math.max(0, Math.ceil((expiresAtMs - Date.now()) / 1000)),
+  };
+}
+
 // ---------- Buat transaksi (inquiry) ----------
 
 export type DuitkuPaymentResult = {
@@ -169,9 +232,11 @@ export async function createDuitkuPayment(i: {
   /** URL webhook callback. */
   callbackUrl: string;
   /** Kode metode pembayaran (opsional — default env DUITKU_PAYMENT_METHOD).
-   *  "SP" = QRIS ShopeePay (hasil inquiry memuat qrString), kode VA lain
-   *  memuat vaNumber. */
+   *  Kode QRIS (SQ/SP/NQ) menghasilkan qrString, kode VA menghasilkan
+   *  vaNumber. */
   paymentMethod?: string;
+  /** Masa berlaku transaksi (menit) — QRIS default QRIS_EXPIRY_MINUTES. */
+  expiryMinutes?: number;
 }): Promise<DuitkuPaymentResult> {
   if (!duitkuConfigured()) {
     return {
@@ -196,8 +261,11 @@ export async function createDuitkuPayment(i: {
     itemDetails: [{ name: i.productName.slice(0, 255), price: i.amount, quantity: 1 }],
     callbackUrl: i.callbackUrl,
     returnUrl: i.returnUrl,
-    // 1440 menit = maksimal masa berlaku Virtual Account (default VA).
-    expiryPeriod: 1440,
+    expiryPeriod:
+      i.expiryMinutes ??
+      (QRIS_CODES.has((i.paymentMethod ?? duitkuPaymentMethod()).toUpperCase())
+        ? QRIS_EXPIRY_MINUTES
+        : 1440),
     signature: duitkuSign([merchantCode, i.merchantOrderId, i.amount]),
   };
   try {
@@ -213,7 +281,12 @@ export async function createDuitkuPayment(i: {
     } catch {
       return { ok: false, error: `respons gateway pembayaran tidak terbaca (HTTP ${res.status})` };
     }
-    if (!res.ok || d.statusCode !== "00" || !d.paymentUrl) {
+    const paymentUrl = String(d.paymentUrl ?? "");
+    const qrString = String(d.qrString ?? "");
+    const vaNumber = String(d.vaNumber ?? "");
+    // Tidak semua kanal mengembalikan paymentUrl: QRIS cukup dengan qrString
+    // (dirender jadi QR di overlay) — jangan anggap gagal bila salah satu ada.
+    if (!res.ok || d.statusCode !== "00" || !(paymentUrl || qrString || vaNumber)) {
       return {
         ok: false,
         error: String(
@@ -224,9 +297,9 @@ export async function createDuitkuPayment(i: {
     return {
       ok: true,
       reference: String(d.reference ?? ""),
-      paymentUrl: String(d.paymentUrl),
-      vaNumber: String(d.vaNumber ?? ""),
-      qrString: String(d.qrString ?? ""),
+      paymentUrl,
+      vaNumber,
+      qrString,
     };
   } catch (e) {
     return { ok: false, error: String(e) };

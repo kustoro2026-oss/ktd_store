@@ -4,7 +4,7 @@
 
 import { NextResponse } from "next/server";
 import { getTopupOrder } from "@/lib/db";
-import { getDuitkuPaymentMethods } from "@/lib/duitku";
+import { getDuitkuPaymentMethods, paymentExpiryInfo } from "@/lib/duitku";
 
 export const runtime = "nodejs";
 
@@ -31,6 +31,10 @@ export async function GET(
         channelImage = method.image;
       }
     }
+    // Masa berlaku pembayaran — QRIS 15 menit, kanal lama mengikuti aturannya
+    // sendiri. Dihitung server-side agar hitungan di halaman tidak bergantung
+    // pada jam perangkat pembeli.
+    const expiry = paymentExpiryInfo(order.created_at, order.payment_channel);
     return NextResponse.json({
       ok: true,
       order: {
@@ -47,6 +51,8 @@ export async function GET(
         payment_channel: order.payment_channel,
         channel_name: channelName,
         channel_image: channelImage,
+        expires_at: expiry.expiresAt,
+        expires_in: expiry.expiresIn,
         paid_at: order.paid_at,
         digiflazz_sn: order.digiflazz_sn,
         error_message: order.error_message,

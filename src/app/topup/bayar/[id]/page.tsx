@@ -1,10 +1,10 @@
 "use client";
 
 // Halaman pembayaran top-up: tampilkan pembayaran langsung di halaman ini —
-// QR code QRIS (dari qrString inquiry) atau nomor VA; kanal redirect
-// (e-wallet, kartu, minimarket) memakai tombol buka halaman pembayaran aman.
+// QR code QRIS (dari qrString inquiry) beserta hitung mundur masa bayar;
+// sesi VA lama tetap bisa ditampilkan (kanal VA tidak dibuat lagi).
 // Polling status pesanan tiap 5 detik — status diperbarui server-side oleh
-// webhook Duitku (dibayar → eksekusi otomatis → notifikasi WA admin), jadi
+// webhook gateway (dibayar → eksekusi otomatis → notifikasi WA admin), jadi
 // halaman ini cukup memantau tabel pesanan dan update statusnya sendiri —
 // alur pembeli sesimpel mungkin: pilih, bayar, tunggu status berubah.
 // Pembeli tidak dikirimi notifikasi WA (hemat biaya template): bila ingin
@@ -53,9 +53,23 @@ type OrderView = {
   digiflazz_sn: string;
   error_message: string;
   created_at: string;
+  /** Batas waktu bayar (ISO) — dihitung server dari jenis kanal. */
+  expires_at?: string;
+  /** Sisa masa bayar (detik) saat respons dibuat. */
+  expires_in?: number;
 };
 
 const POLL_MS = 5000;
+
+/** Hitung mundur masa bayar: MM:SS, atau H:MM:SS untuk masa bayar panjang. */
+const formatCountdown = (totalSec: number) => {
+  const s = Math.max(0, Math.floor(totalSec));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  const mm = h > 0 ? String(m).padStart(2, "0") : String(m);
+  return `${h > 0 ? `${h}:` : ""}${mm}:${String(sec).padStart(2, "0")}`;
+};
 
 export default function TopupBayarPage() {
   const { id } = useParams<{ id: string }>();
@@ -69,6 +83,8 @@ export default function TopupBayarPage() {
   const [copied, setCopied] = useState(false);
   /** Indeks sub-kanal akordeon Cara Pembayaran yang sedang terbuka. */
   const [guideOpen, setGuideOpen] = useState(0);
+  /** Waktu sekarang (ms) — penggerak hitung mundur masa bayar. */
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   const copy = async (text: string) => {
     try {
@@ -122,6 +138,14 @@ export default function TopupBayarPage() {
     return () => clearInterval(t);
   }, [order, missing, load]);
 
+  useEffect(() => {
+    // Penggerak hitung mundur: sumber waktu tetap expires_at dari server agar
+    // tidak terpengaruh jam perangkat pembeli.
+    if (!order?.expires_at || order.payment_status !== "pending") return;
+    const t = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [order?.expires_at, order?.payment_status]);
+
   if (missing) {
     return (
       <div className="container-site flex min-h-[50vh] flex-col items-center justify-center gap-3 py-10 text-center">
@@ -156,6 +180,13 @@ export default function TopupBayarPage() {
   const processing = paid && (order.topup_status === "processing" || order.topup_status === "pending");
   const expired = order.payment_status === "expired" || order.payment_status === "failed";
   const waiting = order.payment_status === "pending";
+  /** Sisa masa bayar (detik); null = tidak ada batas waktu. */
+  const remainingSec = order.expires_at
+    ? Math.max(0, Math.ceil((Date.parse(order.expires_at) - nowMs) / 1000))
+    : null;
+  /** QR sudah lewat masa berlaku — tampilkan ajakan pesan ulang. */
+  const qrExpired =
+    waiting && Boolean(order.payment_qr) && remainingSec === 0;
 
   return (
     <div className="container-site py-5">
@@ -183,7 +214,8 @@ export default function TopupBayarPage() {
             </p>
           )}
 
-          {waiting && order.payment_url && (
+          {waiting &&
+            (order.payment_url || order.payment_qr || order.payment_va) && (
             <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="flex items-center gap-2 text-sm font-bold text-ink">
@@ -195,6 +227,34 @@ export default function TopupBayarPage() {
               </div>
 
               {order.payment_qr ? (
+                qrExpired ? (
+                  <div className="mt-4 flex flex-col items-center gap-2.5 rounded-xl border border-red-100 bg-red-50 px-4 py-6 text-center">
+                    <XCircle className="h-10 w-10 text-red-500" />
+                    <p className="text-sm font-bold text-ink">
+                      Waktu Pembayaran Habis
+                    </p>
+                    <p className="max-w-xs text-xs leading-relaxed text-muted">
+                      Kode QRIS hanya berlaku 15 menit. Silakan buat pesanan baru
+                      untuk mendapatkan kode pembayaran baru.
+                    </p>
+                    <Link
+                      href="/topup"
+                      className="mt-1 rounded-xl bg-brand px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-brand-2"
+                    >
+                      Pesan Ulang
+                    </Link>
+                    <a
+                      href={whatsappLink(
+                        `Halo, pembayaran pesanan top up ${order.id} kedaluwarsa. Mohon bantu proses pesanan ulang.`,
+                      )}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 rounded-xl border border-[#25D366]/40 px-5 py-2.5 text-sm font-bold text-[#128C4A] transition-colors hover:bg-[#25D366]/10"
+                    >
+                      Hubungi CS via WhatsApp
+                    </a>
+                  </div>
+                ) : (
                 <div className="mt-4 flex flex-col items-center gap-3">
                   <div className="rounded-2xl border-2 border-gray-100 bg-white p-4">
                     <QRCodeSVG
@@ -209,7 +269,20 @@ export default function TopupBayarPage() {
                     OVO, DANA, ShopeePay, m-Banking, dll) untuk membayar tanpa
                     pindah halaman.
                   </p>
+                  {remainingSec !== null && (
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold ${
+                        remainingSec <= 120
+                          ? "bg-red-50 text-red-600"
+                          : "bg-amber-50 text-amber-700"
+                      }`}
+                    >
+                      <Clock3 className="h-3.5 w-3.5" />
+                      Berlaku {formatCountdown(remainingSec)}
+                    </span>
+                  )}
                 </div>
+                )
               ) : order.payment_va ? (
                 <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50 p-4">
                   <div className="flex items-center gap-2.5">
@@ -355,7 +428,8 @@ export default function TopupBayarPage() {
             </div>
           )}
 
-          {waiting && !order.payment_url && (
+          {waiting &&
+            !(order.payment_url || order.payment_qr || order.payment_va) && (
             <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
               <p className="flex items-center gap-2 text-sm font-bold text-ink">
                 <Clock3 className="h-4 w-4 text-amber-500" /> Pesanan Tercatat

@@ -3,11 +3,11 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import {
-  ArrowLeft,
   Banknote,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
+  Clock3,
   Copy,
   CreditCard,
   ExternalLink,
@@ -17,6 +17,7 @@ import {
   MessageCircle,
   Navigation,
   Package,
+  QrCode,
   ShieldCheck,
   ShoppingBag,
   Truck,
@@ -34,7 +35,6 @@ import { mapEkspedisiToCourierCodes, matchEkspedisi } from "@/lib/kiriminaja";
 import { getPaymentGuide } from "@/lib/payment-guides";
 import { pixelContact, pixelInitiateCheckout, pixelLead } from "@/lib/meta-pixel";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
-import { channelCategory, duitkuRows } from "@/lib/duitku-channels";
 import { INPUT_CLS } from "@/lib/ui";
 
 // ─── localStorage: simpan data pembeli untuk auto-fill ──────────────────
@@ -66,26 +66,24 @@ function saveBuyerData(data: SavedBuyerData) {
   } catch { /* quota */ }
 }
 
-/** Status overlay pembayaran online Duitku di dalam modal checkout. */
+/** Status overlay pembayaran QRIS di dalam modal checkout. */
 type PayState = {
   step: "paying" | "success" | "failed" | "wa";
   orderId?: string;
   paymentUrl?: string;
   /** String QRIS — dirender jadi QR code langsung di overlay (tanpa tab baru). */
   qrString?: string;
-  /** Nomor VA — ditampilkan langsung di overlay (tanpa tab baru). */
+  /** Nomor VA — hanya untuk sesi lama (kanal VA tidak dibuat lagi). */
   vaNumber?: string;
-  /** Kode kanal yang dipakai: "SP" (QRIS), "VA", atau kanal redirect lain. */
+  /** Kode kanal gateway yang dipakai — untuk panduan cara bayar. */
   channel?: string;
-  /** Nama kanal dari daftar metode Duitku (mis. "MAYBANK VA"). */
-  channelName?: string;
-  /** URL logo kanal dari CDN Duitku. */
-  channelImage?: string;
+  /** Sisa masa bayar (detik) dari server — QRIS 15 menit. */
+  expiresIn?: number;
   total?: number;
   /** Rincian total: subtotal produk & ongkir (untuk breakdown tagihan). */
   subtotal?: number;
   shipping?: number;
-  /** Mode uji coba Duitku (sandbox) — tampilkan badge di overlay. */
+  /** Mode uji coba gateway (sandbox) — tampilkan badge di overlay. */
   sandbox?: boolean;
   error?: string;
 };
@@ -134,6 +132,16 @@ const labelCls = "mb-1 block text-xs font-semibold text-ink";
 
 const formatRupiah = (n: number) =>
   "Rp " + new Intl.NumberFormat("id-ID").format(n);
+
+/** Hitung mundur masa bayar: MM:SS, atau H:MM:SS untuk masa bayar panjang. */
+const formatCountdown = (totalSec: number) => {
+  const s = Math.max(0, Math.floor(totalSec));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  const mm = h > 0 ? String(m).padStart(2, "0") : String(m);
+  return `${h > 0 ? `${h}:` : ""}${mm}:${String(sec).padStart(2, "0")}`;
+};
 
 /** Kelompokkan digit nomor VA per 4 agar mudah dibaca dan disalin. */
 const formatVaNumber = (n: string) =>
@@ -191,23 +199,18 @@ export default function WhatsAppOrderModal({
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const [payment, setPayment] = useState("");
-  /** Kode kanal spesifik Duitku pilihan pembeli (mis. SP = QRIS ShopeePay,
-   *  VA = Maybank VA). Kosong = pakai QRIS pertama yang aktif. */
-  const [payProvider, setPayProvider] = useState("");
-  /** Kategori yang sedang dibuka daftar provider-nya (akordeon step 2). */
-  const [openChannel, setOpenChannel] = useState<string | null>(null);
-  /** Overlay pembayaran Duitku aktif (null = form biasa). */
+  /** Overlay pembayaran aktif (null = form biasa). */
   const [pay, setPay] = useState<PayState | null>(null);
-  /** Sedang membuat pesanan / sesi Duitku (tombol busy). */
+  /** Sedang membuat pesanan / sesi gateway (tombol busy). */
   const [paying, setPaying] = useState(false);
   /** Tombol salin nomor VA baru saja diklik (label "Tersalin"). */
   const [vaCopied, setVaCopied] = useState(false);
   /** Sub-kanal panduan cara bayar yang sedang terbuka (indeks akordeon). */
   const [guideOpen, setGuideOpen] = useState(0);
-  /** Daftar metode pembayaran aktif Duitku (kode + logo resmi gateway). */
-  const [duitkuMethods, setDuitkuMethods] = useState<
-    { code: string; name: string; image: string }[]
-  >([]);
+  /** Detik sisa masa bayar QRIS (null = tanpa batas waktu). */
+  const [payRemaining, setPayRemaining] = useState<number | null>(null);
+  /** Batas waktu bayar (epoch ms) — stabil meski objek pay berganti saat polling. */
+  const payDeadlineRef = useRef(0);
 
   const [provinces, setProvinces] = useState<Province[]>(provinceCache);
   const [cities, setCities] = useState<City[]>([]);
@@ -526,26 +529,19 @@ export default function WhatsAppOrderModal({
     return () => clearInterval(t);
   }, [pay]);
 
-  // Muat daftar metode pembayaran aktif Duitku (logo QRIS / bank) untuk
-  // picker kanal pembayaran di dalam modal. Bila gateway belum siap, picker
-  // tetap tampil dengan label saja.
+  // Hitung mundur masa bayar QRIS. Batas waktu disimpan di ref agar polling
+  // status (yang mengganti objek pay) tidak mereset hitungan.
   useEffect(() => {
-    if (!open || payment !== "duitku" || duitkuMethods.length) return;
-    const load = async () => {
-      try {
-        const res = await fetch("/api/duitku/methods", { cache: "no-store" });
-        const j = await res.json();
-        if (j.ok && Array.isArray(j.methods)) {
-          setDuitkuMethods(
-            j.methods as { code: string; name: string; image: string }[],
-          );
-        }
-      } catch {
-        // Gateway belum siap — biarkan ronde berikutnya.
-      }
-    };
-    void load();
-  }, [open, payment, duitkuMethods.length]);
+    if (!pay || pay.step !== "paying" || !pay.expiresIn) return;
+    if (!payDeadlineRef.current) {
+      payDeadlineRef.current = Date.now() + pay.expiresIn * 1000;
+    }
+    const deadline = payDeadlineRef.current;
+    const t = setInterval(() => {
+      setPayRemaining(Math.max(0, Math.ceil((deadline - Date.now()) / 1000)));
+    }, 1000);
+    return () => clearInterval(t);
+  }, [pay]);
 
   // Auto cek ongkir begitu kecamatan dipilih
   useEffect(() => {
@@ -623,7 +619,7 @@ export default function WhatsAppOrderModal({
     });
   }, [open, items, productId, price]);
 
-  /** Produk Evermos (EVM-) hanya mendukung Bayar Online — COD tidak tersedia. */
+  /** Produk Evermos (EVM-) hanya mendukung QRIS — COD tidak tersedia. */
   const hasEvermos = Boolean(
     productId?.startsWith("EVM-") ||
       items?.some((it) => it.id.startsWith("EVM-"))
@@ -631,29 +627,6 @@ export default function WhatsAppOrderModal({
   const paymentMethods = hasEvermos
     ? PAYMENT_METHODS.filter((m) => m.key !== "cod")
     : PAYMENT_METHODS;
-
-  /** Kanal Duitku yang akan dipakai saat pesanan dikirim: pilihan pembeli,
-   *  atau QRIS pertama yang aktif bila pembeli belum memilih. */
-  const effectiveProvider =
-    payProvider ||
-    duitkuRows(duitkuMethods).find((r) => r.key === "qris")?.methods[0]?.code ||
-    duitkuRows(duitkuMethods)[0]?.methods[0]?.code ||
-    "SP";
-
-  /** Baris kategori yang sedang dibuka (step 2) — null = tampilkan daftar kategori. */
-  const openDuitkuRow = openChannel
-    ? duitkuRows(duitkuMethods).find((r) => r.key === openChannel) ?? null
-    : null;
-
-  /** Provider terpilih beserta kategori induknya — untuk kartu "metode terpilih". */
-  const chosenDuitku = (() => {
-    if (!payProvider) return null;
-    for (const row of duitkuRows(duitkuMethods)) {
-      const method = row.methods.find((m) => m.code === payProvider);
-      if (method) return { row, method };
-    }
-    return null;
-  })();
 
   // Batal-kan pilihan COD bila pesanan memuat produk Evermos (mis. modal yang
   // sama dipakai ulang untuk keranjang yang isinya berubah). Hook wajib di
@@ -903,7 +876,7 @@ export default function WhatsAppOrderModal({
       setError(
         hasEmptyGroups
           ? payment === "cod"
-            ? `Ada ${emptyGroupCount} paket tanpa kurir yang mendukung COD. Pilih Bayar Online atau gunakan tombol "Tanya Admin via WA".`
+            ? `Ada ${emptyGroupCount} paket tanpa kurir yang mendukung COD. Pilih QRIS atau gunakan tombol "Tanya Admin via WA".`
             : `Ada ${emptyGroupCount} paket yang belum punya kurir. Gunakan tombol "Tanya Admin via WA" agar admin bantu hitung ongkirnya.`
           : 'Klik "Cek Ongkir" lalu pilih kurir pengiriman.'
       );
@@ -912,8 +885,8 @@ export default function WhatsAppOrderModal({
     if (!payment) {
       setError(
         hasEvermos
-          ? "Pilih metode pembayaran (Bayar Online)."
-          : "Pilih metode pembayaran (Bayar Online atau COD)."
+          ? "Pilih metode pembayaran (QRIS)."
+          : "Pilih metode pembayaran (QRIS atau COD)."
       );
       return;
     }
@@ -929,8 +902,8 @@ export default function WhatsAppOrderModal({
     const paymentLabel =
       PAYMENT_METHODS.find((p) => p.key === payment)?.label ?? payment;
 
-    // Bayar Online (Duitku): pesanan + sesi gateway dibuat di server (harga
-    // & ongkir dihitung ulang), lalu overlay pembayaran ditampilkan.
+    // QRIS: pesanan + sesi gateway dibuat di server (harga & ongkir
+    // dihitung ulang), lalu overlay pembayaran ditampilkan.
     if (payment === "duitku") {
       setPaying(true);
       setError("");
@@ -954,7 +927,6 @@ export default function WhatsAppOrderModal({
             };
           }),
           clientTotal: grandTotal,
-          paymentChannel: effectiveProvider,
           pageUrl:
             typeof window !== "undefined" ? window.location.href : undefined,
         };
@@ -980,6 +952,7 @@ export default function WhatsAppOrderModal({
           qrString?: string;
           vaNumber?: string;
           channel?: string;
+          expires_in?: number;
           total?: number;
           sandbox?: boolean;
           gatewayError?: string;
@@ -994,11 +967,15 @@ export default function WhatsAppOrderModal({
           );
           return;
         }
-        if (j.mode === "duitku" && j.orderId && j.paymentUrl) {
-          // Nama & logo kanal diambil dari daftar metode Duitku yang sudah
-          // dimuat di picker (j.channel = kode yang benar-benar dipakai).
-          const prov = duitkuMethods.find((m) => m.code === j.channel);
-          // Sesi pembayaran baru — buka lagi sub-kanal pertama panduan.
+        if (
+          j.mode === "duitku" &&
+          j.orderId &&
+          (j.paymentUrl || j.qrString || j.vaNumber)
+        ) {
+          // Sesi pembayaran baru — mulai hitung mundur dari expires_in server
+          // dan buka lagi sub-kanal pertama panduan.
+          payDeadlineRef.current = 0;
+          setPayRemaining(j.expires_in ?? null);
           setGuideOpen(0);
           setPay({
             step: "paying",
@@ -1007,8 +984,7 @@ export default function WhatsAppOrderModal({
             qrString: j.qrString,
             vaNumber: j.vaNumber,
             channel: j.channel,
-            channelName: prov?.name,
-            channelImage: prov?.image,
+            expiresIn: j.expires_in,
             total: j.total,
             subtotal,
             shipping: totalOngkir,
@@ -1189,67 +1165,92 @@ export default function WhatsAppOrderModal({
                     Metode Pembayaran
                   </p>
                   {pay.qrString ? (
-                    <div className="mt-2 rounded-xl border border-gray-100 p-4">
-                      <div className="flex items-center gap-2.5">
-                        {pay.channelImage ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={pay.channelImage}
-                            alt=""
-                            className="h-7 w-7 rounded object-contain"
-                          />
-                        ) : (
-                          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand/10">
-                            <CreditCard className="h-4 w-4 text-brand" />
-                          </span>
-                        )}
-                        <div>
-                          <p className="text-xs font-bold text-ink">
-                            {pay.channelName ?? "QRIS"}
-                          </p>
-                          <p className="text-[10px] text-muted-2">
-                            {channelCategory(pay.channel)} · semua aplikasi QRIS
-                          </p>
-                        </div>
-                      </div>
-                      <div className="mt-3 flex flex-col items-center gap-2.5">
-                        <div className="rounded-xl border-2 border-brand/15 bg-white p-3">
-                          <QRCodeSVG
-                            value={pay.qrString}
-                            size={180}
-                            level="M"
-                            marginSize={2}
-                          />
-                        </div>
-                        <p className="text-center text-xs text-muted-2">
-                          Scan QRIS untuk membayar{" "}
-                          <b className="text-ink">
-                            {pay.total ? formatRupiah(pay.total) : ""}
-                          </b>
+                    payRemaining === 0 ? (
+                      <div className="mt-2 flex flex-col items-center gap-2.5 rounded-xl border border-red-100 bg-red-50 px-4 py-6 text-center">
+                        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
+                          <XCircle className="h-6 w-6 text-red-600" />
+                        </span>
+                        <p className="text-sm font-bold text-ink">
+                          Waktu Pembayaran Habis
                         </p>
+                        <p className="max-w-xs text-xs leading-relaxed text-muted-2">
+                          Kode QRIS hanya berlaku 15 menit. Silakan pesan ulang
+                          untuk mendapatkan kode pembayaran baru.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setPay(null)}
+                          className="mt-1 w-full rounded-xl bg-brand px-4 py-3 text-sm font-bold text-white shadow-sm transition-all hover:bg-brand-2 active:scale-[0.98]"
+                        >
+                          Pesan Ulang
+                        </button>
+                        <a
+                          href={whatsappLink(
+                            `Halo, pembayaran pesanan ${pay.orderId ?? ""} kedaluwarsa. Mohon bantu proses pesanan ulang.`,
+                          )}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#25D366]/40 px-4 py-2.5 text-sm font-bold text-[#128C4A] transition-colors hover:bg-[#25D366]/10"
+                        >
+                          <WhatsAppIcon className="h-4 w-4" />
+                          Hubungi CS via WhatsApp
+                        </a>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="mt-2 rounded-xl border border-gray-100 p-4">
+                        <div className="flex items-center gap-2.5">
+                          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand/10">
+                            <QrCode className="h-5 w-5 text-brand" />
+                          </span>
+                          <div>
+                            <p className="text-sm font-bold text-ink">QRIS</p>
+                            <p className="text-[10px] text-muted-2">
+                              Scan dari semua e-wallet &amp; m-banking
+                            </p>
+                          </div>
+                        </div>
+                        <div className="mt-3 flex flex-col items-center gap-2.5">
+                          <div className="rounded-xl border-2 border-brand/15 bg-white p-3">
+                            <QRCodeSVG
+                              value={pay.qrString}
+                              size={180}
+                              level="M"
+                              marginSize={2}
+                            />
+                          </div>
+                          <p className="text-center text-xs text-muted-2">
+                            Scan QRIS untuk membayar{" "}
+                            <b className="text-ink">
+                              {pay.total ? formatRupiah(pay.total) : ""}
+                            </b>
+                          </p>
+                          {payRemaining !== null && (
+                            <p
+                              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold ${
+                                payRemaining <= 120
+                                  ? "bg-red-50 text-red-600"
+                                  : "bg-amber-50 text-amber-700"
+                              }`}
+                            >
+                              <Clock3 className="h-3.5 w-3.5" />
+                              Berlaku {formatCountdown(payRemaining)}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )
                   ) : pay.vaNumber ? (
                     <div className="mt-2 rounded-xl border border-gray-100 bg-gray-50 p-4">
                       <div className="flex items-center gap-2.5">
-                        {pay.channelImage ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={pay.channelImage}
-                            alt=""
-                            className="h-7 w-7 rounded object-contain"
-                          />
-                        ) : (
-                          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand/10">
-                            <CreditCard className="h-4 w-4 text-brand" />
-                          </span>
-                        )}
+                        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand/10">
+                          <CreditCard className="h-4 w-4 text-brand" />
+                        </span>
                         <div>
                           <p className="text-xs font-bold text-ink">
-                            {pay.channelName ?? "Virtual Account"}
+                            Virtual Account
                           </p>
                           <p className="text-[10px] text-muted-2">
-                            {channelCategory(pay.channel)}
+                            Transfer sesuai nominal tagihan
                           </p>
                         </div>
                       </div>
@@ -1301,7 +1302,7 @@ export default function WhatsAppOrderModal({
                         <CreditCard className="h-5 w-5 text-brand" />
                       </span>
                       <p className="text-sm font-bold text-ink">
-                        {pay.channelName ?? "Lanjutkan ke halaman pembayaran"}
+                        Lanjutkan ke halaman pembayaran
                       </p>
                       <p className="max-w-xs text-xs leading-relaxed text-muted-2">
                         Metode ini membutuhkan pengalihan ke halaman pembayaran
@@ -1321,18 +1322,30 @@ export default function WhatsAppOrderModal({
                 </div>
 
                 {/* Status pembayaran */}
-                <div className="mt-3 flex items-center gap-2">
-                  <span className="relative flex h-2 w-2">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
-                    <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
-                  </span>
-                  <span className="text-xs font-semibold text-amber-700">
-                    Menunggu Pembayaran
-                  </span>
-                  <span className="text-[11px] text-muted-2">
-                    · status dicek otomatis
-                  </span>
-                </div>
+                {payRemaining === 0 && pay.qrString ? (
+                  <div className="mt-3 flex items-center gap-2">
+                    <span className="flex h-2 w-2 rounded-full bg-red-500" />
+                    <span className="text-xs font-semibold text-red-600">
+                      Waktu Pembayaran Habis
+                    </span>
+                    <span className="text-[11px] text-muted-2">
+                      · pesan ulang untuk kode baru
+                    </span>
+                  </div>
+                ) : (
+                  <div className="mt-3 flex items-center gap-2">
+                    <span className="relative flex h-2 w-2">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
+                    </span>
+                    <span className="text-xs font-semibold text-amber-700">
+                      Menunggu Pembayaran
+                    </span>
+                    <span className="text-[11px] text-muted-2">
+                      · status dicek otomatis
+                    </span>
+                  </div>
+                )}
 
                 {/* Cara pembayaran — panduan spesifik per kanal (setiap bank/
                     aplikasi punya alur berbeda; lihat src/lib/payment-guides.ts) */}
@@ -1415,20 +1428,30 @@ export default function WhatsAppOrderModal({
                   <span>
                     Pembayaran diverifikasi otomatis — tidak perlu konfirmasi
                     manual.
+                    {pay.qrString ? " Kode QRIS hanya dapat dipakai sekali." : ""}
                     {pay.vaNumber ? " Virtual Account berlaku 24 jam." : ""}
                   </span>
                 </p>
                 <p className="mt-1.5 text-[10px] leading-relaxed text-muted-2">
-                  Pembayaran diproses secara aman oleh penyelenggara resmi (PT
-                  Espay Debit Indonesia Koe).
+                  Transaksi diproses melalui penyedia pembayaran QRIS resmi yang
+                  terdaftar dan diawasi Bank Indonesia.
                 </p>
               </div>
 
               {/* Footer */}
               <div className="flex shrink-0 items-center justify-between gap-3 border-t border-gray-100 px-5 py-3">
                 <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-2">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin text-brand" />
-                  Menunggu pembayaran…
+                  {payRemaining === 0 && pay.qrString ? (
+                    <>
+                      <XCircle className="h-3.5 w-3.5 text-red-500" />
+                      Waktu pembayaran habis
+                    </>
+                  ) : (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-brand" />
+                      Menunggu pembayaran…
+                    </>
+                  )}
                 </span>
               </div>
             </div>
@@ -1458,7 +1481,7 @@ export default function WhatsAppOrderModal({
                   // notifikasi otomatis dari webhook Duitku.
                   const label =
                     PAYMENT_METHODS.find((p) => p.key === "duitku")?.label ??
-                    "Bayar Online";
+                    "QRIS";
                   const helperNote = [
                     note.trim(),
                     "Pembayaran sudah berhasil — bukti pembayaran saya lampirkan di chat ini.",
@@ -1521,12 +1544,10 @@ export default function WhatsAppOrderModal({
               <div className="mt-5 space-y-2">
                 <button
                   type="button"
-                  onClick={() =>
-                    setPay((p) => (p ? { ...p, step: "paying" } : p))
-                  }
+                  onClick={() => setPay(null)}
                   className="w-full rounded-xl bg-brand px-4 py-3 text-sm font-bold text-white shadow-lg shadow-brand/25 transition-all hover:bg-brand/90 active:scale-[0.98]"
                 >
-                  Coba Bayar Lagi
+                  Pesan Ulang
                 </button>
                 <button
                   type="button"
@@ -1557,7 +1578,7 @@ export default function WhatsAppOrderModal({
                 onClick={() => {
                   const label =
                     PAYMENT_METHODS.find((p) => p.key === "duitku")?.label ??
-                    "Bayar Online";
+                    "QRIS";
                   const helperNote = [
                     note.trim(),
                     "Bayar online belum tersedia — mohon bantu proses & kirim petunjuk pembayaran.",
@@ -1940,7 +1961,7 @@ export default function WhatsAppOrderModal({
                     onClick={() => setPayment("duitku")}
                     className="font-semibold text-brand underline underline-offset-2"
                   >
-                    Ganti ke Bayar Online
+                    Ganti ke QRIS
                   </button>
                 </p>
               )}
@@ -1988,7 +2009,7 @@ export default function WhatsAppOrderModal({
                       )}
                       <p className="mt-1 text-[11px] text-amber-700/80">
                         {payment === "cod"
-                          ? "Tidak ada kurir yang mendukung COD untuk paket ini — pilih Bayar Online, atau gunakan tombol “Tanya Admin via WA” di bawah."
+                          ? "Tidak ada kurir yang mendukung COD untuk paket ini — pilih QRIS, atau gunakan tombol “Tanya Admin via WA” di bawah."
                           : "Pesanan tetap bisa diproses — admin akan bantu hitung ongkir paket ini lewat tombol “Tanya Admin via WA” di bawah."}
                       </p>
                     </div>
@@ -2102,189 +2123,25 @@ export default function WhatsAppOrderModal({
                       <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-2" />
                     </label>
 
-                    {/* Bila Bayar Online dipilih, pilihan kanalnya tampil
-                        tepat di bawahnya — baru setelah itu opsi COD. */}
+                    {/* QRIS adalah satu-satunya metode online — tidak ada
+                        pemilihan kanal/bank; kanal aktif dipilih server. */}
                     {p.key === "duitku" && payment === "duitku" && (
                       <div className="space-y-2">
-                        {openDuitkuRow ? (
-                          /* Step 2 — tampilan khusus kategori terpilih: tombol
-                              kembali + header kategori + daftar provider.
-                              Menggantikan daftar kategori agar area di
-                              bawahnya sepenuhnya milik kategori itu. */
-                          <div className="rounded-xl bg-gray-50 p-3">
-                            <button
-                              type="button"
-                              onClick={() => setOpenChannel(null)}
-                              className="mb-2 flex items-center gap-1.5 rounded-lg px-1 py-1 text-xs font-semibold text-brand transition-colors hover:bg-brand/10"
-                            >
-                              <ArrowLeft className="h-4 w-4" />
-                              Kembali
-                              <span className="font-normal text-muted-2">
-                                — pilih metode pembayaran lain
-                              </span>
-                            </button>
-
-                            {/* Header kategori (logo kiri, label + note kanan) */}
-                            <div className="mb-2 flex items-center gap-3 rounded-lg bg-white px-3 py-2.5">
-                              <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-                                {openDuitkuRow.methods.slice(0, 5).map((m) =>
-                                  m.image ? (
-                                    <img
-                                      key={m.code}
-                                      src={m.image}
-                                      alt={m.name}
-                                      className="h-6 w-auto rounded object-contain"
-                                    />
-                                  ) : (
-                                    <span
-                                      key={m.code}
-                                      className="text-[10px] font-semibold text-muted-2"
-                                    >
-                                      {m.name}
-                                    </span>
-                                  ),
-                                )}
-                              </span>
-                              <span className="shrink-0 text-right">
-                                <span className="block text-xs font-bold uppercase tracking-wide text-ink">
-                                  {openDuitkuRow.label}
-                                </span>
-                                <span className="block text-[10px] leading-snug text-muted-2">
-                                  {openDuitkuRow.note}
-                                </span>
-                              </span>
-                            </div>
-
-                            <p className="px-1 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-2">
-                              {openDuitkuRow.key === "qris"
-                                ? "Pilih aplikasi QRIS"
-                                : openDuitkuRow.key === "va"
-                                  ? "Pilih bank tujuan transfer"
-                                  : "Pilih metode"}
-                            </p>
-                            <div className="space-y-1">
-                              {openDuitkuRow.methods.map((m) => {
-                                const selected = payProvider === m.code;
-                                return (
-                                  <button
-                                    key={m.code}
-                                    type="button"
-                                    onClick={() => {
-                                      setPayProvider(m.code);
-                                      setOpenChannel(null);
-                                    }}
-                                    className={`flex w-full items-center gap-2.5 rounded-lg bg-white px-2.5 py-2.5 text-left transition-all ${
-                                      selected
-                                        ? "ring-2 ring-brand/30"
-                                        : "hover:bg-brand/5"
-                                    }`}
-                                  >
-                                    {m.image ? (
-                                      <img
-                                        src={m.image}
-                                        alt={m.name}
-                                        className="h-6 w-auto rounded object-contain"
-                                      />
-                                    ) : (
-                                      <span className="flex h-6 w-6 items-center justify-center rounded bg-gray-100 text-[9px] font-bold text-muted-2">
-                                        {m.code}
-                                      </span>
-                                    )}
-                                    <span className="min-w-0 flex-1 truncate text-xs font-semibold text-ink">
-                                      {m.name}
-                                    </span>
-                                    <span
-                                      className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 ${
-                                        selected
-                                          ? "border-brand bg-brand"
-                                          : "border-gray-300 bg-white"
-                                      }`}
-                                    >
-                                      {selected && (
-                                        <span className="h-1.5 w-1.5 rounded-full bg-white" />
-                                      )}
-                                    </span>
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        ) : chosenDuitku ? (
-                          /* Metode terpilih — kartu tunggal; daftar kategori
-                              disembunyikan karena metode sudah dipilih. Klik
-                              kartu untuk kembali memilih metode lain. */
-                          <button
-                            type="button"
-                            onClick={() => setPayProvider("")}
-                            className="flex w-full items-center gap-3 rounded-xl bg-brand/5 px-3 py-3 text-left ring-2 ring-brand/30 transition-colors hover:bg-brand/10"
-                          >
-                            {chosenDuitku.method.image ? (
-                              <img
-                                src={chosenDuitku.method.image}
-                                alt={chosenDuitku.method.name}
-                                className="h-6 w-auto rounded object-contain"
-                              />
-                            ) : (
-                              <span className="flex h-6 w-6 items-center justify-center rounded bg-gray-100 text-[9px] font-bold text-muted-2">
-                                {chosenDuitku.method.code}
-                              </span>
-                            )}
-                            <span className="min-w-0 flex-1">
-                              <span className="block text-xs font-bold uppercase tracking-wide text-ink">
-                                {chosenDuitku.method.name}
-                              </span>
-                              <span className="block text-[10px] leading-snug text-muted-2">
-                                {chosenDuitku.row.label} — {chosenDuitku.row.note}
-                              </span>
+                        <div className="flex items-center gap-3 rounded-xl bg-brand/5 px-3 py-3 ring-1 ring-brand/20">
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white">
+                            <QrCode className="h-5 w-5 text-brand" />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-xs font-bold uppercase tracking-wide text-ink">
+                              QRIS
                             </span>
-                            <span className="shrink-0 text-xs font-semibold text-brand">
-                              Ganti
+                            <span className="block text-[10px] leading-snug text-muted-2">
+                              Scan dari semua e-wallet &amp; m-banking — kode
+                              berlaku 15 menit setelah pesanan dibuat.
                             </span>
-                          </button>
-                        ) : (
-                          /* Step 1 — baris kategori gaya marketplace: logo kiri,
-                              label + note kanan, chevron. Klik membuka tampilan
-                              khusus kategori tersebut (step 2). */
-                          <div className="space-y-1.5">
-                            {duitkuRows(duitkuMethods).map((row) => (
-                              <button
-                                key={row.key}
-                                type="button"
-                                onClick={() => setOpenChannel(row.key)}
-                                className="flex w-full items-center gap-3 rounded-xl bg-gray-50 px-3 py-3 text-left transition-colors hover:bg-gray-100"
-                              >
-                                <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-                                  {row.methods.slice(0, 5).map((m) =>
-                                    m.image ? (
-                                      <img
-                                        key={m.code}
-                                        src={m.image}
-                                        alt={m.name}
-                                        className="h-6 w-auto rounded object-contain"
-                                      />
-                                    ) : (
-                                      <span
-                                        key={m.code}
-                                        className="text-[10px] font-semibold text-muted-2"
-                                      >
-                                        {m.name}
-                                      </span>
-                                    ),
-                                  )}
-                                </span>
-                                <span className="shrink-0 text-right">
-                                  <span className="block text-xs font-bold uppercase tracking-wide text-ink">
-                                    {row.label}
-                                  </span>
-                                  <span className="hidden text-[10px] leading-snug text-muted-2 sm:block">
-                                    {row.note}
-                                  </span>
-                                </span>
-                                <ChevronRight className="h-4 w-4 shrink-0 text-muted-2" />
-                              </button>
-                            ))}
-                          </div>
-                        )}
+                          </span>
+                          <CheckCircle2 className="h-4 w-4 shrink-0 text-brand" />
+                        </div>
                         <div className="flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5">
                           <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
                           <p className="text-[11px] leading-relaxed text-green-700">
@@ -2304,7 +2161,7 @@ export default function WhatsAppOrderModal({
               {hasEvermos && (
                 <p className="mt-3 text-[11px] leading-relaxed text-muted-2">
                   Pesanan ini memuat produk Evermos — pembayaran hanya tersedia
-                  via Bayar Online (tanpa COD).
+                  via QRIS (tanpa COD).
                 </p>
               )}
             </div>
@@ -2382,7 +2239,7 @@ export default function WhatsAppOrderModal({
             </div>
           </div>
 
-          {/* Tombol: "Pesan Sekarang" — Bayar Online memakai gaya brand,
+          {/* Tombol: "Pesan Sekarang" — QRIS memakai gaya brand,
               COD tetap gaya WhatsApp. */}
           <button
             type="button"

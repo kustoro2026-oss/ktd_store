@@ -5,15 +5,20 @@
 // pesanan tetap tersimpan dan pembeli diarahkan ke fallback WhatsApp (CS
 // memverifikasi transfer manual lalu eksekusi dari /topup/admin).
 //
-// Body: { sku, id, server?, nickname?, buyerName, buyerPhone, paymentChannel? }
+// Body: { sku, id, server?, nickname?, buyerName, buyerPhone }
 // Respons: { ok, orderId, mode: "duitku" | "wa", paymentUrl?, waLink? }
 
 import { NextResponse } from "next/server";
 import { TOPUP_PRODUCTS, formatRupiah, providerForSku } from "@/lib/topup";
 import { composeCustomerNo, fieldsForProvider } from "@/lib/topup-fields";
 import { createTopupOrder, newOrderId, newRefId, setOrderPaymentSession } from "@/lib/db";
-import { createDuitkuPayment, duitkuConfigured, DUITKU_MIN_AMOUNT, vaSafeForGross, vaMinSellForCategory } from "@/lib/duitku";
-import { QRIS_CODES } from "@/lib/duitku-channels";
+import {
+  activeQrisCodes,
+  createDuitkuPayment,
+  duitkuConfigured,
+  DUITKU_MIN_AMOUNT,
+  QRIS_EXPIRY_MINUTES,
+} from "@/lib/duitku";
 import { gateBalanceForCost } from "@/lib/topup-balance";
 import { gateProductHealth } from "@/lib/topup-health";
 import { notifyTopupOwner } from "@/lib/wa";
@@ -39,7 +44,6 @@ export async function POST(req: Request) {
     nickname?: unknown;
     buyerName?: unknown;
     buyerPhone?: unknown;
-    paymentChannel?: unknown;
   } = {};
   try {
     body = await req.json();
@@ -189,27 +193,13 @@ export async function POST(req: Request) {
         { status: 503 },
       );
     }
-    // Kanal spesifik pilihan pembeli (mis. SP = QRIS ShopeePay, VA = Maybank
-    // VA, FT = Indomaret) — kirim apa adanya. Bila ditolak gateway (mis.
-    // belum aktif), jatuh ke QRIS (SP) lalu VA tanpa duplikasi kode.
+    // Pembayaran online HANYA QRIS: kanal dicoba sesuai prioritas aktif
+    // (SQ → SP → NQ). Tidak ada fallback VA/e-wallet dan kode kanal dari
+    // klien diabaikan.
     // merchantOrderId WAJIB = ref_id pesanan — router callback mencocokkan
     // merchantOrderId ke kolom ref_id; akhiran apa pun akan membuat callback
     // tidak pernah cocok dan pesanan tidak pernah lunas.
-    const channelWanted = String(body.paymentChannel ?? "")
-      .trim()
-      .toUpperCase();
-    // Kanal VA untuk top-up dikendalikan env TOPUP_VA_ENABLED, TETAPI nominal
-    // kecil tetap dilarang walau VA aktif: fee flat VA (terbukti Rp 4.000 dari
-    // settlement transaksi nyata dana10000, 13 Okt 2026) memakan margin 5-10%.
-    // VA hanya dicoba bila margin kotor (sell − cost) menutup ambang
-    // VA_MIN_GROSS (default 4.500). Nominal di bawah ambang jatuh ke QRIS,
-    // lalu ke WhatsApp dengan info pengajuan bila QRIS belum aktif.
-    const VA_ENABLED = process.env.TOPUP_VA_ENABLED === "true";
-    const VA_SAFE =
-      VA_ENABLED && vaSafeForGross(product.sellPrice, product.costPrice);
-    const attempts = [
-      ...new Set(channelWanted ? [channelWanted, "SP", "VA"] : ["SP", "VA"]),
-    ].filter((code) => VA_SAFE || QRIS_CODES.has(code));
+    const attempts = await activeQrisCodes();
     let pay: Awaited<ReturnType<typeof createDuitkuPayment>> | null = null;
     let payChannel = "";
     for (const code of attempts) {
@@ -222,6 +212,7 @@ export async function POST(req: Request) {
         returnUrl: `${SITE_URL}/topup/bayar/${orderId}`,
         callbackUrl: `${SITE_URL}/api/duitku/callback`,
         paymentMethod: code,
+        expiryMinutes: QRIS_EXPIRY_MINUTES,
       });
       if (attempt.ok) {
         pay = attempt;
@@ -230,11 +221,11 @@ export async function POST(req: Request) {
       }
       pay = attempt; // simpan error terakhir untuk gatewayError
     }
-    if (pay?.ok && pay.paymentUrl) {
+    if (pay?.ok && (pay.paymentUrl || pay.qrString || pay.vaNumber)) {
       await setOrderPaymentSession(
         orderId,
         pay.reference ?? "",
-        pay.paymentUrl,
+        pay.paymentUrl ?? "",
         pay.vaNumber ?? "",
         pay.qrString ?? "",
         payChannel,
@@ -247,6 +238,8 @@ export async function POST(req: Request) {
         qrString: pay.qrString ?? "",
         vaNumber: pay.vaNumber ?? "",
         channel: payChannel,
+        /** Sisa masa bayar (detik) — dipakai hitungan waktu di halaman bayar. */
+        expires_in: QRIS_EXPIRY_MINUTES * 60,
         sandbox: process.env.DUITKU_SANDBOX === "true",
       });
     }
@@ -256,15 +249,9 @@ export async function POST(req: Request) {
       orderId,
       mode: "wa",
       waLink,
-      gatewayError: VA_SAFE
-        ? pay?.error ?? "sesi pembayaran online gagal dibuat"
-        : VA_ENABLED
-          ? `Untuk sementara, transaksi isi saldo di bawah ${formatRupiah(
-              vaMinSellForCategory("pulsa"),
-            )} dan top up game di bawah ${formatRupiah(
-              vaMinSellForCategory("game"),
-            )} belum dapat menggunakan pembayaran online karena aktivasi QRIS masih dalam proses pengajuan. Silakan pilih nominal lain atau hubungi CS kami melalui WhatsApp — CS siap memandu pembayaran hingga selesai.`
-          : "Pembayaran online sedang tidak tersedia karena aktivasi QRIS masih dalam proses pengajuan. Silakan hubungi CS kami melalui WhatsApp — CS siap memandu pembayaran hingga selesai.",
+      gatewayError:
+        pay?.error ??
+        "Pembayaran QRIS sedang tidak tersedia. Silakan hubungi CS kami melalui WhatsApp — CS siap memandu pembayaran hingga selesai.",
     });
   }
 

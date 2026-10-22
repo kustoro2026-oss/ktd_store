@@ -9,7 +9,7 @@ export const PRODUCT_FAQ: FaqItem[] = [
   },
   {
     q: "Metode pembayaran apa saja yang tersedia?",
-    a: "Pembayaran dapat dilakukan melalui transfer bank, Virtual Account (BCA, Mandiri, BNI, BRI, dll.), dan QRIS via Duitku, atau disepakati langsung dengan CS setelah pesanan dikonfirmasi. Pesanan diproses setelah pembayaran terverifikasi.",
+    a: "Pembayaran online dilakukan dengan memindai kode QRIS dari aplikasi e-wallet atau m-banking apa pun (GoPay, OVO, DANA, ShopeePay, LinkAja, dan lainnya) — kode berlaku 15 menit dan terverifikasi otomatis. Untuk produk tertentu tersedia juga pembayaran COD (bayar di tempat). Pesanan diproses setelah pembayaran terverifikasi.",
   },
   {
     q: "Berapa lama pesanan diproses dan dikirim?",

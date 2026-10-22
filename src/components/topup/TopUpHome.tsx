@@ -58,8 +58,8 @@ const STEPS = [
   },
   {
     icon: Wallet,
-    title: "Bayar QRIS / Virtual Account",
-    desc: "Selesaikan pembayaran via QRIS atau VA — verifikasi otomatis.",
+    title: "Bayar via QRIS",
+    desc: "Selesaikan pembayaran dengan scan QRIS — verifikasi otomatis.",
   },
   {
     icon: Zap,
