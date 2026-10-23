@@ -70,17 +70,25 @@ async function relay(
   }
 }
 
-/** Body respons relay yang benar-benar berasal dari Digiflazz: objek `data`
- *  dengan rc/status/message. Digiflazz memakai HTTP 400 untuk MENOLAK
- *  request yang tidak valid (rc 40 "Invalid Payload", rc 41 signature, rc 43
- *  "SKU tidak di temukan atau Non-Aktif") tetapi tetap mengirim body lengkap
- *  — relay meneruskan kode HTTP itu apa adanya. Tanpa pemisahan ini, penolakan
- *  bisnis menyamar jadi "relay mati" dan pesanan menggantung Pending selamanya
- *  (tidak pernah masuk jalur gagal/refund/karantina). */
-function dgPayload(r: { data?: unknown }): Record<string, unknown> | undefined {
+/** Objek `data` dari body relay (bila ada). Dipakai endpoint yang bentuk
+ *  datanya berbeda-beda — cek-saldo hanya mengirim `{ deposit }`. */
+function dgData(r: { data?: unknown }): Record<string, unknown> | undefined {
   const d = r.data;
   if (!d || typeof d !== "object" || Array.isArray(d)) return undefined;
-  const o = d as Record<string, unknown>;
+  return d as Record<string, unknown>;
+}
+
+/** Body respons relay yang benar-benar berasal dari Digiflazz untuk
+ *  transaksi: objek `data` dengan rc/status/message. Digiflazz memakai HTTP
+ *  400 untuk MENOLAK request yang tidak valid (rc 40 "Invalid Payload", rc 41
+ *  signature, rc 43 "SKU tidak di temukan atau Non-Aktif") tetapi tetap
+ *  mengirim body lengkap — relay meneruskan kode HTTP itu apa adanya. Tanpa
+ *  pemisahan ini, penolakan bisnis menyamar jadi "relay mati" dan pesanan
+ *  menggantung Pending selamanya (tidak pernah masuk jalur gagal/refund/
+ *  karantina). */
+function dgPayload(r: { data?: unknown }): Record<string, unknown> | undefined {
+  const o = dgData(r);
+  if (!o) return undefined;
   return "rc" in o || "status" in o || "message" in o ? o : undefined;
 }
 
@@ -207,7 +215,7 @@ export async function checkDigiflazzBalance(): Promise<BalanceResult> {
     return { ok: false, balance: 0, error: "config_missing" };
   }
   const r = await relay("cek-saldo", buildCekSaldoPayload());
-  const d = dgPayload(r) as
+  const d = dgData(r) as
     | { deposit?: string | number; message?: string }
     | undefined;
   // Non-2xx TANPA body Digiflazz = relay mati/kredensial ditolak (retryable).
