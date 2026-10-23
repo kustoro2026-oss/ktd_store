@@ -35,6 +35,16 @@ export type ExecuteOutcome = {
   wa?: string;
 };
 
+/** Plafon harga yang diizinkan ke Digiflazz: modal + 5%. Menutup kenaikan
+ *  harga seller kecil (mis. 10.500 → 10.600) yang sebelumnya ditolak dengan
+ *  "Harga seller lebih besar dari ketentuan harga Buyer" (HTTP 400). Seller
+ *  tetap dibayar sesuai harga aktualnya — max_price hanya batas izin, dan
+ *  margin tidak pernah terkikis lebih dari 5% modal. */
+function maxPriceFor(order: TopUpOrder): number | undefined {
+  if (!Number.isFinite(order.cost) || order.cost <= 0) return undefined;
+  return Math.ceil(order.cost * 1.05);
+}
+
 /** Jalankan eksekusi otomatis satu pesanan (diklaim atomik — aman dipanggil
  *  berulang oleh webhook retry / cron / admin tanpa transaksi ganda). */
 export async function executeTopupOrder(
@@ -104,6 +114,7 @@ async function runExecution(order: TopUpOrder, testing: boolean): Promise<Execut
       customerNo: order.customer_no,
       refId: attemptRef,
       testing,
+      maxPrice: maxPriceFor(order),
     });
     if (!res.ok || res.success || res.pending) break;
     percobaan = n;
@@ -203,6 +214,7 @@ export async function recheckTopupOrder(order: TopUpOrder): Promise<ExecuteOutco
     sku: order.sku,
     customerNo: order.customer_no,
     refId: order.ref_id,
+    maxPrice: maxPriceFor(order),
   });
   if (!res.ok) {
     // Relay belum terjangkau — pertahankan status pending untuk ronde berikut.
