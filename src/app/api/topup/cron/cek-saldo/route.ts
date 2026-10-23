@@ -1,8 +1,10 @@
 // Pengecekan saldo Digiflazz terjadwal — kirim WA ke owner bila saldo turun
 // di bawah ambang (TOPUP_LOW_BALANCE_THRESHOLD, default Rp 100.000).
 // Sekaligus menyegarkan snapshot kesehatan produk (pintu pra-bayar) DAN
-// mengaudit penyimpangan katalog vs price-list live — satu panggilan
-// price-list dari kuota Digiflazz yang terbatas (rc=83) untuk semua.
+// MENSINKRONKAN katalog vs price-list live (SKU mati dinonaktifkan, modal
+// diperbarui, nominal baru ditambahkan — otomatis, tanpa tangan owner) —
+// satu panggilan price-list dari kuota Digiflazz yang terbatas (rc=83)
+// untuk semua.
 // Dipanggil oleh:
 //   - cron Vercel harian (vercel.json) dengan header x-cron-secret,
 //   - admin /topup/admin dengan x-topup-secret (pemantauan manual).
@@ -12,7 +14,7 @@
 import { NextResponse } from "next/server";
 import { alertLowBalanceIfNeeded, getBalance, LOW_BALANCE_THRESHOLD } from "@/lib/topup-balance";
 import { refreshHealthSnapshot } from "@/lib/topup-health";
-import { auditTopupCatalog } from "@/lib/topup-audit";
+import { syncTopupCatalog } from "@/lib/topup-live";
 import { buildPriceListPayload, relayDigiflazz } from "@/lib/digiflazz";
 import { cronOrAdminGuard } from "@/lib/admin-guard";
 
@@ -48,11 +50,11 @@ export async function GET(req: Request) {
 
   const alert = await alertLowBalanceIfNeeded(bal.balance);
 
-  // Segarkan snapshot kesehatan produk + audit katalog sinkron — after() lama
+  // Segarkan snapshot kesehatan produk + sinkronkan katalog — after() lama
   // terbukti tidak tereksekusi di produksi (snapshot membeku), dan kegagalan
   // hanya dicatat, tidak menggagalkan respons cron. Price-list ditarik SEKALI
   // lalu dipakai bersama (kuota Digiflazz terbatas, rc=83).
-  let audit: Awaited<ReturnType<typeof auditTopupCatalog>> | null = null;
+  let sync: Awaited<ReturnType<typeof syncTopupCatalog>> | null = null;
   try {
     const pr = await relayDigiflazz("price-list", buildPriceListPayload({ cmd: "prepaid" }));
     const prefetched = pr.ok ? pr.data : undefined;
@@ -64,10 +66,10 @@ export async function GET(req: Request) {
       console.warn("[topup] refresh snapshot kesehatan gagal:", e);
     }
     try {
-      audit = await auditTopupCatalog(prefetched);
-      if (!audit.ok) console.warn("[topup] audit katalog:", audit.detail);
+      sync = await syncTopupCatalog(prefetched);
+      if (!sync.ok) console.warn("[topup] sinkron katalog:", sync.detail);
     } catch (e) {
-      console.warn("[topup] audit katalog gagal:", e);
+      console.warn("[topup] sinkron katalog gagal:", e);
     }
   } catch (e) {
     console.warn("[topup] price-list gagal total:", e);
@@ -78,14 +80,17 @@ export async function GET(req: Request) {
     balance: bal.balance,
     threshold: LOW_BALANCE_THRESHOLD,
     alert,
-    audit: audit
+    sync: sync
       ? {
-          detail: audit.detail,
-          live: audit.live,
-          hilang: audit.hilang.length,
-          naik: audit.naik.length,
-          urgent: audit.urgent.length,
-          baru: audit.baru.length,
+          detail: sync.detail,
+          live: sync.live,
+          hilang: sync.hilang,
+          harga: sync.harga,
+          urgent: sync.urgent,
+          baru: sync.baru,
+          restored: sync.restored,
+          applied: sync.applied,
+          notified: sync.notified,
         }
       : null,
   });

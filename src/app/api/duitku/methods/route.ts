@@ -9,7 +9,7 @@ import {
   vaSafeForGross,
   vaMinSellForCategory,
 } from "@/lib/duitku";
-import { TOPUP_PRODUCTS } from "@/lib/topup";
+import { getEffectiveProductBySku } from "@/lib/topup-live";
 
 export const runtime = "nodejs";
 
@@ -33,11 +33,12 @@ export async function GET(req: Request) {
     const vaMinOther = vaMinSellForCategory("pulsa");
     let vaAllowed = vaEnabled;
     if (sku) {
-      const product = TOPUP_PRODUCTS.find((p) => p.sku === sku);
+      // Katalog efektif — SKU mati tidak diizinkan VA (sama seperti order).
+      const product = await getEffectiveProductBySku(sku);
       if (product) {
         vaAllowed = vaEnabled && vaSafeForGross(product.sellPrice, product.costPrice);
       } else {
-        // SKU tidak dikenal — jangan izinkan VA (berhati-hati).
+        // SKU tidak dikenal / nonaktif — jangan izinkan VA (berhati-hati).
         vaAllowed = false;
       }
     }

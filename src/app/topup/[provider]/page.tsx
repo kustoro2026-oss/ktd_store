@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { formatRupiah, providerBySlug } from "@/lib/topup";
+import { formatRupiah } from "@/lib/topup";
+import { getEffectiveProviderBySlug } from "@/lib/topup-live";
 import NominalPicker from "@/components/topup/NominalPicker";
 
 type Props = {
@@ -11,7 +12,9 @@ type Props = {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { provider } = await params;
-  const p = providerBySlug(provider);
+  // Katalog efektif — provider yang seluruh SKU-nya dinonaktifkan sinkron
+  // otomatis tidak lagi muncul di metadata.
+  const p = await getEffectiveProviderBySlug(provider);
   if (!p) {
     return { title: "Provider Tidak Ditemukan — KTD Store" };
   }
@@ -43,7 +46,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function ProviderPage({ params, searchParams }: Props) {
   const { provider } = await params;
   const { sku } = await searchParams;
-  const p = providerBySlug(provider);
+  const p = await getEffectiveProviderBySlug(provider);
   if (!p) notFound();
 
   return (

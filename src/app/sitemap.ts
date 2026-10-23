@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 import { SITE_URL } from "@/lib/config";
 import { blogPosts } from "@/lib/data";
 import { getStaticCategories, getStaticProducts } from "@/lib/products-cache";
-import { TOPUP_PROVIDERS } from "@/lib/topup";
+import { getEffectiveTopupProviders } from "@/lib/topup-live";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticRoutes: MetadataRoute.Sitemap = [
@@ -32,8 +32,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.7,
   }));
 
-  // Halaman provider top-up (Free Fire, pulsa, dll).
-  const topupRoutes: MetadataRoute.Sitemap = TOPUP_PROVIDERS.map((p) => ({
+  // Halaman provider top-up (Free Fire, pulsa, dll) — katalog efektif
+  // (provider yang seluruh SKU-nya mati tidak lagi masuk sitemap).
+  const topupRoutes: MetadataRoute.Sitemap = (await getEffectiveTopupProviders()).map((p) => ({
     url: `${SITE_URL}/topup/${encodeURIComponent(p.slug)}`,
     lastModified: new Date(),
     changeFrequency: "weekly",

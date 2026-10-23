@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import TopUpHome from "@/components/topup/TopUpHome";
+import { getEffectiveTopupProviders } from "@/lib/topup-live";
 
 export const metadata: Metadata = {
   title: "Top Up & Isi Saldo — KTD Store",
@@ -26,12 +27,15 @@ export const metadata: Metadata = {
   },
 };
 
-export default function TopUpPage() {
+export default async function TopUpPage() {
+  // Katalog efektif (statis + override DB) — SKU mati dan nominal baru hasil
+  // sinkron otomatis ikut tampil di beranda tanpa menunggu regen.
+  const providers = await getEffectiveTopupProviders();
   return (
     <div className="container-site py-5">
       {/* Breadcrumb */}
       <nav
-        className="mb-4 flex flex-wrap items-center gap-1 text-xs text-muted-2"
+        className="mb-4 flex flex-wrap items-center gap-1 text-xs text-muted-2" 
         aria-label="Breadcrumb"
       >
         <Link href="/" className="transition-colors hover:text-brand">
@@ -41,7 +45,7 @@ export default function TopUpPage() {
         <span className="text-muted">Top Up &amp; Isi Saldo</span>
       </nav>
 
-      <TopUpHome />
+      <TopUpHome providers={providers} />
     </div>
   );
 }

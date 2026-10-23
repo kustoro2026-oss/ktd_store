@@ -5,9 +5,13 @@ import {
   AlertTriangle,
   CheckCircle2,
   Info,
+  ListChecks,
   Loader2,
   Play,
+  Power,
+  RefreshCw,
   Search,
+  Trash2,
   Wallet,
 } from "lucide-react";
 import { formatRupiah } from "@/lib/topup";
@@ -51,6 +55,33 @@ type ExecRes =
   | { ok: true; preview: false; step: string; detail: string; order?: OrderInfo }
   | { ok: false; error: string };
 
+/** Baris override katalog (topup_catalog_live) — hanya berisi diff vs
+ *  katalog statis; SKU tanpa baris berarti ikut katalog statis. */
+type CatalogRow = {
+  sku: string;
+  active: number;
+  cost: number;
+  name: string;
+  type: string;
+  brand: string;
+  category: string;
+  note: string;
+  updated_at: string;
+};
+
+/** Ringkasan sinkron katalog otomatis/manual. */
+type SyncRes = {
+  detail: string;
+  live: number;
+  hilang: number;
+  harga: number;
+  urgent: number;
+  baru: number;
+  restored: number;
+  applied: number;
+  notified: boolean;
+};
+
 /** Warna badge status pembayaran/top-up. */
 const statusBadge = (s: string) =>
   s === "paid" || s === "success"
@@ -89,6 +120,14 @@ export default function TopUpAdminPage() {
   const [exec, setExec] = useState<ExecRes | null>(null);
   const [execBusy, setExecBusy] = useState(false);
   const [error, setError] = useState("");
+
+  // ---- Tab Katalog (sinkron + saklar per SKU) ----
+  const [tab, setTab] = useState<"pesanan" | "katalog">("pesanan");
+  const [syncBusy, setSyncBusy] = useState(false);
+  const [syncRes, setSyncRes] = useState<SyncRes | null>(null);
+  const [catBusy, setCatBusy] = useState(false);
+  const [catRows, setCatRows] = useState<CatalogRow[] | null>(null);
+  const [catError, setCatError] = useState("");
 
   // Ingat secret per sesi browser (bukan keamanan tinggi, cukup untuk gating).
   useEffect(() => {
@@ -143,6 +182,66 @@ export default function TopUpAdminPage() {
     pOrder.topup_status !== "success" &&
     pOrder.topup_status !== "failed";
 
+  /** Panggil konsol API Digiflazz (guard x-topup-secret = Kode Admin). */
+  const postDigiflazz = async (body: Record<string, unknown>) => {
+    const res = await fetch("/api/topup/digiflazz", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-topup-secret": secret },
+      body: JSON.stringify(body),
+    });
+    return res.json() as Promise<Record<string, unknown>>;
+  };
+
+  /** Sinkronkan katalog vs price-list live SEKARANG (mode manual; otomatis
+   *  jalan tiap malam lewat cron cek-saldo). */
+  const doSync = async () => {
+    setSyncBusy(true);
+    setSyncRes(null);
+    setCatError("");
+    try {
+      const j = await postDigiflazz({ action: "katalog-sync" });
+      if (j.ok) {
+        setSyncRes((j.sync as SyncRes | undefined) ?? null);
+        setCatRows(null);
+      } else {
+        setCatError(String(j.detail ?? j.error ?? "Gagal"));
+      }
+    } catch (e) {
+      setCatError("Jaringan bermasalah: " + String(e));
+    } finally {
+      setSyncBusy(false);
+    }
+  };
+
+  const loadRows = async () => {
+    setCatBusy(true);
+    setCatError("");
+    try {
+      const j = await postDigiflazz({ action: "katalog-list" });
+      if (j.ok) setCatRows((j.rows as CatalogRow[]) ?? []);
+      else setCatError(String(j.detail ?? j.error ?? "Gagal"));
+    } catch (e) {
+      setCatError("Jaringan bermasalah: " + String(e));
+    } finally {
+      setCatBusy(false);
+    }
+  };
+
+  /** Saklar per SKU: nonaktifkan/aktifkan/hapus override (note manual). */
+  const doSku = async (sku: string, patch: Record<string, unknown>) => {
+    setCatBusy(true);
+    setCatError("");
+    try {
+      const j = await postDigiflazz({ action: "katalog-sku", payload: { sku, ...patch } });
+      if (!j.ok) setCatError(String(j.detail ?? j.error ?? "Gagal"));
+    } catch (e) {
+      setCatError("Jaringan bermasalah: " + String(e));
+    } finally {
+      setCatBusy(false);
+      void loadRows();
+    }
+  };
+
   return (
     <div className="container-site py-5">
       <nav
@@ -153,6 +252,35 @@ export default function TopUpAdminPage() {
       </nav>
 
       <h1 className="text-xl font-bold text-ink sm:text-2xl">Proses Pesanan Top Up</h1>
+
+      {/* Tab: CS pesanan (bawaan) / Katalog (sinkron + saklar SKU) */}
+      <div className="mt-4 flex gap-2">
+        <button
+          type="button"
+          onClick={() => setTab("pesanan")}
+          className={`rounded-full px-4 py-1.5 text-sm font-semibold transition-colors ${
+            tab === "pesanan"
+              ? "bg-brand text-white"
+              : "border border-gray-200 bg-white text-muted hover:text-brand"
+          }`}
+        >
+          Proses Pesanan
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("katalog")}
+          className={`rounded-full px-4 py-1.5 text-sm font-semibold transition-colors ${
+            tab === "katalog"
+              ? "bg-brand text-white"
+              : "border border-gray-200 bg-white text-muted hover:text-brand"
+          }`}
+        >
+          Sinkron Katalog
+        </button>
+      </div>
+
+      {tab === "pesanan" && (
+        <>
       <p className="mt-1 text-sm text-muted">
         Tempel No. Pesanan dari pesan WhatsApp pembeli — detail diambil
         otomatis, lalu konfirmasi untuk menandai lunas dan mengeksekusi top-up.
@@ -374,6 +502,180 @@ export default function TopUpAdminPage() {
           </div>
         )}
       </div>
+        </>
+      )}
+
+      {tab === "katalog" && (
+        <div className="mt-4 max-w-2xl space-y-4 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+          <p className="text-sm text-muted">
+            Katalog disinkronkan OTOMATIS tiap malam (cron 00:00 UTC): SKU mati
+            disembunyikan, modal diperbarui, nominal baru ditambahkan — tanpa
+            regen file. Tombol di bawah untuk sinkron manual sekarang.
+          </p>
+
+          <button
+            type="button"
+            onClick={doSync}
+            disabled={syncBusy || !secret}
+            className="flex items-center gap-2 rounded-xl bg-brand px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-brand-2 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {syncBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            Sinkronkan Katalog Sekarang
+          </button>
+
+          {syncRes && (
+            <div className="space-y-2 rounded-xl border border-emerald-100 bg-emerald-50 p-4">
+              <p className="flex items-center gap-2 text-sm font-bold text-emerald-700">
+                <CheckCircle2 className="h-4 w-4" />
+                Sinkron selesai — {syncRes.live} SKU live dibandingkan.
+              </p>
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-3">
+                <div>
+                  <dt className="text-xs text-muted-2">SKU dinonaktifkan</dt>
+                  <dd className="font-semibold text-ink">{syncRes.hilang}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted-2">Modal diperbarui</dt>
+                  <dd className="font-semibold text-ink">
+                    {syncRes.harga}
+                    {syncRes.urgent > 0 && (
+                      <span className="ml-1 text-red-600">({syncRes.urgent} urgent)</span>
+                    )}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted-2">Nominal baru</dt>
+                  <dd className="font-semibold text-ink">{syncRes.baru}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted-2">SKU pulih</dt>
+                  <dd className="font-semibold text-ink">{syncRes.restored}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted-2">Baris override</dt>
+                  <dd className="font-semibold text-ink">{syncRes.applied}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted-2">WA owner</dt>
+                  <dd className="font-semibold text-ink">
+                    {syncRes.notified ? "Terkirim" : "Tidak ada perubahan"}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          )}
+
+          {catError && (
+            <p className="rounded-xl border border-red-100 bg-red-50 px-4 py-2.5 text-sm text-red-700">
+              {catError}
+            </p>
+          )}
+
+          <div className="border-t border-gray-100 pt-4">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-semibold text-ink">Override Aktif per SKU</p>
+              <button
+                type="button"
+                onClick={loadRows}
+                disabled={catBusy || !secret}
+                className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-muted transition-colors hover:border-brand hover:text-brand disabled:opacity-50"
+              >
+                {catBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ListChecks className="h-3.5 w-3.5" />}
+                Muat Daftar
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-muted-2">
+              Hanya berisi diff vs katalog statis — SKU tanpa baris ikut katalog
+              file. Saklar manual (note=manual) tidak disentuh sinkron otomatis.
+            </p>
+
+            {catRows !== null && (
+              <>
+                {catRows.length === 0 ? (
+                  <p className="mt-3 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-sm text-muted">
+                    Tidak ada override — katalog sepenuhnya mengikuti file statis.
+                  </p>
+                ) : (
+                  <div className="mt-3 overflow-x-auto rounded-xl border border-gray-100">
+                    <table className="w-full min-w-[560px] text-left text-sm">
+                      <thead className="bg-gray-50 text-xs text-muted-2">
+                        <tr>
+                          <th className="px-3 py-2 font-semibold">SKU</th>
+                          <th className="px-3 py-2 font-semibold">Status</th>
+                          <th className="px-3 py-2 font-semibold">Modal</th>
+                          <th className="px-3 py-2 font-semibold">Catatan</th>
+                          <th className="px-3 py-2 text-right font-semibold">Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {catRows.map((r) => (
+                          <tr key={r.sku}>
+                            <td className="px-3 py-2">
+                              <span className="font-mono text-xs text-ink">{r.sku}</span>
+                              {r.name && (
+                                <span className="block text-[11px] text-muted-2">{r.name}</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2">
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                                  r.active === 1
+                                    ? "bg-emerald-100 text-emerald-700"
+                                    : "bg-red-100 text-red-700"
+                                }`}
+                              >
+                                {r.active === 1 ? "Aktif" : "Nonaktif"}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 text-xs text-ink">
+                              {r.cost > 0 ? formatRupiah(r.cost) : "—"}
+                            </td>
+                            <td className="px-3 py-2 text-[11px] text-muted-2">
+                              {r.note === "manual"
+                                ? "manual"
+                                : r.note === "baru"
+                                  ? "nominal baru"
+                                  : r.active === 0
+                                    ? "mati (sinkron)"
+                                    : "modal baru (sinkron)"}
+                            </td>
+                            <td className="px-3 py-2 text-right">
+                              <div className="flex justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => doSku(r.sku, { active: r.active !== 1 })}
+                                  disabled={catBusy}
+                                  className="rounded-lg border border-gray-200 p-1.5 text-muted transition-colors hover:border-brand hover:text-brand disabled:opacity-50"
+                                  title={r.active === 1 ? "Nonaktifkan (sembunyikan dari etalase)" : "Aktifkan kembali"}
+                                >
+                                  <Power className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => doSku(r.sku, { hapus: true })}
+                                  disabled={catBusy}
+                                  className="rounded-lg border border-gray-200 p-1.5 text-muted transition-colors hover:border-red-300 hover:text-red-600 disabled:opacity-50"
+                                  title="Hapus override — SKU kembali ikut katalog statis"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                <p className="mt-2 text-[11px] text-muted-2">
+                  {catRows.length} baris override — perubahan langsung berlaku
+                  maksimal 1 menit kemudian (cache resolver).
+                </p>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

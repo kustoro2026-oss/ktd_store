@@ -27,7 +27,6 @@ import {
   TOPUP_PROVIDERS,
   categoryMinPrice,
   categoryNominals,
-  categoryProviders,
   formatRupiah,
   type TopUpCategory,
   type TopUpProvider,
@@ -39,9 +38,6 @@ const MAX_RECENT = 5;
 const MAX_SUGGESTIONS = 8;
 
 const POPULAR = ["Free Fire", "Mobile Legends", "Telkomsel", "PLN", "DANA"];
-
-/** Total SKU di katalog — dipakai strip statistik di hero. */
-const TOTAL_NOMINALS = TOPUP_PROVIDERS.reduce((a, p) => a + p.nominals.length, 0);
 
 const TRUST = [
   { icon: ShieldCheck, title: "Transaksi Aman", sub: "Pembayaran terverifikasi otomatis", tint: "bg-sky-100 text-sky-600" },
@@ -110,11 +106,11 @@ function categoryIcon(id: TopUpCategory) {
 
 /** Provider yang cocok dengan kata kunci — label/brand lebih dulu, lalu
  *  nominal per provider. Hasil dibatasi MAX_SUGGESTIONS. */
-function buildSuggestions(q: string): Suggestion[] {
+function buildSuggestions(q: string, providers: TopUpProvider[]): Suggestion[] {
   const lq = q.toLowerCase();
   const out: Suggestion[] = [];
   const pushedProvider = new Set<string>();
-  for (const p of TOPUP_PROVIDERS) {
+  for (const p of providers) {
     if (p.label.toLowerCase().includes(lq) || p.brand.toLowerCase().includes(lq)) {
       out.push({
         slug: p.slug,
@@ -124,7 +120,7 @@ function buildSuggestions(q: string): Suggestion[] {
       pushedProvider.add(p.slug);
     }
   }
-  for (const p of TOPUP_PROVIDERS) {
+  for (const p of providers) {
     for (const n of p.nominals) {
       if (out.length >= MAX_SUGGESTIONS) break;
       if (n.name.toLowerCase().includes(lq) || n.sku.toLowerCase().includes(lq)) {
@@ -166,12 +162,19 @@ function ProviderCard({ p, cat }: { p: TopUpProvider; cat: TopUpCategory }) {
   );
 }
 
-export default function TopUpHome() {
+export default function TopUpHome({
+  providers = TOPUP_PROVIDERS,
+}: {
+  /** Katalog efektif dari server (statis + override DB) — beranda /topup. */
+  providers?: TopUpProvider[];
+}) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const [recent, setRecent] = useState<string[]>([]);
+
+  const totalNominals = providers.reduce((a, p) => a + p.nominals.length, 0);
 
   useEffect(() => {
     // Isi pencarian terbaru setelah mount (localStorage hanya ada di klien).
@@ -180,7 +183,7 @@ export default function TopUpHome() {
   }, []);
 
   const q = query.trim();
-  const suggestions = q ? buildSuggestions(q) : [];
+  const suggestions = q ? buildSuggestions(q, providers) : [];
   const rowCount = suggestions.length;
 
   const saveSearch = (term: string) => {
@@ -205,13 +208,13 @@ export default function TopUpHome() {
   };
 
   const goSearch = (term: string) => {
-    const s = buildSuggestions(term)[0];
+    const s = buildSuggestions(term, providers)[0];
     if (!s) return;
     goSuggestion(s);
   };
 
   const goChip = (label: string) => {
-    const p = TOPUP_PROVIDERS.find((x) => x.label.toLowerCase() === label.toLowerCase());
+    const p = providers.find((x) => x.label.toLowerCase() === label.toLowerCase());
     if (p) {
       saveSearch(p.label);
       router.push(`/topup/${p.slug}`);
@@ -381,11 +384,11 @@ export default function TopUpHome() {
           {/* Strip statistik katalog */}
           <div className="mx-auto mt-6 flex max-w-xl flex-wrap items-center justify-center gap-x-6 gap-y-1.5 text-xs font-semibold text-muted sm:text-sm">
             <span>
-              <b className="font-extrabold text-ink">{TOPUP_PROVIDERS.length}</b> Provider
+              <b className="font-extrabold text-ink">{providers.length}</b> Provider
             </span>
             <span aria-hidden="true" className="hidden h-1 w-1 rounded-full bg-gray-300 sm:inline-block" />
             <span>
-              <b className="font-extrabold text-ink">{TOTAL_NOMINALS.toLocaleString("id-ID")}</b>{" "}
+              <b className="font-extrabold text-ink">{totalNominals.toLocaleString("id-ID")}</b>{" "}
               Pilihan Nominal
             </span>
             <span aria-hidden="true" className="hidden h-1 w-1 rounded-full bg-gray-300 sm:inline-block" />
@@ -431,8 +434,10 @@ export default function TopUpHome() {
 
         {/* Section per kategori */}
         {TOPUP_CATEGORIES.map((cat) => {
-          const providers = categoryProviders(cat.id);
-          if (!providers.length) return null;
+          const catProviders = providers.filter((p) =>
+            p.nominals.some((n) => n.category === cat.id),
+          );
+          if (!catProviders.length) return null;
           return (
             <section key={cat.id} id={`kategori-${cat.id}`} className="mt-10 scroll-mt-24">
               <div className="flex items-end justify-between gap-3 border-b-2 border-brand/10 pb-3">
@@ -446,11 +451,11 @@ export default function TopUpHome() {
                   </div>
                 </div>
                 <span className="hidden shrink-0 rounded-full border border-gray-200 bg-white px-3 py-1 text-[11px] font-semibold text-muted-2 sm:inline-block">
-                  {providers.length} provider
+                  {catProviders.length} provider
                 </span>
               </div>
               <div className="mt-4 grid grid-cols-3 gap-2.5 sm:grid-cols-4 sm:gap-3 lg:grid-cols-6">
-                {providers.map((p) => (
+                {catProviders.map((p) => (
                   <ProviderCard key={p.slug} p={p} cat={cat.id} />
                 ))}
               </div>

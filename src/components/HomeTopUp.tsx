@@ -9,7 +9,8 @@ import Link from "next/link";
 import { Exo, Exo_2 } from "next/font/google";
 import type { ReactNode } from "react";
 import { ChevronRight, Gamepad2, LayoutGrid, Wallet } from "lucide-react";
-import { TOPUP_PROVIDERS, type TopUpProvider } from "@/lib/topup";
+import type { TopUpProvider } from "@/lib/topup";
+import { getEffectiveTopupProviders } from "@/lib/topup-live";
 import ProviderLogo from "@/components/topup/ProviderLogo";
 
 const exo = Exo({ subsets: ["latin"], weight: ["700"] });
@@ -47,9 +48,9 @@ const SALDO_SLUGS = [
   "pln",
 ];
 
-function pickSlugs(slugs: string[]): TopUpProvider[] {
+function pickSlugs(slugs: string[], providers: TopUpProvider[]): TopUpProvider[] {
   return slugs
-    .map((s) => TOPUP_PROVIDERS.find((p) => p.slug === s))
+    .map((s) => providers.find((p) => p.slug === s))
     .filter((p): p is TopUpProvider => Boolean(p));
 }
 
@@ -216,9 +217,12 @@ function SectionCard({
   );
 }
 
-export default function HomeTopUp() {
-  const games = pickSlugs(GAME_SLUGS);
-  const saldo = pickSlugs(SALDO_SLUGS);
+export default async function HomeTopUp() {
+  // Katalog efektif — provider yang seluruh SKU-nya mati ikut menghilang
+  // dari grid beranda.
+  const providers = await getEffectiveTopupProviders();
+  const games = pickSlugs(GAME_SLUGS, providers);
+  const saldo = pickSlugs(SALDO_SLUGS, providers);
   return (
     <section aria-label="Top Up Game dan Isi Saldo" className="container-site">
       <div className="grid grid-cols-1 gap-3 py-3 sm:grid-cols-2 sm:gap-6 sm:py-6">

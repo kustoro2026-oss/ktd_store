@@ -15,6 +15,9 @@
 //   webhook-sim   — simulasi payload webhook Digiflazz (tanpa menulis DB)
 //   webhook-log   — log webhook masuk terbaru (audit)
 //   health-snapshot — daftar SKU gangguan terkini (pintu pra-bayar, read-only)
+//   katalog-sync  — sinkronkan katalog vs price-list live (tulis override DB)
+//   katalog-list  — daftar override katalog terkini (read-only)
+//   katalog-sku   — saklar manual SATU SKU: nonaktifkan/aktifkan/hapus override
 //
 // Endpoint mutasi (topup/pay-pasca/deposit) diizinkan di sini karena konsol
 // hub sudah mewajibkan dialog konfirmasi sebelum mengirim. Guard x-topup-secret
@@ -32,11 +35,21 @@ import {
   type DgRawResult,
   type PascaCommand,
 } from "@/lib/digiflazz";
-import { listHealthSnapshot, listTopupWebhookLogs } from "@/lib/db";
+import {
+  deleteTopupCatalogOverride,
+  listHealthSnapshot,
+  listTopupCatalogOverrides,
+  listTopupWebhookLogs,
+  setTopupCatalogOverride,
+} from "@/lib/db";
 import { processDigiflazzWebhook } from "@/lib/digiflazz-webhook";
 import { adminGuard } from "@/lib/admin-guard";
 import { refreshHealthSnapshot } from "@/lib/topup-health";
-import { auditTopupCatalog } from "@/lib/topup-audit";
+import { TOPUP_PRODUCTS } from "@/lib/topup";
+import {
+  invalidateTopupCatalogCache,
+  syncTopupCatalog,
+} from "@/lib/topup-live";
 import {
   normalizePhone,
   sendWaTemplateParam,
@@ -61,6 +74,9 @@ const ACTIONS = new Set([
   "webhook-log",
   "health-snapshot",
   "wa-test",
+  "katalog-sync",
+  "katalog-list",
+  "katalog-sku",
 ]);
 
 const PASCA_COMMANDS: Record<string, PascaCommand> = {
@@ -146,11 +162,11 @@ export async function POST(req: Request) {
         }),
       );
       // Piggyback: data price-list prepaid yang sama dipakai menyegarkan
-      // snapshot kesehatan produk (nol panggilan API tambahan — kuota
-      // price-list Digiflazz terbatas, rc=83). DI-AWAIT sinkron: praktik
-      // after() lama terbukti tidak mengeksekusi refresh di produksi
-      // (snapshot membeku 79 jam), sehingga pintu pra-bayar kehilangan
-      // kesegaran datanya.
+      // snapshot kesehatan produk + mensinkronkan katalog (nol panggilan
+      // API tambahan — kuota price-list Digiflazz terbatas, rc=83).
+      // DI-AWAIT sinkron: praktik after() lama terbukti tidak mengeksekusi
+      // refresh di produksi (snapshot membeku 79 jam), sehingga pintu
+      // pra-bayar kehilangan kesegaran datanya.
       if (cmd === "prepaid" && r.ok) {
         try {
           const h = await refreshHealthSnapshot(r.data);
@@ -159,13 +175,64 @@ export async function POST(req: Request) {
           console.warn("[topup] refresh snapshot kesehatan gagal:", e);
         }
         try {
-          const a = await auditTopupCatalog(r.data);
-          if (!a.ok) console.warn("[topup] audit katalog:", a.detail);
+          const a = await syncTopupCatalog(r.data);
+          if (!a.ok) console.warn("[topup] sinkron katalog:", a.detail);
         } catch (e) {
-          console.warn("[topup] audit katalog gagal:", e);
+          console.warn("[topup] sinkron katalog gagal:", e);
         }
       }
       return resp(r, { cmd });
+    }
+
+    case "katalog-sync": {
+      const s = await syncTopupCatalog();
+      return NextResponse.json({ ok: true, sync: s });
+    }
+
+    case "katalog-list": {
+      const rows = await listTopupCatalogOverrides();
+      return NextResponse.json({ ok: true, rows });
+    }
+
+    case "katalog-sku": {
+      const sku = str("sku");
+      if (!sku) {
+        return NextResponse.json(
+          { ok: false, error: "field_kurang", detail: "sku wajib diisi." },
+          { status: 400 },
+        );
+      }
+      if (p.hapus === true) {
+        await deleteTopupCatalogOverride(sku as string);
+        invalidateTopupCatalogCache();
+        return NextResponse.json({ ok: true, sku, hapus: true });
+      }
+      const staticProduct = TOPUP_PRODUCTS.find((x) => x.sku === sku);
+      const existing = (await listTopupCatalogOverrides()).find((x) => x.sku === sku);
+      const activeRaw = p.active;
+      const active =
+        typeof activeRaw === "boolean"
+          ? activeRaw
+            ? 1
+            : 0
+          : (existing?.active ?? 1);
+      const costRaw = p.cost;
+      const cost =
+        typeof costRaw === "number" && Number.isFinite(costRaw) && costRaw > 0
+          ? Math.round(costRaw)
+          : (existing?.cost ?? staticProduct?.costPrice ?? 0);
+      await setTopupCatalogOverride({
+        sku: sku as string,
+        active,
+        cost,
+        name: existing?.name || staticProduct?.name || (sku as string),
+        type: existing?.type || "",
+        brand: existing?.brand || staticProduct?.brand || "",
+        category: existing?.category || staticProduct?.category || "",
+        note: "manual",
+      });
+      invalidateTopupCatalogCache();
+      return NextResponse.json({ ok: true, sku, active, cost });
     }
 
     case "cek-saldo":

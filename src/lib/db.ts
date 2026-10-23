@@ -327,6 +327,23 @@ const SCHEMA_SQL = `
     seller TEXT NOT NULL DEFAULT '',
     updated_at TEXT NOT NULL DEFAULT ''
   );
+
+  -- Override katalog top-up runtime: absen = ikut katalog statis
+  -- (src/lib/topup.ts); active=0 = SKU disembunyikan dari etalase dan
+  -- ditolak saat order; cost>0 = modal dikoreksi (harga jual dihitung
+  -- ulang oleh resolver). note='manual' = diset admin, tidak disentuh
+  -- sinkron otomatis; note='baru' = nominal baru dari sinkron otomatis.
+  CREATE TABLE IF NOT EXISTS topup_catalog_live (
+    sku TEXT PRIMARY KEY,
+    active INTEGER NOT NULL DEFAULT 1,
+    cost INTEGER NOT NULL DEFAULT 0,
+    name TEXT NOT NULL DEFAULT '',
+    type TEXT NOT NULL DEFAULT '',
+    brand TEXT NOT NULL DEFAULT '',
+    category TEXT NOT NULL DEFAULT '',
+    note TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL DEFAULT ''
+  );
 `;
 
 /** Waktu sekarang sebagai teks UTC "YYYY-MM-DD HH:MM:SS" (format sama di
@@ -585,6 +602,95 @@ export async function replaceHealthSnapshot(
       params,
     );
   }
+}
+
+// ---------- override katalog top-up (sinkron katalog) ----------
+
+export type TopupCatalogOverrideRow = {
+  sku: string;
+  active: number;
+  cost: number;
+  name: string;
+  type: string;
+  brand: string;
+  category: string;
+  note: string;
+  updated_at: string;
+};
+
+/** Semua baris override katalog (biasanya hanya diff vs katalog statis). */
+export async function listTopupCatalogOverrides(): Promise<TopupCatalogOverrideRow[]> {
+  return queryAll<TopupCatalogOverrideRow>(
+    "SELECT sku, active, cost, name, type, brand, category, note, updated_at FROM topup_catalog_live ORDER BY sku",
+  );
+}
+
+/** Ganti seluruh isi override hasil sinkron otomatis: baris non-manual
+ *  dihapus satu query lalu di-upsert per chunk (ON CONFLICT didukung kedua
+ *  backend). Baris note='manual' (saklar admin) tidak pernah disentuh.
+ *  Pola batch sama dengan replaceHealthSnapshot — ratusan baris satu per
+ *  satu membuat serverless timeout (524). */
+export async function replaceTopupCatalogOverrides(
+  rows: Array<{
+    sku: string;
+    active: number;
+    cost: number;
+    name: string;
+    type: string;
+    brand: string;
+    category: string;
+    note: string;
+  }>,
+): Promise<void> {
+  const now = nowUtc();
+  await queryRun("DELETE FROM topup_catalog_live WHERE note <> 'manual'");
+  const CHUNK = 250;
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const slice = rows.slice(i, i + CHUNK);
+    const marks = slice.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?)").join(",");
+    const params: SQLInputValue[] = [];
+    for (const r of slice) {
+      params.push(r.sku, r.active, r.cost, r.name, r.type, r.brand, r.category, r.note, now);
+    }
+    await queryRun(
+      `INSERT INTO topup_catalog_live (sku, active, cost, name, type, brand, category, note, updated_at)
+       VALUES ${marks}
+       ON CONFLICT (sku) DO UPDATE
+         SET active = excluded.active, cost = excluded.cost, name = excluded.name,
+             type = excluded.type, brand = excluded.brand, category = excluded.category,
+             note = excluded.note, updated_at = excluded.updated_at`,
+      params,
+    );
+  }
+}
+
+/** Saklar manual admin untuk SATU SKU (note='manual' — dilindungi dari
+ *  sinkron otomatis). cost 0 = ikut modal katalog statis. */
+export async function setTopupCatalogOverride(row: {
+  sku: string;
+  active: number;
+  cost: number;
+  name: string;
+  type: string;
+  brand: string;
+  category: string;
+  note: string;
+}): Promise<void> {
+  const now = nowUtc();
+  await queryRun(
+    `INSERT INTO topup_catalog_live (sku, active, cost, name, type, brand, category, note, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT (sku) DO UPDATE
+       SET active = excluded.active, cost = excluded.cost, name = excluded.name,
+           type = excluded.type, brand = excluded.brand, category = excluded.category,
+           note = excluded.note, updated_at = excluded.updated_at`,
+    [row.sku, row.active, row.cost, row.name, row.type, row.brand, row.category, row.note, now],
+  );
+}
+
+/** Hapus override satu SKU — kembali mengikuti katalog statis. */
+export async function deleteTopupCatalogOverride(sku: string): Promise<void> {
+  await queryRun("DELETE FROM topup_catalog_live WHERE sku = ?", [sku]);
 }
 
 // ---------- karantina otomatis (pintu pra-bayar) ----------

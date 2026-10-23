@@ -9,7 +9,8 @@
 // Respons: { ok, orderId, mode: "duitku" | "wa", paymentUrl?, waLink? }
 
 import { NextResponse } from "next/server";
-import { TOPUP_PRODUCTS, formatRupiah, providerForSku } from "@/lib/topup";
+import { formatRupiah } from "@/lib/topup";
+import { getEffectiveProductBySku, getEffectiveProviderForSku } from "@/lib/topup-live";
 import { composeCustomerNo, fieldsForProvider } from "@/lib/topup-fields";
 import { createTopupOrder, newOrderId, newRefId, setOrderPaymentSession } from "@/lib/db";
 import {
@@ -52,7 +53,9 @@ export async function POST(req: Request) {
   }
 
   const sku = String(body.sku ?? "").trim();
-  const product = TOPUP_PRODUCTS.find((p) => p.sku === sku);
+  // Katalog efektif (statis + override DB) — SKU mati tidak akan ditemukan
+  // dan otomatis ditolak, harga jual mengikuti override terkini.
+  const product = await getEffectiveProductBySku(sku);
   if (!product) {
     return NextResponse.json({ ok: false, error: "sku_tidak_dikenal" }, { status: 400 });
   }
@@ -75,7 +78,7 @@ export async function POST(req: Request) {
 
   // Skema input per produk (ala itemku) — customer_no disusun sesuai format
   // Digiflazz (ML = "id zone", Genshin/HSR = "UID|Server", dsb.).
-  const provider = providerForSku(sku);
+  const provider = await getEffectiveProviderForSku(sku);
   const schema = provider ? fieldsForProvider(provider.slug) : null;
   const values: Record<string, string> = {
     target: String(body.id ?? "").trim(),
