@@ -62,15 +62,35 @@ async function relay(
       parsed = { raw: text };
     }
     const data = (parsed as { data?: unknown }).data;
-    // Hanya 2xx yang dianggap berhasil — 4xx (token relay salah, endpoint
-    // diblokir) berarti request tidak pernah sampai Digiflazz dan harus
-    // diperlakukan retryable (pending), bukan kegagalan transaksi permanen.
-    // Body mentah ikut dibawa (dipotong) — penting untuk diagnosis saat
-    // relay membalas 200 tapi tanpa field data (mis. halaman keamanan hosting).
+    // ok hanya menandai status transport (2xx). Body mentah ikut dibawa
+    // (dipotong) untuk diagnosis saat relay membalas tanpa field data.
     return { ok: res.ok, data, status: res.status, raw: text.slice(0, 300) };
   } catch (e) {
     return { ok: false, error: String(e) };
   }
+}
+
+/** Body respons relay yang benar-benar berasal dari Digiflazz: objek `data`
+ *  dengan rc/status/message. Digiflazz memakai HTTP 400 untuk MENOLAK
+ *  request yang tidak valid (rc 40 "Invalid Payload", rc 41 signature, rc 43
+ *  "SKU tidak di temukan atau Non-Aktif") tetapi tetap mengirim body lengkap
+ *  — relay meneruskan kode HTTP itu apa adanya. Tanpa pemisahan ini, penolakan
+ *  bisnis menyamar jadi "relay mati" dan pesanan menggantung Pending selamanya
+ *  (tidak pernah masuk jalur gagal/refund/karantina). */
+function dgPayload(r: { data?: unknown }): Record<string, unknown> | undefined {
+  const d = r.data;
+  if (!d || typeof d !== "object" || Array.isArray(d)) return undefined;
+  const o = d as Record<string, unknown>;
+  return "rc" in o || "status" in o || "message" in o ? o : undefined;
+}
+
+/** Pesan kegagalan transport relay (bukan penolakan Digiflazz) — potongan
+ *  body mentah ikut dibawa supaya insiden produksi bisa didiagnosis tanpa
+ *  probe ulang. */
+function relayFailure(r: { error?: string; status?: number; raw?: string }): string {
+  if (r.error) return r.error;
+  const base = `relay_unreachable (HTTP ${r.status ?? "?"})`;
+  return r.raw ? `${base} — ${r.raw.slice(0, 200)}` : base;
 }
 
 // ==== Builder payload konsol API (dipakai /api/topup/digiflazz) ====
@@ -187,14 +207,15 @@ export async function checkDigiflazzBalance(): Promise<BalanceResult> {
     return { ok: false, balance: 0, error: "config_missing" };
   }
   const r = await relay("cek-saldo", buildCekSaldoPayload());
-  if (!r.ok) {
-    return {
-      ok: false,
-      balance: 0,
-      error: r.error ?? `relay_unreachable (HTTP ${r.status ?? "?"})`,
-    };
+  const d = dgPayload(r) as
+    | { deposit?: string | number; message?: string }
+    | undefined;
+  // Non-2xx TANPA body Digiflazz = relay mati/kredensial ditolak (retryable).
+  // Non-2xx DENGAN body Digiflazz = jawaban bisnis (mis. rc 41) — tampilkan
+  // pesannya, jangan dikaburkan jadi "relay_unreachable".
+  if (!r.ok && !d) {
+    return { ok: false, balance: 0, error: relayFailure(r) };
   }
-  const d = r.data as { deposit?: string | number; message?: string } | undefined;
   if (!d || typeof d.deposit === "undefined") {
     return {
       ok: false,
@@ -253,16 +274,20 @@ export async function digiflazzTopup(o: {
   payload.sign = md5(username() + apiKey() + o.refId);
 
   const r = await relay("transaction", payload);
-  if (!r.ok) {
+  const d = dgPayload(r);
+  // Non-2xx TANPA body Digiflazz = relay/hosting bermasalah: transaksi mungkin
+  // belum sampai Digiflazz → retryable (Pending). Non-2xx DENGAN body
+  // Digiflazz = penolakan validasi (rc 40/41/43) → jawaban bisnis final,
+  // lanjut ke klasifikasi rc di bawah.
+  if (!r.ok && !d) {
     return {
       ok: false,
       refId: o.refId,
       success: false,
       pending: false,
-      error: r.error ?? `relay_unreachable (HTTP ${r.status ?? "?"})`,
+      error: relayFailure(r),
     };
   }
-  const d = r.data as Record<string, unknown> | undefined;
   // Data kosong = relay membalas tanpa hasil Digiflazz (error HTML / body
   // tidak berbentuk) — perlakukan sebagai kegagalan relay retryable, BUKAN
   // transaksi gagal. Tanpa guard ini respons kosong turun ke klasifikasi
@@ -273,7 +298,7 @@ export async function digiflazzTopup(o: {
       refId: o.refId,
       success: false,
       pending: false,
-      error: "respons relay tidak valid (data kosong)",
+      error: `respons relay tidak valid (data kosong)${r.raw ? ` — ${r.raw.slice(0, 200)}` : ""}`,
     };
   }
   const rc = String(d?.rc ?? "");
