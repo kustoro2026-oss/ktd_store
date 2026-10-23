@@ -18,6 +18,11 @@ import { cronOrAdminGuard } from "@/lib/admin-guard";
 
 export const runtime = "nodejs";
 
+// Pull price-list penuh + audit katalog butuh lebih dari batas default —
+// beri ruang eksekusi (di plan non-hobby dipakai penuh; di hobby Vercel
+// tetap membatasi sesuai plan).
+export const maxDuration = 300;
+
 const CRON_SECRET = process.env.CRON_SECRET ?? "";
 const ADMIN_SECRET = process.env.TOPUP_ADMIN_SECRET ?? "";
 

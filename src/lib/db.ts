@@ -541,7 +541,11 @@ export async function listHealthSnapshot(): Promise<HealthSnapshotRow[]> {
 
 /** Ganti isi snapshot dengan daftar gangguan terkini: baris yang sudah
  *  pulih dihapus, baris baru di-upsert (ON CONFLICT — didukung kedua
- *  backend). Baris karantina otomatis yang masih aktif dipertahankan. */
+ *  backend). Baris karantina otomatis yang masih aktif dipertahankan.
+ *  Semua operasi DI-BATCH (hapus satu query, upsert per chunk 250 baris)
+ *  karena daftar gangguan bisa ratusan baris — versi lama menjalankan
+ *  ratusan query satu-per-satu dan membuat cron cek-saldo timeout (524)
+ *  di serverless (latensi per query Neon). */
 export async function replaceHealthSnapshot(
   gangguan: { sku: string; status: string; seller: string }[],
 ): Promise<void> {
@@ -549,20 +553,36 @@ export async function replaceHealthSnapshot(
   const fresh = new Set(gangguan.map((g) => g.sku));
   const existing = await listHealthSnapshot();
   const staleCutoff = utcAgo(48);
-  for (const row of existing) {
-    if (fresh.has(row.sku)) continue;
-    // Produk mungkin sehat di price-list tapi seller-nya gagal kirim
-    // berulang — karantina otomatis yang belum kedaluwarsa jangan dihapus.
-    if (row.seller === AUTO_QUARANTINE_MARK && row.updated_at >= staleCutoff) continue;
-    await queryRun("DELETE FROM topup_health_snapshot WHERE sku = ?", [row.sku]);
+  // SKU karantina otomatis yang masih aktif dan TIDAK ada di daftar gangguan
+  // terkini dipertahankan (seller gagal kirim walau price-list melaporkan
+  // sehat — karantina belum kedaluwarsa jangan dihapus).
+  const keep = existing
+    .filter((r) => !fresh.has(r.sku))
+    .filter((r) => r.seller === AUTO_QUARANTINE_MARK && r.updated_at >= staleCutoff)
+    .map((r) => r.sku);
+  const protect = [...fresh, ...keep];
+  if (protect.length === 0) {
+    await queryRun("DELETE FROM topup_health_snapshot");
+  } else {
+    const marks = protect.map(() => "?").join(",");
+    await queryRun(
+      `DELETE FROM topup_health_snapshot WHERE sku NOT IN (${marks})`,
+      protect,
+    );
   }
-  for (const g of gangguan) {
+  // Upsert massal per chunk — batas parameter SQLite tetap aman.
+  const CHUNK = 250;
+  for (let i = 0; i < gangguan.length; i += CHUNK) {
+    const slice = gangguan.slice(i, i + CHUNK);
+    const marks = slice.map(() => "(?, ?, ?, ?)").join(",");
+    const params: SQLInputValue[] = [];
+    for (const g of slice) params.push(g.sku, g.status, g.seller, now);
     await queryRun(
       `INSERT INTO topup_health_snapshot (sku, status, seller, updated_at)
-       VALUES (?, ?, ?, ?)
+       VALUES ${marks}
        ON CONFLICT (sku) DO UPDATE
          SET status = excluded.status, seller = excluded.seller, updated_at = excluded.updated_at`,
-      [g.sku, g.status, g.seller, now],
+      params,
     );
   }
 }
