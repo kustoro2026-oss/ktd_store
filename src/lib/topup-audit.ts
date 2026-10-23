@@ -31,7 +31,12 @@ export type CatalogDrift = {
   baru: string[];
 };
 
-type LiveEntry = { price: number; status: string; brand: string };
+type LiveEntry = { price: number; active: boolean; brand: string };
+
+/** Nilai kebenaran price-list bisa boolean `true` atau string "True". */
+function isTrue(v: unknown): boolean {
+  return String(v ?? "").toLowerCase() === "true";
+}
 
 const MAX_WA_ITEMS = 12;
 
@@ -65,9 +70,12 @@ export async function auditTopupCatalog(prefetched?: unknown): Promise<CatalogDr
   for (const it of data as Array<Record<string, unknown>>) {
     const sku = String(it.buyer_sku_code ?? "");
     if (!sku) continue;
+    // Generator katalog mensyaratkan buyer DAN seller aktif — audit harus
+    // pakai syarat yang sama, kalau tidak SKU nonaktif sisi buyer lolos
+    // dari deteksi dan baru ketahuan saat transaksi ditolak.
     liveMap.set(sku, {
       price: Number(it.price ?? 0) || 0,
-      status: String(it.seller_product_status ?? "").toLowerCase(),
+      active: isTrue(it.buyer_product_status) && isTrue(it.seller_product_status),
       brand: String(it.brand ?? ""),
     });
   }
@@ -82,7 +90,7 @@ export async function auditTopupCatalog(prefetched?: unknown): Promise<CatalogDr
 
   for (const p of TOPUP_PRODUCTS) {
     const l = liveMap.get(p.sku);
-    if (!l || l.status !== "true") {
+    if (!l || !l.active) {
       hilang.push(p.sku);
       continue;
     }
@@ -93,7 +101,7 @@ export async function auditTopupCatalog(prefetched?: unknown): Promise<CatalogDr
     }
   }
   for (const [sku, l] of liveMap) {
-    if (catalogSkus.has(sku) || l.status !== "true") continue;
+    if (catalogSkus.has(sku) || !l.active) continue;
     if (storeBrands.has(l.brand)) baru.push(sku);
   }
 
