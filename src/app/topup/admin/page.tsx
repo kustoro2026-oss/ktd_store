@@ -129,12 +129,21 @@ export default function TopUpAdminPage() {
   const [catRows, setCatRows] = useState<CatalogRow[] | null>(null);
   const [catError, setCatError] = useState("");
 
+  // ---- Gerbang password halaman (validasi server-side) ----
+  const [unlocked, setUnlocked] = useState(false);
+  const [pass, setPass] = useState("");
+  const [passBusy, setPassBusy] = useState(false);
+  const [passError, setPassError] = useState("");
+
   // Ingat secret per sesi browser (bukan keamanan tinggi, cukup untuk gating).
   useEffect(() => {
     // Intentional one-time hydration of client-only state.
     /* eslint-disable react-hooks/set-state-in-effect */
     const saved = window.sessionStorage.getItem("topup-admin-secret");
     if (saved) setSecret(saved);
+    if (window.sessionStorage.getItem("topup-admin-unlocked") === "1") {
+      setUnlocked(true);
+    }
   }, []);
 
   /** Langkah 1: pratinjau pesanan + saldo (tanpa perubahan). */
@@ -241,6 +250,81 @@ export default function TopUpAdminPage() {
       void loadRows();
     }
   };
+
+  /** Buka gerbang halaman — password divalidasi SERVER-SIDE (bukan di
+   *  browser), lalu status buka diingat per sesi (sessionStorage). */
+  const doUnlock = async () => {
+    setPassBusy(true);
+    setPassError("");
+    try {
+      const res = await fetch("/api/topup/admin/gate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: pass }),
+      });
+      if (res.ok) {
+        window.sessionStorage.setItem("topup-admin-unlocked", "1");
+        setUnlocked(true);
+      } else {
+        const j = (await res.json().catch(() => null)) as { detail?: string } | null;
+        setPassError(
+          j?.detail === "terlalu_sering"
+            ? "Terlalu banyak percobaan — tunggu 10 menit lalu coba lagi."
+            : "Password salah.",
+        );
+      }
+    } catch (e) {
+      setPassError("Jaringan bermasalah: " + String(e));
+    } finally {
+      setPassBusy(false);
+    }
+  };
+
+  // Gerbang halaman: tanpa password, hanya form masuk yang dirender —
+  // seluruh UI admin (pesanan, katalog) tersembunyi sampai terbuka.
+  if (!unlocked) {
+    return (
+      <div className="container-site py-5">
+        <div className="mx-auto mt-10 max-w-sm rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+          <h1 className="text-xl font-bold text-ink sm:text-2xl">Top Up Admin</h1>
+          <p className="mt-1 text-sm text-muted">
+            Halaman internal CS — masukkan password untuk melanjutkan.
+          </p>
+          <div className="mt-6 space-y-4">
+            <div>
+              <label htmlFor="ta-pass" className="mb-1.5 block text-sm font-semibold text-ink">
+                Password
+              </label>
+              <input
+                id="ta-pass"
+                type="password"
+                value={pass}
+                onChange={(e) => setPass(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && pass) doUnlock();
+                }}
+                placeholder="••••••"
+                autoFocus
+                className={INPUT_CLS}
+              />
+            </div>
+            {passError && (
+              <p className="text-sm font-semibold text-red-600">{passError}</p>
+            )}
+            <button
+              type="button"
+              onClick={doUnlock}
+              disabled={passBusy || !pass}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-brand-2 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {passBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Power className="h-4 w-4" />}
+              Masuk
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container-site py-5">
