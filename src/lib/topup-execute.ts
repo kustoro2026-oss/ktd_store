@@ -165,12 +165,12 @@ async function runExecution(order: TopUpOrder, testing: boolean): Promise<Execut
   const label = percobaan > 1 ? `gagal setelah ${percobaan} percobaan: ${reason}` : reason;
   await finishTopup(order.id, "failed", "", label);
   const wa = await notifyTopupOwner(
-    `[Top-up] Pesanan ${order.id} (${order.product_name}, ${formatRupiah(order.amount)}) GAGAL${percobaan > 1 ? ` setelah ${percobaan} percobaan` : ""}: ${reason}. Tindak lanjut refund via CS.`,
+    `[Top-up] Pesanan ${order.id} (${order.product_name}, ${formatRupiah(order.amount)}) GAGAL${percobaan > 1 ? ` setelah ${percobaan} percobaan` : ""}: ${reason}. Tindak lanjut refund via CS — pembeli ${order.buyer_name} (${order.buyer_phone}).`,
   );
   const q = await autoQuarantineIfRepeated(order.sku, label);
   if (q.quarantined) {
     await notifyTopupOwner(
-      `[Top-up] SKU ${order.sku} dikarantina otomatis — ${q.failures}x gagal refund dalam 24 jam. Pintu pra-bayar menolak produk ini sementara (24 jam).`,
+      `[Top-up] SKU ${order.sku} dikarantina otomatis — ${q.failures}x kegagalan terkait SKU dalam 24 jam. Pintu pra-bayar menolak produk ini sementara (24 jam).`,
     );
   }
   return { step: "failed", detail: label, wa };

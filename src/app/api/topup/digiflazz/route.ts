@@ -36,6 +36,7 @@ import { listHealthSnapshot, listTopupWebhookLogs } from "@/lib/db";
 import { processDigiflazzWebhook } from "@/lib/digiflazz-webhook";
 import { adminGuard } from "@/lib/admin-guard";
 import { refreshHealthSnapshot } from "@/lib/topup-health";
+import { auditTopupCatalog } from "@/lib/topup-audit";
 import {
   normalizePhone,
   sendWaTemplateParam,
@@ -156,6 +157,12 @@ export async function POST(req: Request) {
           if (!h.ok) console.warn("[topup] refresh snapshot kesehatan:", h.detail);
         } catch (e) {
           console.warn("[topup] refresh snapshot kesehatan gagal:", e);
+        }
+        try {
+          const a = await auditTopupCatalog(r.data);
+          if (!a.ok) console.warn("[topup] audit katalog:", a.detail);
+        } catch (e) {
+          console.warn("[topup] audit katalog gagal:", e);
         }
       }
       return resp(r, { cmd });

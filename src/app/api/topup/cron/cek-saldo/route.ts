@@ -1,8 +1,8 @@
 // Pengecekan saldo Digiflazz terjadwal — kirim WA ke owner bila saldo turun
 // di bawah ambang (TOPUP_LOW_BALANCE_THRESHOLD, default Rp 100.000).
-// Sekaligus menyegarkan snapshot kesehatan produk (pintu pra-bayar) — dua
-// pekerjaan dalam satu jadwal, dan harga satu panggilan price-list dari
-// kuota Digiflazz yang terbatas (rc=83).
+// Sekaligus menyegarkan snapshot kesehatan produk (pintu pra-bayar) DAN
+// mengaudit penyimpangan katalog vs price-list live — satu panggilan
+// price-list dari kuota Digiflazz yang terbatas (rc=83) untuk semua.
 // Dipanggil oleh:
 //   - cron Vercel harian (vercel.json) dengan header x-cron-secret,
 //   - admin /topup/admin dengan x-topup-secret (pemantauan manual).
@@ -12,6 +12,8 @@
 import { NextResponse } from "next/server";
 import { alertLowBalanceIfNeeded, getBalance, LOW_BALANCE_THRESHOLD } from "@/lib/topup-balance";
 import { refreshHealthSnapshot } from "@/lib/topup-health";
+import { auditTopupCatalog } from "@/lib/topup-audit";
+import { buildPriceListPayload, relayDigiflazz } from "@/lib/digiflazz";
 import { cronOrAdminGuard } from "@/lib/admin-guard";
 
 export const runtime = "nodejs";
@@ -41,14 +43,29 @@ export async function GET(req: Request) {
 
   const alert = await alertLowBalanceIfNeeded(bal.balance);
 
-  // Segarkan snapshot kesehatan produk sinkron — after() lama terbukti tidak
-  // tereksekusi di produksi (snapshot membeku), dan kegagalan refresh hanya
-  // dicatat, tidak menggagalkan respons cron.
+  // Segarkan snapshot kesehatan produk + audit katalog sinkron — after() lama
+  // terbukti tidak tereksekusi di produksi (snapshot membeku), dan kegagalan
+  // hanya dicatat, tidak menggagalkan respons cron. Price-list ditarik SEKALI
+  // lalu dipakai bersama (kuota Digiflazz terbatas, rc=83).
+  let audit: Awaited<ReturnType<typeof auditTopupCatalog>> | null = null;
   try {
-    const h = await refreshHealthSnapshot();
-    if (!h.ok) console.warn("[topup] refresh snapshot kesehatan:", h.detail);
+    const pr = await relayDigiflazz("price-list", buildPriceListPayload({ cmd: "prepaid" }));
+    const prefetched = pr.ok ? pr.data : undefined;
+    if (!pr.ok) console.warn("[topup] price-list gagal:", pr.error ?? `HTTP ${pr.status ?? "?"}`);
+    try {
+      const h = await refreshHealthSnapshot(prefetched);
+      if (!h.ok) console.warn("[topup] refresh snapshot kesehatan:", h.detail);
+    } catch (e) {
+      console.warn("[topup] refresh snapshot kesehatan gagal:", e);
+    }
+    try {
+      audit = await auditTopupCatalog(prefetched);
+      if (!audit.ok) console.warn("[topup] audit katalog:", audit.detail);
+    } catch (e) {
+      console.warn("[topup] audit katalog gagal:", e);
+    }
   } catch (e) {
-    console.warn("[topup] refresh snapshot kesehatan gagal:", e);
+    console.warn("[topup] price-list gagal total:", e);
   }
 
   return NextResponse.json({
@@ -56,5 +73,15 @@ export async function GET(req: Request) {
     balance: bal.balance,
     threshold: LOW_BALANCE_THRESHOLD,
     alert,
+    audit: audit
+      ? {
+          detail: audit.detail,
+          live: audit.live,
+          hilang: audit.hilang.length,
+          naik: audit.naik.length,
+          urgent: audit.urgent.length,
+          baru: audit.baru.length,
+        }
+      : null,
   });
 }

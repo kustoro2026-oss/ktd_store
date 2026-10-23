@@ -16,7 +16,7 @@ import {
   relayDigiflazz,
 } from "./digiflazz";
 import {
-  countRecentRefundFailures,
+  countRecentSkuFaultFailures,
   getHealthSnapshot,
   quarantineSku,
   replaceHealthSnapshot,
@@ -129,22 +129,33 @@ export async function gateProductHealth(sku: string): Promise<ProductHealthGate>
   }
 }
 
-/** Ambang karantina: SKU dianggap bermasalah bila gagal refund minimal
- *  N kali dalam 24 jam. */
+/** Ambang karantina: SKU dianggap bermasalah bila gagal final terkait SKU
+ *  minimal N kali dalam 24 jam. */
 const QUARANTINE_MIN_FAILURES = 2;
 
-/** Karantina otomatis pasca kegagalan final: SKU yang berulang kali
- *  "Transaksi Refund" (seller gagal kirim padahal price-list melaporkan
- *  sehat) ditandai gangguan supaya pintu pra-bayar menolaknya sementara
+/** Alasan kegagalan final yang menandakan masalah PADA SKU (bukan kesalahan
+ *  pembeli seperti nomor salah rc 54) — layak dihitung untuk karantina. */
+const SKU_FAULT_REASONS: RegExp[] = [
+  /refund/i, // rc 74 — seller gagal kirim padahal price-list melaporkan sehat
+  /SKU tidak di temukan|tidak ditemukan|non-?aktif/i, // rc 43 — SKU mati/hilang
+  /ketentuan harga/i, // penolakan harga — katalog basi vs ketentuan buyer
+];
+
+/** Karantina otomatis pasca kegagalan final: SKU yang berulang kali gagal
+ *  karena kesalahan SKU — seller gagal kirim (rc 74 "Transaksi Refund"),
+ *  SKU tidak ditemukan/nonaktif (rc 43), atau penolakan harga (katalog
+ *  basi) — ditandai gangguan supaya pintu pra-bayar menolaknya sementara
  *  (24 jam, lalu lepas sendiri). Dipanggil dari jalur kegagalan final
  *  topup-execute — tidak menahan alur apa pun bila DB bermasalah. */
 export async function autoQuarantineIfRepeated(
   sku: string,
   reason: string,
 ): Promise<{ quarantined: boolean; failures: number }> {
-  if (!/refund/i.test(reason)) return { quarantined: false, failures: 0 };
+  if (!SKU_FAULT_REASONS.some((re) => re.test(reason))) {
+    return { quarantined: false, failures: 0 };
+  }
   try {
-    const failures = await countRecentRefundFailures(sku);
+    const failures = await countRecentSkuFaultFailures(sku);
     if (failures < QUARANTINE_MIN_FAILURES) {
       return { quarantined: false, failures };
     }

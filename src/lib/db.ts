@@ -579,13 +579,22 @@ function utcAgo(hours: number): string {
   return new Date(Date.now() - hours * 3600_000).toISOString().slice(0, 19).replace("T", " ");
 }
 
-/** Jumlah kegagalan refund (rc 74 "Transaksi Refund") untuk satu SKU dalam
- *  24 jam terakhir — dipakai memutuskan karantina otomatis. */
-export async function countRecentRefundFailures(sku: string): Promise<number> {
+/** Jumlah kegagalan final "kesalahan SKU" untuk satu SKU dalam 24 jam
+ *  terakhir — dipakai memutuskan karantina otomatis. Pola alasan:
+ *  - "Refund" (rc 74): seller gagal kirim padahal price-list sehat,
+ *  - "tidak di temukan"/"tidak ditemukan"/"Non-Aktif" (rc 43): SKU mati,
+ *  - "ketentuan harga": penolakan harga (katalog basi vs ketentuan buyer).
+ *  Kesalahan pembeli (nomor salah rc 54) TIDAK dihitung. */
+export async function countRecentSkuFaultFailures(sku: string): Promise<number> {
   const row = await queryOne<{ n: string | number }>(
     `SELECT COUNT(*) AS n FROM topup_orders
      WHERE sku = ? AND topup_status = 'failed'
-       AND error_message LIKE '%Refund%' AND updated_at >= ?`,
+       AND (error_message LIKE '%Refund%'
+            OR error_message LIKE '%tidak di temukan%'
+            OR error_message LIKE '%tidak ditemukan%'
+            OR error_message LIKE '%Non-Aktif%'
+            OR error_message LIKE '%ketentuan harga%')
+       AND updated_at >= ?`,
     [sku, utcAgo(24)],
   );
   return Number(row?.n ?? 0);
