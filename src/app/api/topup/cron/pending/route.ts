@@ -1,14 +1,13 @@
-// Perawatan pesanan top-up: tandai pesanan gateway yang kedaluwarsa + cek
-// ulang transaksi Digiflazz yang masih Pending (kirim ulang ref_id sama =
-// idempoten). Dipanggil oleh:
+// Perawatan pesanan top-up — logika penuh di @/lib/topup-daily
+// (runDailyPendingMaintenance), dipakai bersama cron Vercel & worker VPS.
+// Dipanggil oleh:
 //   - cron Vercel harian (vercel.json) dengan header x-cron-secret,
 //   - tombol "Cek Ulang Pending" di /topup/admin dengan x-topup-secret,
 //   - webhook Duitku secara internal (tick latar belakang) — jalur tercepat,
 //     karena Vercel Hobby hanya mengizinkan 1 cron/hari.
 
 import { NextResponse } from "next/server";
-import { expireStalePendingOrders } from "@/lib/db";
-import { recheckPendingTopups } from "@/lib/topup-execute";
+import { runDailyPendingMaintenance } from "@/lib/topup-daily";
 import { cronOrAdminGuard } from "@/lib/admin-guard";
 
 export const runtime = "nodejs";
@@ -28,12 +27,11 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
   }
 
-  const expired = await expireStalePendingOrders();
-  const recheck = await recheckPendingTopups();
+  const res = await runDailyPendingMaintenance();
   return NextResponse.json({
     ok: true,
-    expired,
-    rechecked: recheck.checked,
-    results: recheck.results,
+    expired: res.expired,
+    rechecked: res.checked,
+    results: res.results,
   });
 }

@@ -1,10 +1,5 @@
-// Pengecekan saldo Digiflazz terjadwal — kirim WA ke owner bila saldo turun
-// di bawah ambang (TOPUP_LOW_BALANCE_THRESHOLD, default Rp 100.000).
-// Sekaligus menyegarkan snapshot kesehatan produk (pintu pra-bayar) DAN
-// MENSINKRONKAN katalog vs price-list live (SKU mati dinonaktifkan, modal
-// diperbarui, nominal baru ditambahkan — otomatis, tanpa tangan owner) —
-// satu panggilan price-list dari kuota Digiflazz yang terbatas (rc=83)
-// untuk semua.
+// Pengecekan saldo Digiflazz terjadwal — logika penuh di @/lib/topup-daily
+// (runDailyTopupMaintenance), dipakai bersama cron Vercel & worker VPS.
 // Dipanggil oleh:
 //   - cron Vercel harian (vercel.json) dengan header x-cron-secret,
 //   - admin /topup/admin dengan x-topup-secret (pemantauan manual).
@@ -12,10 +7,7 @@
 // ini bertindak sebagai jaring pengaman harian.
 
 import { NextResponse } from "next/server";
-import { alertLowBalanceIfNeeded, getBalance, LOW_BALANCE_THRESHOLD } from "@/lib/topup-balance";
-import { refreshHealthSnapshot } from "@/lib/topup-health";
-import { syncTopupCatalog } from "@/lib/topup-live";
-import { buildPriceListPayload, relayDigiflazz } from "@/lib/digiflazz";
+import { runDailyTopupMaintenance } from "@/lib/topup-daily";
 import { cronOrAdminGuard } from "@/lib/admin-guard";
 
 export const runtime = "nodejs";
@@ -40,70 +32,12 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
   }
 
-  const bal = await getBalance(true);
-  if (!bal.ok) {
+  const res = await runDailyTopupMaintenance();
+  if (!res.ok) {
     return NextResponse.json(
-      { ok: false, error: "cek_saldo_gagal", detail: bal.error },
+      { ok: false, error: res.error ?? "cek_saldo_gagal", detail: res.detail },
       { status: 502 },
     );
   }
-
-  const alert = await alertLowBalanceIfNeeded(bal.balance);
-
-  // Segarkan snapshot kesehatan produk + sinkronkan katalog — after() lama
-  // terbukti tidak tereksekusi di produksi (snapshot membeku), dan kegagalan
-  // hanya dicatat, tidak menggagalkan respons cron. Price-list ditarik SEKALI
-  // lalu dipakai bersama (kuota Digiflazz terbatas, rc=83).
-  let sync: Awaited<ReturnType<typeof syncTopupCatalog>> | null = null;
-  try {
-    const pr = await relayDigiflazz("price-list", buildPriceListPayload({ cmd: "prepaid" }));
-    const prefetched = pr.ok ? pr.data : undefined;
-    if (!pr.ok) console.warn("[topup] price-list gagal:", pr.error ?? `HTTP ${pr.status ?? "?"}`);
-    // Price-list pasca (cmd "pasca") — kegagalan hanya melewati bagian pasca
-    // (null = jangan tarik ulang di dalam sinkron; undefined = tarik internal).
-    let prefetchedPasca: unknown | null = undefined;
-    try {
-      const pp = await relayDigiflazz("price-list", buildPriceListPayload({ cmd: "pasca" }));
-      prefetchedPasca = pp.ok && Array.isArray(pp.data) ? pp.data : null;
-      if (!pp.ok) console.warn("[topup] price-list pasca gagal:", pp.error ?? `HTTP ${pp.status ?? "?"}`);
-    } catch (e) {
-      prefetchedPasca = null;
-      console.warn("[topup] price-list pasca gagal total:", e);
-    }
-    try {
-      const h = await refreshHealthSnapshot(prefetched);
-      if (!h.ok) console.warn("[topup] refresh snapshot kesehatan:", h.detail);
-    } catch (e) {
-      console.warn("[topup] refresh snapshot kesehatan gagal:", e);
-    }
-    try {
-      sync = await syncTopupCatalog(prefetched, prefetchedPasca);
-      if (!sync.ok) console.warn("[topup] sinkron katalog:", sync.detail);
-    } catch (e) {
-      console.warn("[topup] sinkron katalog gagal:", e);
-    }
-  } catch (e) {
-    console.warn("[topup] price-list gagal total:", e);
-  }
-
-  return NextResponse.json({
-    ok: true,
-    balance: bal.balance,
-    threshold: LOW_BALANCE_THRESHOLD,
-    alert,
-    sync: sync
-      ? {
-          detail: sync.detail,
-          live: sync.live,
-          hilang: sync.hilang,
-          harga: sync.harga,
-          urgent: sync.urgent,
-          baru: sync.baru,
-          restored: sync.restored,
-          applied: sync.applied,
-          notified: sync.notified,
-          pasca: sync.pasca,
-        }
-      : null,
-  });
+  return NextResponse.json(res);
 }

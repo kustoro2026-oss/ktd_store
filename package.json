@@ -27,13 +27,18 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/sanitize-html": "^2.16.2",
+    "adm-zip": "^0.6.1",
     "eslint": "^9",
     "eslint-config-next": "16.4.0",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5",
     "xlsx": "^0.18.5"
   },
   "overrides": {
     "undici": "^7.30.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
   }
 }
