@@ -1,12 +1,1 @@
-{
-  "crons": [
-    {
-      "path": "/api/topup/cron/pending",
-      "schedule": "17 3 * * *"
-    },
-    {
-      "path": "/api/topup/cron/cek-saldo",
-      "schedule": "0 0 * * *"
-    }
-  ]
-}
+{}
