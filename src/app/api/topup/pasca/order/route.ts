@@ -118,6 +118,23 @@ export async function POST(req: Request) {
     ].join("\n"),
   );
 
+  // Guard margin tipis: komisi aktual (amount - cost dari inquiry) harus
+  // menutup MDR QRIS (0,7% total bayar — terukur di transaksi produksi).
+  // Bila tidak, jangan buat sesi QRIS yang pasti merugi; arahkan via
+  // WhatsApp (transfer manual tanpa MDR — komisi utuh).
+  const margin = order.amount - order.cost;
+  const qrisMdr = Math.ceil(order.amount * 0.007);
+  if (margin < qrisMdr) {
+    return NextResponse.json({
+      ok: true,
+      orderId: order.id,
+      mode: "wa",
+      waLink,
+      gatewayError:
+        "Pembayaran tagihan ini diproses via WhatsApp — CS kami siap memandu pembayaran hingga selesai.",
+    });
+  }
+
   if (duitkuConfigured()) {
     if (order.amount < DUITKU_MIN_AMOUNT) {
       return NextResponse.json({
