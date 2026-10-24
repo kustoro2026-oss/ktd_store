@@ -281,7 +281,43 @@ export async function digiflazzTopup(o: {
   if (o.cbUrl) payload.cb_url = o.cbUrl;
   payload.sign = md5(username() + apiKey() + o.refId);
 
-  const r = await relay("transaction", payload);
+  return classifyTransaction(await relay("transaction", payload), o.refId);
+}
+
+/** Transaksi pascabayar — commands inq-pasca/pay-pasca/status-pasca lewat
+ *  endpoint /v1/transaction yang sama. pay-pasca WAJIB memakai ref_id yang
+ *  sama dengan inquiry-nya (ref diikat ke tagihan, tidak boleh dicoba ulang
+ *  dengan ref baru). */
+export async function digiflazzPasca(o: {
+  commands: PascaCommand;
+  sku: string;
+  customerNo: string;
+  refId: string;
+  testing?: boolean;
+}): Promise<TopupResult> {
+  if (!digiflazzConfigured()) {
+    return { ok: false, refId: o.refId, success: false, pending: false, error: "config_missing" };
+  }
+  return classifyTransaction(
+    await relay(
+      "transaction",
+      buildPascaPayload(o.commands, {
+        sku: o.sku,
+        customerNo: o.customerNo,
+        refId: o.refId,
+        ...(o.testing === true ? { testing: true } : {}),
+      }),
+    ),
+    o.refId,
+  );
+}
+
+/** Klasifikasi respons transaksi (dipakai prepaid & pasca — bentuk
+ *  rc/status/message identik untuk keduanya). */
+function classifyTransaction(
+  r: { ok: boolean; data?: unknown; error?: string; status?: number; raw?: string },
+  refId: string,
+): TopupResult {
   const d = dgPayload(r);
   // Non-2xx TANPA body Digiflazz = relay/hosting bermasalah: transaksi mungkin
   // belum sampai Digiflazz → retryable (Pending). Non-2xx DENGAN body
@@ -290,7 +326,7 @@ export async function digiflazzTopup(o: {
   if (!r.ok && !d) {
     return {
       ok: false,
-      refId: o.refId,
+      refId,
       success: false,
       pending: false,
       error: relayFailure(r),
@@ -303,7 +339,7 @@ export async function digiflazzTopup(o: {
   if (!d) {
     return {
       ok: false,
-      refId: o.refId,
+      refId,
       success: false,
       pending: false,
       error: `respons relay tidak valid (data kosong)${r.raw ? ` — ${r.raw.slice(0, 200)}` : ""}`,
@@ -333,7 +369,7 @@ export async function digiflazzTopup(o: {
     );
   return {
     ok: true,
-    refId: o.refId,
+    refId,
     success,
     pending,
     status,

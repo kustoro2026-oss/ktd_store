@@ -27,6 +27,10 @@ import {
   type TopUpProduct,
   type TopUpProvider,
 } from "./topup";
+import {
+  PASCA_PRODUCTS,
+  type PascaProduct,
+} from "./topup-pasca";
 import { notifyTopupOwner } from "./wa";
 
 // ---------- Pemetaan Digiflazz → UI (cermin scripts/gen-topup-catalog.cjs) ----------
@@ -104,7 +108,13 @@ type LiveCatalog = {
   at: number;
   products: TopUpProduct[];
   providers: TopUpProvider[];
+  pasca: EffectivePascaProduct[];
 };
+
+/** Produk pasca efektif: katalog statis + override (active/admin dari kolom
+ *  cost). Baris override SKU pasca menyimpan admin di kolom cost — bukan
+ *  modal prepaid — sehingga tidak pernah lolos filter r.cost <= 0. */
+export type EffectivePascaProduct = PascaProduct & { active: boolean };
 
 const g = globalThis as { __ktdTopupLive?: LiveCatalog };
 
@@ -196,7 +206,20 @@ async function effectiveCatalog(): Promise<LiveCatalog> {
     });
   }
 
-  const built: LiveCatalog = { at: Date.now(), products, providers };
+  // Produk pasca efektif: override active=0 → disembunyikan; override cost
+  // membawa admin terkini (sinkron cmd "pasca").
+  const pasca: EffectivePascaProduct[] = [];
+  for (const p of PASCA_PRODUCTS) {
+    const r = bySku.get(p.sku);
+    if (r && r.active === 0) continue;
+    pasca.push({
+      ...p,
+      admin: r && r.cost > 0 ? r.cost : p.admin,
+      active: true,
+    });
+  }
+
+  const built: LiveCatalog = { at: Date.now(), products, providers, pasca };
   g.__ktdTopupLive = built;
   return built;
 }
@@ -212,6 +235,17 @@ export async function getEffectiveTopupProviders(): Promise<TopUpProvider[]> {
 export async function getEffectiveProductBySku(sku: string): Promise<TopUpProduct | undefined> {
   const { products } = await effectiveCatalog();
   return products.find((p) => p.sku === sku);
+}
+
+export async function getEffectivePascaProducts(): Promise<EffectivePascaProduct[]> {
+  return (await effectiveCatalog()).pasca;
+}
+
+export async function getEffectivePascaBySku(
+  sku: string,
+): Promise<EffectivePascaProduct | undefined> {
+  const { pasca } = await effectiveCatalog();
+  return pasca.find((p) => p.sku === sku);
 }
 
 export async function getEffectiveProviderBySlug(slug: string): Promise<TopUpProvider | undefined> {
@@ -243,6 +277,14 @@ export type CatalogSyncResult = {
   /** Total baris override yang ditulis. */
   applied: number;
   notified: boolean;
+  /** Bagian sinkron pascabayar (cmd "pasca") — bisa skipped (kuota/format). */
+  pasca: {
+    live: number;
+    hilang: number;
+    harga: number;
+    skipped: boolean;
+    detail: string;
+  };
 };
 
 type LiveEntry = {
@@ -260,6 +302,10 @@ type LiveEntry = {
  *  massal gara-gara respons parsial). */
 const MIN_LIVE_SKUS = 1000;
 
+/** Batas minimal SKU pasca live — akun kita 664; di bawah ini berarti
+ *  respons terpotong dan bagian pasca dibatalkan (prepaid tetap jalan). */
+const MIN_PASCA_SKUS = 400;
+
 function fail(detail: string): CatalogSyncResult {
   return {
     ok: false,
@@ -272,6 +318,7 @@ function fail(detail: string): CatalogSyncResult {
     restored: 0,
     applied: 0,
     notified: false,
+    pasca: { live: 0, hilang: 0, harga: 0, skipped: false, detail: "" },
   };
 }
 
@@ -282,6 +329,7 @@ function fail(detail: string): CatalogSyncResult {
  *  dicatat dan dikembalikan sebagai ok:false. */
 export async function syncTopupCatalog(
   prefetched?: unknown,
+  prefetchedPasca?: unknown | null,
   notify = true,
 ): Promise<CatalogSyncResult> {
   let data: unknown = prefetched;
@@ -403,8 +451,74 @@ export async function syncTopupCatalog(
   }
 
   const computedSkus = new Set(rows.map((r) => r.sku));
+
+  // ---- Bagian pascabayar: SKU pasca statis (PASCA_PRODUCTS) vs cmd "pasca".
+  // Admin digiflazz tersimpan di kolom cost; SKU mati → active 0. Tidak ada
+  // penambahan "baru" — SKU pasca baru harus lewat regen katalog.
+  const pasca = { live: 0, hilang: 0, harga: 0, skipped: false, detail: "" };
+  let pascaData: unknown = prefetchedPasca;
+  if (pascaData === undefined) {
+    const pr = await relayDigiflazz("price-list", buildPriceListPayload({ cmd: "pasca" }));
+    if (!pr.ok || !Array.isArray(pr.data)) {
+      pasca.skipped = true;
+      pasca.detail = pr.ok
+        ? "respons bukan daftar (kemungkinan limitasi rc=83)"
+        : pr.error ?? `HTTP ${pr.status ?? "?"}`;
+    } else {
+      pascaData = pr.data;
+    }
+  }
+  if (Array.isArray(pascaData)) {
+    if (pascaData.length < MIN_PASCA_SKUS) {
+      pasca.skipped = true;
+      pasca.detail = `respons mencurigakan (${pascaData.length} < ${MIN_PASCA_SKUS}) — bagian pasca dibatalkan`;
+    } else {
+      const pLive = new Map<string, { admin: number; active: boolean }>();
+      for (const it of pascaData as Array<Record<string, unknown>>) {
+        const sku = String(it.buyer_sku_code ?? "");
+        if (!sku) continue;
+        pLive.set(sku, {
+          admin: Number(it.admin ?? 0) || 0,
+          active: isTrue(it.buyer_product_status) && isTrue(it.seller_product_status),
+        });
+      }
+      pasca.live = pLive.size;
+      for (const p of PASCA_PRODUCTS) {
+        if (manualSkus.has(p.sku)) continue; // saklar manual dilindungi
+        const l = pLive.get(p.sku);
+        if (!l || !l.active) {
+          rows.push({
+            sku: p.sku,
+            active: 0,
+            cost: l ? l.admin : p.admin,
+            name: p.name,
+            type: "",
+            brand: p.brand,
+            category: p.category,
+            note: "",
+          });
+          pasca.hilang++;
+          continue;
+        }
+        if (l.admin !== p.admin) {
+          rows.push({
+            sku: p.sku,
+            active: 1,
+            cost: l.admin,
+            name: p.name,
+            type: "",
+            brand: p.brand,
+            category: p.category,
+            note: "",
+          });
+          pasca.harga++;
+        }
+      }
+    }
+  }
+
   const restored = existing.filter((r) => r.note !== "manual" && !computedSkus.has(r.sku)).length;
-  const changed = hilang + harga + baru + restored > 0;
+  const changed = hilang + harga + baru + restored + pasca.hilang + pasca.harga > 0;
 
   try {
     await replaceTopupCatalogOverrides(rows);
@@ -424,6 +538,7 @@ export async function syncTopupCatalog(
     restored,
     applied: rows.length,
     notified: false,
+    pasca,
   };
   if (notify && changed) {
     try {
@@ -454,6 +569,13 @@ async function notifySync(d: CatalogSyncResult): Promise<void> {
   }
   if (d.restored > 0) {
     lines.push(`- ${d.restored} SKU pulih → kembali ikut katalog statis.`);
+  }
+  if (d.pasca && !d.pasca.skipped) {
+    const ph = d.pasca.hilang > 0 ? `, ${d.pasca.hilang} nonaktif` : "";
+    const pa = d.pasca.harga > 0 ? `, ${d.pasca.harga} admin berubah` : "";
+    lines.push(`- Bayar Tagihan: ${d.pasca.live} SKU aktif${ph}${pa}.`);
+  } else if (d.pasca && d.pasca.skipped && d.pasca.detail) {
+    lines.push(`- Bayar Tagihan tidak disinkron: ${d.pasca.detail}.`);
   }
   lines.push("Harga jual dihitung ulang otomatis (margin standar). Saklar manual admin tidak diubah.");
   await notifyTopupOwner(lines.join("\n"));

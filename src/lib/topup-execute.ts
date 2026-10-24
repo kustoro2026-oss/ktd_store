@@ -13,8 +13,9 @@ import {
   recordExecAttempt,
   type TopUpOrder,
 } from "./db";
-import { digiflazzTopup, shouldRetryFailure, type TopupResult } from "./digiflazz";
+import { digiflazzTopup, digiflazzPasca, shouldRetryFailure, type TopupResult } from "./digiflazz";
 import { formatRupiah } from "./topup";
+import { PASCA_SKUS } from "./topup-pasca";
 import { alertLowBalanceIfNeeded, getBalance, recordBalance } from "./topup-balance";
 import { notifyTopupOwner } from "./wa";
 import { autoQuarantineIfRepeated } from "./topup-health";
@@ -103,6 +104,17 @@ async function runExecution(order: TopUpOrder, testing: boolean): Promise<Execut
   //    (mis. rc 74 "Transaksi Refund") yang refund saldonya terkonfirmasi
   //    dicoba ulang dengan ref BARU, maksimal 3 percobaan. Pending & relay
   //    TIDAK PERNAH dicoba dengan ref baru (risiko transaksi ganda).
+  //    PASCABAYAR tidak masuk sini: ref_id terikat inquiry, langsung pay-pasca.
+  if (PASCA_SKUS.has(order.sku)) {
+    const res = await digiflazzPasca({
+      commands: "pay-pasca",
+      sku: order.sku,
+      customerNo: order.customer_no,
+      refId: order.ref_id,
+      testing,
+    });
+    return settlePascaResult(order, res);
+  }
   const balBefore = bal.ok ? bal.balance : undefined;
   const MAX_ATTEMPTS = 3;
   let res: TopupResult | null = null;
@@ -195,6 +207,40 @@ async function alertAfterTransaction(lastBalance?: number): Promise<void> {
   }
 }
 
+/** Hasil transaksi pasca → status pesanan + WA owner. Dipakai pay pertama
+ *  maupun cek ulang cron. Tidak ada karantina otomatis (tabel kesehatan
+ *  khusus prabayar). */
+async function settlePascaResult(order: TopUpOrder, res: TopupResult): Promise<ExecuteOutcome> {
+  if (!res.ok) {
+    await finishTopup(order.id, "pending", "", `relay: ${res.error ?? "tidak terjangkau"}`);
+    const wa = await notifyTopupOwner(
+      `[Top-up] Pesanan ${order.id} (${order.product_name}) menunggu cek ulang — relay Digiflazz gagal (${res.error}). Cron akan mencoba lagi.`,
+    );
+    return { step: "pending", detail: `relay gagal, ditunda: ${res.error}`, wa };
+  }
+  if (res.success) {
+    await finishTopup(order.id, "success", res.sn);
+    const wa = await notifyTopupOwner(
+      `[Top-up] Pesanan ${order.id} (${order.product_name}, ${formatRupiah(order.amount)}) LUNAS — pembayaran tagihan SUKSES${res.sn ? ` (SN ${res.sn})` : ""} untuk ${order.customer_no}.`,
+    );
+    await alertAfterTransaction(res.lastBalance);
+    return { step: "success", detail: `sukses ${res.sn ? `(SN ${res.sn})` : ""}`, wa };
+  }
+  if (res.pending) {
+    await finishTopup(order.id, "pending", "", res.message || "status Pending Digiflazz");
+    const wa = await notifyTopupOwner(
+      `[Top-up] Pesanan ${order.id} (${order.product_name}, ${formatRupiah(order.amount)}) LUNAS tetapi pembayaran tagihan Pending di Digiflazz${res.message ? ` (${res.message})` : ""}. Pantau /topup/admin — sistem cek ulang otomatis.`,
+    );
+    return { step: "pending", detail: res.message || "Pending", wa };
+  }
+  const reason = res.message || res.status || "ditolak Digiflazz";
+  await finishTopup(order.id, "failed", "", reason);
+  const wa = await notifyTopupOwner(
+    `[Top-up] Pesanan ${order.id} (${order.product_name}, ${formatRupiah(order.amount)}) GAGAL (bayar tagihan): ${reason}. Tindak lanjut refund via CS — pembeli ${order.buyer_name} (${order.buyer_phone}).`,
+  );
+  return { step: "failed", detail: reason, wa };
+}
+
 /** Cek ulang pesanan berstatus Pending dengan mengirim ulang ref_id yang
  *  sama ke Digiflazz (idempoten — mengembalikan status terkini). Saldo dicek
  *  dulu: bila masih kurang / tak terbaca, pertahankan pending tanpa
@@ -209,6 +255,28 @@ export async function recheckTopupOrder(order: TopUpOrder): Promise<ExecuteOutco
       step: "pending",
       detail: `saldo ${formatRupiah(bal.balance)} < cost ${formatRupiah(order.cost)} — menunggu deposit`,
     };
+  }
+  // Pascabayar: cek status-pasca dulu (tidak memicu pembayaran); bila
+  // transaksi tidak ditemukan (pay belum sampai Digiflazz), kirim ulang
+  // pay-pasca dengan ref yang sama (idempoten).
+  if (PASCA_SKUS.has(order.sku)) {
+    let res = await digiflazzPasca({
+      commands: "status-pasca",
+      sku: order.sku,
+      customerNo: order.customer_no,
+      refId: order.ref_id,
+    });
+    const notFound =
+      res.rc === "03" || /invalid ref|tidak ditemukan|not found/i.test(`${res.rc ?? ""} ${res.message ?? ""}`);
+    if (notFound) {
+      res = await digiflazzPasca({
+        commands: "pay-pasca",
+        sku: order.sku,
+        customerNo: order.customer_no,
+        refId: order.ref_id,
+      });
+    }
+    return settlePascaResult(order, res);
   }
   const res = await digiflazzTopup({
     sku: order.sku,

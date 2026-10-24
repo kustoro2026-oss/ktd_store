@@ -175,7 +175,9 @@ export async function POST(req: Request) {
           console.warn("[topup] refresh snapshot kesehatan gagal:", e);
         }
         try {
-          const a = await syncTopupCatalog(r.data);
+          // null = lewati bagian pasca di sini (hemat kuota — cmd "pasca"
+          // sudah ditarik oleh cron harian dan tombol katalog-sync).
+          const a = await syncTopupCatalog(r.data, null);
           if (!a.ok) console.warn("[topup] sinkron katalog:", a.detail);
         } catch (e) {
           console.warn("[topup] sinkron katalog gagal:", e);

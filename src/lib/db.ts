@@ -455,6 +455,19 @@ export async function getTopupOrderByRef(
   ]);
 }
 
+/** Perbarui data pembeli pesanan (dipakai jalur pasca: pesanan dibuat saat
+ *  inquiry, nama/HP pembeli diisi saat lanjut bayar). */
+export async function updateOrderBuyer(
+  id: string,
+  buyerName: string,
+  buyerPhone: string,
+): Promise<void> {
+  await queryRun(
+    "UPDATE topup_orders SET buyer_name = ?, buyer_phone = ?, updated_at = ? WHERE id = ?",
+    [buyerName, buyerPhone, nowUtc(), id],
+  );
+}
+
 /** Simpan data sesi payment gateway hasil buat pembayaran — termasuk kode
  *  kanal yang benar-benar dipakai (untuk panduan Cara Pembayaran di halaman
  *  bayar). */

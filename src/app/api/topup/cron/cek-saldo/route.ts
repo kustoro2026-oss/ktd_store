@@ -59,6 +59,17 @@ export async function GET(req: Request) {
     const pr = await relayDigiflazz("price-list", buildPriceListPayload({ cmd: "prepaid" }));
     const prefetched = pr.ok ? pr.data : undefined;
     if (!pr.ok) console.warn("[topup] price-list gagal:", pr.error ?? `HTTP ${pr.status ?? "?"}`);
+    // Price-list pasca (cmd "pasca") — kegagalan hanya melewati bagian pasca
+    // (null = jangan tarik ulang di dalam sinkron; undefined = tarik internal).
+    let prefetchedPasca: unknown | null = undefined;
+    try {
+      const pp = await relayDigiflazz("price-list", buildPriceListPayload({ cmd: "pasca" }));
+      prefetchedPasca = pp.ok && Array.isArray(pp.data) ? pp.data : null;
+      if (!pp.ok) console.warn("[topup] price-list pasca gagal:", pp.error ?? `HTTP ${pp.status ?? "?"}`);
+    } catch (e) {
+      prefetchedPasca = null;
+      console.warn("[topup] price-list pasca gagal total:", e);
+    }
     try {
       const h = await refreshHealthSnapshot(prefetched);
       if (!h.ok) console.warn("[topup] refresh snapshot kesehatan:", h.detail);
@@ -66,7 +77,7 @@ export async function GET(req: Request) {
       console.warn("[topup] refresh snapshot kesehatan gagal:", e);
     }
     try {
-      sync = await syncTopupCatalog(prefetched);
+      sync = await syncTopupCatalog(prefetched, prefetchedPasca);
       if (!sync.ok) console.warn("[topup] sinkron katalog:", sync.detail);
     } catch (e) {
       console.warn("[topup] sinkron katalog gagal:", e);
@@ -91,6 +102,7 @@ export async function GET(req: Request) {
           restored: sync.restored,
           applied: sync.applied,
           notified: sync.notified,
+          pasca: sync.pasca,
         }
       : null,
   });
