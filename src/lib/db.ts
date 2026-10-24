@@ -93,9 +93,14 @@ function toPg(query: string): string {
   return query.replace(/\?/g, () => `$${++i}`);
 }
 
-/** Pecah blok SQL multi-statement menjadi daftar statement tunggal. */
+/** Pecah blok SQL multi-statement menjadi daftar statement tunggal.
+ *  Baris komentar murni (diawali `--`) dibuang dulu supaya titik koma di
+ *  dalam komentar tidak memotong statement berikutnya jadi pecahan. */
 function splitStatements(sql: string): string[] {
   return sql
+    .split("\n")
+    .filter((l) => !l.trim().startsWith("--"))
+    .join("\n")
     .split(";")
     .map((s) => s.trim())
     .filter(Boolean);
@@ -329,10 +334,11 @@ const SCHEMA_SQL = `
   );
 
   -- Override katalog top-up runtime: absen = ikut katalog statis
-  -- (src/lib/topup.ts); active=0 = SKU disembunyikan dari etalase dan
-  -- ditolak saat order; cost>0 = modal dikoreksi (harga jual dihitung
-  -- ulang oleh resolver). note='manual' = diset admin, tidak disentuh
-  -- sinkron otomatis; note='baru' = nominal baru dari sinkron otomatis.
+  -- (src/lib/topup.ts). active=0 berarti SKU disembunyikan dari etalase
+  -- dan ditolak saat order. cost>0 berarti modal dikoreksi (harga jual
+  -- dihitung ulang oleh resolver). note='manual' berarti diset admin dan
+  -- tidak disentuh sinkron otomatis. note='baru' berarti nominal baru
+  -- dari sinkron otomatis.
   CREATE TABLE IF NOT EXISTS topup_catalog_live (
     sku TEXT PRIMARY KEY,
     active INTEGER NOT NULL DEFAULT 1,
