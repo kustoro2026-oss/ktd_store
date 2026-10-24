@@ -13,6 +13,7 @@ import type { AnekaCategory, AnekaProduct } from "./anekadropship";
 import _cacheData from "./products-cache.json";
 import _evermosData from "./evermos-products-cache.json";
 import { formatHargaKtd, petaHargaKtd } from "./ktd-store-harga";
+import { petaStokKtd } from "./ktd-store-stok";
 
 interface CacheData {
     generatedAt: string;
@@ -46,16 +47,23 @@ function mergeProducts(primary: AnekaProduct[], secondary: AnekaProduct[]): Anek
 const mergedProducts: AnekaProduct[] = mergeProducts(cacheData.products, evermosData.products);
 
 /**
- * Terapkan harga override KTD Store (bila sudah dimuat) ke SALINAN produk —
- * cache asli tidak diubah. Hanya produk Aneka (id numerik) yang punya override;
- * produk Evermos (EVM-*) tidak pernah ada di peta override.
+ * Terapkan harga + stok override KTD Store (bila sudah dimuat) ke SALINAN
+ * produk — cache asli tidak diubah. Hanya produk Aneka (id numerik) yang
+ * punya override; produk Evermos (EVM-*) tidak pernah ada di peta override.
  */
 function denganOverrideKtd(products: AnekaProduct[]): AnekaProduct[] {
     const peta = petaHargaKtd();
-    if (!peta || peta.size === 0) return products;
+    const petaS = petaStokKtd();
+    if ((!peta || peta.size === 0) && (!petaS || petaS.size === 0)) return products;
     return products.map((p) => {
-        const harga = peta.get(String(p.id));
-        return harga ? { ...p, rekomendasiJual: formatHargaKtd(harga) } : p;
+        const harga = peta?.get(String(p.id));
+        const stok = petaS?.get(String(p.id));
+        if (!harga && stok === undefined) return p;
+        return {
+            ...p,
+            ...(harga ? { rekomendasiJual: formatHargaKtd(harga) } : {}),
+            ...(stok !== undefined ? { stok: String(stok) } : {}),
+        };
     });
 }
 

@@ -10,6 +10,10 @@
  * harga katalog) tetap dipakai.
  */
 
+// Override stok dimuat bersama di muatHargaKtd (satu titik pemanggilan yang
+// sudah dipakai semua halaman/route) — tak perlu menyentuh tiap call site.
+import { muatStokKtd } from "./ktd-store-stok";
+
 const HARGA_URL =
   process.env.KTD_HUB_HARGA_URL ?? "https://admin.kustoro2026.com/api/ktd-store/harga";
 
@@ -22,6 +26,8 @@ const state = globalThis as unknown as {
 /** Muat (dan cache) peta override dari KTD Hub. Aman dipanggil berkali-kali —
  *  panggilan berikutnya langsung lewat selama data masih segar. */
 export async function muatHargaKtd(): Promise<void> {
+  // Stok punya TTL sendiri; muatStokKtd langsung lewat bila masih segar.
+  await muatStokKtd();
   const hit = state.__ktdHarga;
   if (hit && Date.now() - hit.at < TTL_MS) return;
   try {
