@@ -94,10 +94,13 @@ function detailValue(k: string, v: unknown) {
 
 export default function BayarTagihan({
   products,
+  initialCategory,
 }: {
   /** Katalog pasca efektif dari server (statis + override DB) — SKU mati
    *  hasil sinkron sudah tidak disertakan. */
   products: EffectivePascaProduct[];
+  /** Kategori awal dari query ?kategori= (mis. dari tile di beranda). */
+  initialCategory?: string | null;
 }) {
   const router = useRouter();
   const cats = useMemo(
@@ -105,7 +108,11 @@ export default function BayarTagihan({
     [products],
   );
 
-  const [cat, setCat] = useState<PascaCategoryId | "all">("all");
+  const [cat, setCat] = useState<PascaCategoryId | "all">(() =>
+    initialCategory && PASCA_CATEGORIES.some((c) => c.id === initialCategory)
+      ? (initialCategory as PascaCategoryId)
+      : "all",
+  );
   const [q, setQ] = useState("");
   const [sel, setSel] = useState<EffectivePascaProduct | null>(null);
   const [no, setNo] = useState("");
@@ -224,7 +231,7 @@ export default function BayarTagihan({
   };
 
   return (
-    <section id="bayar-tagihan" className="mt-12 scroll-mt-24">
+    <section id="bayar-tagihan" className="mt-6 scroll-mt-24">
       <div className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm sm:p-6">
         {/* Header panel */}
         <div className="flex flex-wrap items-center justify-between gap-3">

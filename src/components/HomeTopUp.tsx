@@ -8,9 +8,18 @@
 import Link from "next/link";
 import { Exo, Exo_2 } from "next/font/google";
 import type { ReactNode } from "react";
-import { ChevronRight, Gamepad2, LayoutGrid, Wallet } from "lucide-react";
+import {
+  ChevronRight,
+  Droplets,
+  Gamepad2,
+  Landmark,
+  LayoutGrid,
+  ReceiptText,
+  Wallet,
+} from "lucide-react";
 import type { TopUpProvider } from "@/lib/topup";
-import { getEffectiveTopupProviders } from "@/lib/topup-live";
+import { getEffectivePascaProducts, getEffectiveTopupProviders } from "@/lib/topup-live";
+import type { PascaCategoryId } from "@/lib/topup-pasca";
 import ProviderLogo from "@/components/topup/ProviderLogo";
 
 const exo = Exo({ subsets: ["latin"], weight: ["700"] });
@@ -46,6 +55,38 @@ const SALDO_SLUGS = [
   "indosat",
   "xl",
   "pln",
+];
+
+/** Tile Bayar Tagihan (urutan = urutan tampil) — 10 item: 9 kategori + 2
+ *  BPJS. PDAM & PBB tidak punya logo resmi (PDAM beda logo tiap daerah,
+ *  PBB adalah jenis pajak) sehingga memakai ikon, selainnya logo brand. */
+const PASCA_TILES: Array<{
+  key: string;
+  label: string;
+  kategori: PascaCategoryId;
+  slug?: string;
+  icon?: ReactNode;
+}> = [
+  { key: "pln", label: "PLN", slug: "pln", kategori: "pln" },
+  {
+    key: "pdam",
+    label: "PDAM",
+    icon: <Droplets className="h-8 w-8 text-[#307FE2] sm:h-9 sm:w-9" />,
+    kategori: "pdam",
+  },
+  {
+    key: "pbb",
+    label: "PBB",
+    icon: <Landmark className="h-8 w-8 text-[#307FE2] sm:h-9 sm:w-9" />,
+    kategori: "pbb",
+  },
+  { key: "bpjs-kes", label: "BPJS Kesehatan", slug: "bpjs-kesehatan", kategori: "bpjs" },
+  { key: "bpjs-tk", label: "BPJS Ketenagakerjaan", slug: "bpjs-ketenagakerjaan", kategori: "bpjs" },
+  { key: "indihome", label: "IndiHome", slug: "indihome", kategori: "internet" },
+  { key: "mnc-vision", label: "MNC Vision", slug: "mnc-vision", kategori: "tv" },
+  { key: "telkomsel", label: "Telkomsel", slug: "telkomsel", kategori: "hp" },
+  { key: "adira-finance", label: "Adira Finance", slug: "adira-finance", kategori: "multifinance" },
+  { key: "pgn", label: "PGN", slug: "pgn", kategori: "gas" },
 ];
 
 function pickSlugs(slugs: string[], providers: TopUpProvider[]): TopUpProvider[] {
@@ -110,19 +151,30 @@ function TileBox({ children }: { children: ReactNode }) {
   );
 }
 
+/** Item grid kartu — generik: logo bisa gambar brand atau ikon. */
+type CardItem = {
+  key: string;
+  label: string;
+  href: string;
+  logo: ReactNode;
+};
+
 function SectionCard({
   title,
   href,
   icon,
   items,
   allTile,
+  gridClass = "grid-cols-4 sm:grid-cols-5",
 }: {
   title: string;
   href: string;
   icon: ReactNode;
-  items: TopUpProvider[];
+  items: CardItem[];
   /** Tile tambahan di akhir grid (mis. "Semua Game" → halaman kategori). */
-  allTile?: { label: string; href: string };
+  allTile?: { label: string; href: string; logo: ReactNode };
+  /** Kolom grid — kartu full-width (Bayar Tagihan) memakai lebih banyak. */
+  gridClass?: string;
 }) {
   return (
     <div className="flex w-full flex-col gap-2">
@@ -175,17 +227,15 @@ function SectionCard({
           ala tiket kupon. Segitiga warna latar halaman ditaruh di atas kedua
           sudut untuk membentuk potongan. */}
       <div className="relative h-full">
-        <div className="grid h-full grid-cols-4 items-start justify-items-center gap-4 rounded-bl rounded-tr bg-[#EAF2FC] p-4 sm:grid-cols-5 sm:px-6">
-          {items.map((p) => (
+        <div className={`grid h-full items-start justify-items-center gap-4 rounded-bl rounded-tr bg-[#EAF2FC] p-4 sm:px-6 ${gridClass}`}>
+          {items.map((it) => (
             <Link
-              key={p.slug}
-              href={`/topup/${p.slug}`}
+              key={it.key}
+              href={it.href}
               className="group flex w-16 flex-col items-center gap-2 sm:w-[84px]"
             >
-              <TileBox>
-                <ProviderLogo slug={p.slug} label={p.label} className="h-full w-full" />
-              </TileBox>
-              <ItemLabel>{p.label}</ItemLabel>
+              <TileBox>{it.logo}</TileBox>
+              <ItemLabel>{it.label}</ItemLabel>
             </Link>
           ))}
           {allTile ? (
@@ -193,9 +243,7 @@ function SectionCard({
               href={allTile.href}
               className="group flex w-16 flex-col items-center gap-2 sm:w-[84px]"
             >
-              <TileBox>
-                <LayoutGrid className="h-8 w-8 text-[#307FE2] sm:h-9 sm:w-9" />
-              </TileBox>
+              <TileBox>{allTile.logo}</TileBox>
               <ItemLabel>{allTile.label}</ItemLabel>
             </Link>
           ) : null}
@@ -219,27 +267,63 @@ function SectionCard({
 
 export default async function HomeTopUp() {
   // Katalog efektif — provider yang seluruh SKU-nya mati ikut menghilang
-  // dari grid beranda.
+  // dari grid beranda. Begitu pula kategori Bayar Tagihan yang kosong.
   const providers = await getEffectiveTopupProviders();
   const games = pickSlugs(GAME_SLUGS, providers);
   const saldo = pickSlugs(SALDO_SLUGS, providers);
+  const pasca = await getEffectivePascaProducts();
+  const pascaCats = new Set(pasca.map((p) => p.category));
+  const pascaItems: CardItem[] = PASCA_TILES.filter((t) => pascaCats.has(t.kategori)).map(
+    (t) => ({
+      key: t.key,
+      label: t.label,
+      href: `/bayar-tagihan?kategori=${t.kategori}`,
+      logo: t.slug ? (
+        <ProviderLogo slug={t.slug} label={t.label} className="h-full w-full" />
+      ) : (
+        t.icon
+      ),
+    }),
+  );
+  const toItems = (ps: TopUpProvider[]): CardItem[] =>
+    ps.map((p) => ({
+      key: p.slug,
+      label: p.label,
+      href: `/topup/${p.slug}`,
+      logo: <ProviderLogo slug={p.slug} label={p.label} className="h-full w-full" />,
+    }));
   return (
-    <section aria-label="Top Up Game dan Isi Saldo" className="container-site">
+    <section aria-label="Top Up Game, Isi Saldo, dan Bayar Tagihan" className="container-site">
       <div className="grid grid-cols-1 gap-3 py-3 sm:grid-cols-2 sm:gap-6 sm:py-6">
         <SectionCard
           title="Top Up Game"
           href="/topup#kategori-game"
           icon={<Gamepad2 className="h-6 w-6" />}
-          items={games}
-          allTile={{ label: "Semua Game", href: "/topup#kategori-game" }}
+          items={toItems(games)}
+          allTile={{
+            label: "Semua Game",
+            href: "/topup#kategori-game",
+            logo: <LayoutGrid className="h-8 w-8 text-[#307FE2] sm:h-9 sm:w-9" />,
+          }}
         />
         <SectionCard
           title="Isi Saldo"
           href="/topup"
           icon={<Wallet className="h-6 w-6" />}
-          items={saldo}
+          items={toItems(saldo)}
         />
       </div>
+      {pascaItems.length > 0 && (
+        <div className="grid grid-cols-1 gap-3 pb-6">
+          <SectionCard
+            title="Bayar Tagihan"
+            href="/bayar-tagihan"
+            icon={<ReceiptText className="h-6 w-6" />}
+            items={pascaItems}
+            gridClass="grid-cols-4 sm:grid-cols-5 lg:grid-cols-10"
+          />
+        </div>
+      )}
     </section>
   );
 }

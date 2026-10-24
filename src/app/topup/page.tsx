@@ -1,20 +1,19 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import TopUpHome from "@/components/topup/TopUpHome";
-import BayarTagihan from "@/components/topup/BayarTagihan";
-import { getEffectivePascaProducts, getEffectiveTopupProviders } from "@/lib/topup-live";
+import { getEffectiveTopupProviders } from "@/lib/topup-live";
 
 export const metadata: Metadata = {
   title: "Top Up & Isi Saldo — KTD Store",
   description:
-    "Top up game, pulsa, paket data, token listrik, e-wallet, dan bayar tagihan pascabayar (PDAM, PBB, PLN, BPJS) di KTD Store. Pengisian otomatis setelah pembayaran terverifikasi.",
+    "Top up game, pulsa, paket data, token listrik, dan e-wallet di KTD Store. Pengisian otomatis setelah pembayaran terverifikasi.",
   alternates: { canonical: "/topup" },
   openGraph: {
     type: "website",
     url: "/topup",
     title: "Top Up & Isi Saldo — KTD Store",
     description:
-      "Top up game, pulsa, paket data, token listrik, e-wallet, dan bayar tagihan pascabayar (PDAM, PBB, PLN, BPJS) di KTD Store. Pengisian otomatis setelah pembayaran terverifikasi.",
+      "Top up game, pulsa, paket data, token listrik, dan e-wallet di KTD Store. Pengisian otomatis setelah pembayaran terverifikasi.",
     images: [{ url: "/images/logo.png", width: 512, height: 512, alt: "KTD Store" }],
     siteName: "KTD Store",
     locale: "id_ID",
@@ -23,7 +22,7 @@ export const metadata: Metadata = {
     card: "summary",
     title: "Top Up & Isi Saldo — KTD Store",
     description:
-      "Top up game, pulsa, paket data, token listrik, e-wallet, dan bayar tagihan pascabayar (PDAM, PBB, PLN, BPJS) di KTD Store.",
+      "Top up game, pulsa, paket data, token listrik, dan e-wallet di KTD Store.",
     images: ["/images/logo.png"],
   },
 };
@@ -32,8 +31,6 @@ export default async function TopUpPage() {
   // Katalog efektif (statis + override DB) — SKU mati dan nominal baru hasil
   // sinkron otomatis ikut tampil di beranda tanpa menunggu regen.
   const providers = await getEffectiveTopupProviders();
-  // Katalog Bayar Tagihan (pascabayar) — SKU mati hasil sinkron disembunyikan.
-  const pasca = await getEffectivePascaProducts();
   return (
     <div className="container-site py-5">
       {/* Breadcrumb */}
@@ -49,9 +46,6 @@ export default async function TopUpPage() {
       </nav>
 
       <TopUpHome providers={providers} />
-
-      {/* Panel Bayar Tagihan (pascabayar) — cek tagihan → bayar QRIS/WA */}
-      <BayarTagihan products={pasca} />
     </div>
   );
 }
