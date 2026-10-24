@@ -360,32 +360,38 @@ export default function BayarTagihan({
         ) : (
           /* ---------- Pilih produk + nomor pelanggan ---------- */
           <>
-            {/* Chip kategori */}
-            <div className="mt-4 flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Kategori bayar tagihan">
+            {/* Chip kategori — kolom ke bawah: mobile 2 kolom x 5 baris,
+             *  sm 3 kolom x 4 baris, lg 4 kolom x 3 baris (3 ke bawah
+             *  sampingnya 3 ke bawah dst.) — tanpa scroll horizontal. */}
+            <div
+              className="mt-4 grid grid-flow-col grid-rows-5 gap-2 sm:grid-rows-4 lg:grid-rows-3"
+              role="tablist"
+              aria-label="Kategori bayar tagihan"
+            >
               <button
                 type="button"
                 onClick={() => setCat("all")}
-                className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+                className={`flex min-w-0 items-center justify-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold transition-colors ${
                   cat === "all"
                     ? "bg-brand text-white"
                     : "border border-gray-200 bg-white text-muted hover:border-brand hover:text-brand"
                 }`}
               >
-                Semua
+                <span className="truncate">Semua</span>
               </button>
               {cats.map((c) => (
                 <button
                   key={c.id}
                   type="button"
                   onClick={() => setCat(c.id)}
-                  className={`flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+                  className={`flex min-w-0 items-center justify-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold transition-colors ${
                     cat === c.id
                       ? "bg-brand text-white"
                       : "border border-gray-200 bg-white text-muted hover:border-brand hover:text-brand"
                   }`}
                 >
-                  {categoryIcon(c.id)}
-                  {c.label}
+                  <span className="shrink-0">{categoryIcon(c.id)}</span>
+                  <span className="truncate">{c.label}</span>
                 </button>
               ))}
             </div>
