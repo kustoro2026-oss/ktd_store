@@ -126,7 +126,17 @@ export async function sendWaTemplateParam(
           components: [
             {
               type: "body",
-              parameters: [{ type: "text", text: param }],
+              // Param multi-baris ditolak Meta #132018 (newline/tab) —
+              // sterilkan dulu sebelum dikirim.
+              parameters: [
+                {
+                  type: "text",
+                  text: param
+                    .replace(/[\r\n\t]+/g, " ")
+                    .replace(/ {2,}/g, " ")
+                    .trim(),
+                },
+              ],
             },
           ],
         },
